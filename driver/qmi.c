@@ -302,14 +302,6 @@ int libeuicc_qmi_apdu_open_logical_channel(struct qmi_data *qmi_priv, const uint
     for (int i = 0; i < aid_len; i++)
         g_array_append_val(aid_data, aid[i]);
 
-    // debug print aid
-    printf("aid: ");
-    for (int i = 0; i < aid_len; i++)
-    {
-        printf("%02X", aid[i]);
-    }
-    printf("\n");
-
     QmiMessageUimOpenLogicalChannelInput *input;
     input = qmi_message_uim_open_logical_channel_input_new();
     qmi_message_uim_open_logical_channel_input_set_slot(input, qmi_priv->uimSlot, NULL);

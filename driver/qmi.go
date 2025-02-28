@@ -23,7 +23,7 @@ type qmi struct {
 	qmi    *C.struct_qmi_data
 }
 
-func NewQMI(device string, uimSlot int) (apdu.SmartCardChannel, error) {
+func NewQMI(device string, uimSlot uint8) (apdu.SmartCardChannel, error) {
 	q := (*C.struct_qmi_data)(C.malloc(C.sizeof_struct_qmi_data))
 	if q == nil {
 		return nil, errors.New("failed to allocate memory for QMI data")
