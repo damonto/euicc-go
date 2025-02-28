@@ -71,7 +71,7 @@ func (q *qmi) OpenLogicalChannel(aid []byte) (byte, error) {
 	cAID := C.CBytes(aid)
 	defer C.free(unsafe.Pointer(cAID))
 	channel := C.libeuicc_qmi_apdu_open_logical_channel(q.qmi, (*C.uchar)(cAID), C.uint8_t(len(aid)))
-	if channel == 0 {
+	if channel < 1 {
 		return 0, errors.New("failed to open logical channel")
 	}
 	return byte(channel), nil
