@@ -1,12 +1,16 @@
 package sgp22
 
-import "encoding/hex"
+import (
+	"bytes"
+	"encoding/hex"
+)
 
 type HexString []byte
 
 func (h *HexString) MarshalText() (text []byte, err error) {
 	text = make([]byte, hex.EncodedLen(len(*h)))
 	hex.Encode(text, *h)
+	text = bytes.ToUpper(text)
 	return
 }
 
