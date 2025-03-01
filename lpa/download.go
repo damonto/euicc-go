@@ -51,10 +51,16 @@ func (c *Client) DownloadProfile(ctx context.Context, activationCode *Activation
 		_, err := c.cancelSession(activationCode.SMDP, clientResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
 		return nil, err
 	}
+	
 	if ccRequired {
 		activationCode.ConfirmationCode = <-handler.ConfirmationCode()
 		if activationCode.ConfirmationCode == "" {
-			return nil, errors.New("confirmation code is required")
+			return nil, c.handleDownloadError(
+				activationCode,
+				clientResponse.TransactionID,
+				errors.New("confirmation code is required"),
+				sgp22.CancelSessionReasonEndUserRejection,
+			)
 		}
 	}
 
