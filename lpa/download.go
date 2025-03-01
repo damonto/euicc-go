@@ -53,6 +53,9 @@ func (c *Client) DownloadProfile(ctx context.Context, activationCode *Activation
 	}
 	if ccRequired {
 		activationCode.ConfirmationCode = <-handler.ConfirmationCode()
+		if activationCode.ConfirmationCode == "" {
+			return nil, errors.New("confirmation code is required")
+		}
 	}
 
 	handler.Progress(DownloadProgressAuthenticateServer)
