@@ -22,7 +22,7 @@ type transmitter struct {
 	card io.ReadWriteCloser
 }
 
-func NewTransmitter(channel apdu.SmartCardChannel, MTU int) (Transmitter, error) {
+func NewTransmitter(channel apdu.SmartCardChannel, AID []byte, MTU int) (Transmitter, error) {
 	t, err := apdu.NewTransmitter(channel, AID, MTU)
 	if err != nil {
 		return nil, err
