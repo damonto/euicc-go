@@ -9,24 +9,24 @@ import (
 )
 
 type Transmitter struct {
-	MTU            int
+	MSS            int
 	mutex          sync.Mutex
 	channel        SmartCardChannel
 	logicalChannel byte
 	response       *bytes.Buffer
 }
 
-func NewTransmitter(channel SmartCardChannel, aid []byte, MTU int) (io.ReadWriteCloser, error) {
+func NewTransmitter(channel SmartCardChannel, AID []byte, MSS int) (io.ReadWriteCloser, error) {
 	var err error
 	if err = channel.Connect(); err != nil {
 		return nil, err
 	}
 	var transmitter Transmitter
 	transmitter.channel = channel
-	if transmitter.logicalChannel, err = channel.OpenLogicalChannel(aid); err != nil {
+	if transmitter.logicalChannel, err = channel.OpenLogicalChannel(AID); err != nil {
 		return nil, err
 	}
-	transmitter.MTU = MTU
+	transmitter.MSS = MSS
 	return &transmitter, nil
 }
 
@@ -38,8 +38,8 @@ func (t *Transmitter) Write(command []byte) (n int, err error) {
 	t.response = new(bytes.Buffer)
 	request := Request{CLA: 0x80, INS: 0xE2}
 	var response Response
-	chunks := byte(len(command) / t.MTU)
-	for request.Data = range slices.Chunk(command, t.MTU) {
+	chunks := byte(len(command) / t.MSS)
+	for request.Data = range slices.Chunk(command, t.MSS) {
 		if request.P1 = 0x11; request.P2 == chunks {
 			request.P1 = 0x91
 		}
