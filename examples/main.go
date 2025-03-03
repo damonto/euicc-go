@@ -44,7 +44,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	transmitter, err := driver.NewTransmitter(pcsc, 240)
+	transmitter, err := driver.NewTransmitter(pcsc, driver.SGP22AID, 240)
 	if err != nil {
 		panic(err)
 	}
