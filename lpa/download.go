@@ -51,7 +51,7 @@ func (c *Client) DownloadProfile(ctx context.Context, activationCode *Activation
 		_, err := c.cancelSession(activationCode.SMDP, clientResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
 		return nil, err
 	}
-	
+
 	if ccRequired {
 		activationCode.ConfirmationCode = <-handler.ConfirmationCode()
 		if activationCode.ConfirmationCode == "" {
@@ -152,7 +152,14 @@ func (c *Client) authenticateClient(activationCode *ActivationCode) (*sgp22.ES9A
 	if err != nil {
 		return response, nil, false, err
 	}
-	return response, metadata, c.needConfirmationCode(response.Signed2), nil
+	return response, metadata, c.confirmationCodeRequired(response.Signed2), nil
+}
+
+func (c *Client) confirmationCodeRequired(tlv *bertlv.TLV) bool {
+	var required bool
+	_ = tlv.First(bertlv.Universal.Primitive(1)).
+		UnmarshalValue(primitive.UnmarshalBool(&required))
+	return required
 }
 
 func (c *Client) profileMetadata(tlv *bertlv.TLV) (*sgp22.ProfileInfo, error) {
@@ -189,11 +196,4 @@ func (c *Client) cancelSession(address *url.URL, transactionID []byte, reason sg
 		return nil, err
 	}
 	return sgp22.InvokeHTTP(c.HTTP, address, cancelSessionRequest)
-}
-
-func (c *Client) needConfirmationCode(tlv *bertlv.TLV) bool {
-	var required bool
-	_ = tlv.First(bertlv.Universal.Primitive(1)).
-		UnmarshalValue(primitive.UnmarshalBool(&required))
-	return required
 }
