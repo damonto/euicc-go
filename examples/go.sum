@@ -1,7 +1,5 @@
-github.com/damonto/libeuicc-go v0.0.0-20241014073658-6122c976bf1b h1:4ZW0AwnTuxD1L318A8lzTcwGF3VlvbhCg6KRZAX/gLE=
-github.com/damonto/libeuicc-go v0.0.0-20241014073658-6122c976bf1b/go.mod h1:/E4KPGI5yUzcgI0TROolgVCG0o3vf9bim/pAuCqipN8=
-github.com/damonto/libeuicc-go/driver/qmi v0.0.0-20250109023509-4f4c20bbcbc8 h1:OIJ7/eF5XDJtcRByZwPqk/76d0MIvQXhe4MnkDqEIUg=
-github.com/damonto/libeuicc-go/driver/qmi v0.0.0-20250109023509-4f4c20bbcbc8/go.mod h1:mFoeLMLxkkmPTmn/THvv7cLE8amgpZwiNL+sbh8pmFA=
+github.com/damonto/euicc-go/driver/qmi v0.0.0-20250304050158-fe40b4ef26c8 h1:8iFsLPCN05ped+vBcPFdIsMO556W7Sh53MB9gT/5NZ0=
+github.com/damonto/euicc-go/driver/qmi v0.0.0-20250304050158-fe40b4ef26c8/go.mod h1:mZTHcC9r/mfw3GaILYyAHkrSCdEuSpQvhKTN9zrjiXo=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
