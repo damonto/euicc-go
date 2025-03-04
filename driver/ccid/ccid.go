@@ -21,7 +21,7 @@ type CCIDReader struct {
 }
 
 func New() (CCID, error) {
-	pcsc := &CCIDReader{}
+	ccid := &CCIDReader{}
 	if err := goscard.Initialize(goscard.NewDefaultLogger(goscard.LogLevelNone)); err != nil {
 		return nil, err
 	}
@@ -30,17 +30,17 @@ func New() (CCID, error) {
 	if err != nil {
 		return nil, err
 	}
-	pcsc.context = context
-	readers, err := pcsc.ListReaders()
+	ccid.context = context
+	readers, err := ccid.ListReaders()
 	if err != nil {
 		return nil, err
 	}
-	pcsc.SetReader(readers[0])
-	return pcsc, nil
+	ccid.SetReader(readers[0])
+	return ccid, nil
 }
 
-func (p *CCIDReader) ListReaders() ([]string, error) {
-	readers, _, err := p.context.ListReaders(nil)
+func (c *CCIDReader) ListReaders() ([]string, error) {
+	readers, _, err := c.context.ListReaders(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -50,62 +50,62 @@ func (p *CCIDReader) ListReaders() ([]string, error) {
 	return readers, nil
 }
 
-func (p *CCIDReader) SetReader(reader string) {
-	p.reader = reader
+func (c *CCIDReader) SetReader(reader string) {
+	c.reader = reader
 }
 
-func (p *CCIDReader) Connect() error {
-	card, _, err := p.context.Connect(p.reader, goscard.SCardShareExclusive, goscard.SCardProtocolT0)
+func (c *CCIDReader) Connect() error {
+	card, _, err := c.context.Connect(c.reader, goscard.SCardShareExclusive, goscard.SCardProtocolT0)
 	if err != nil {
 		return err
 	}
-	p.card = card
-	_, err = p.Transmit([]byte{0x80, 0xAA, 0x00, 0x00, 0x0A, 0xA9, 0x08, 0x81, 0x00, 0x82, 0x01, 0x01, 0x83, 0x01, 0x07})
+	c.card = card
+	_, err = c.Transmit([]byte{0x80, 0xAA, 0x00, 0x00, 0x0A, 0xA9, 0x08, 0x81, 0x00, 0x82, 0x01, 0x01, 0x83, 0x01, 0x07})
 	return err
 }
 
-func (p *CCIDReader) Disconnect() error {
+func (c *CCIDReader) Disconnect() error {
 	defer goscard.Finalize()
-	if _, err := p.card.Disconnect(goscard.SCardLeaveCard); err != nil {
+	if _, err := c.card.Disconnect(goscard.SCardLeaveCard); err != nil {
 		return err
 	}
-	if _, err := p.context.Release(); err != nil {
+	if _, err := c.context.Release(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *CCIDReader) Transmit(command []byte) ([]byte, error) {
-	resp, _, err := p.card.Transmit(&goscard.SCardIoRequestT0, command, nil)
+func (c *CCIDReader) Transmit(command []byte) ([]byte, error) {
+	resp, _, err := c.card.Transmit(&goscard.SCardIoRequestT0, command, nil)
 	if err != nil {
 		return nil, err
 	}
 	return resp, nil
 }
 
-func (p *CCIDReader) OpenLogicalChannel(aid []byte) (byte, error) {
-	channel, err := p.Transmit([]byte{0x00, 0x70, 0x00, 0x00, 0x01})
+func (c *CCIDReader) OpenLogicalChannel(aid []byte) (byte, error) {
+	channel, err := c.Transmit([]byte{0x00, 0x70, 0x00, 0x00, 0x01})
 	if err != nil {
 		return 0, err
 	}
 	if channel[1] != 0x90 {
 		return 0, errors.New("failed to open logical channel")
 	}
-	p.channel = channel[0]
-	command := []byte{p.channel, 0xA4, 0x04, 0x00, byte(len(aid))}
+	c.channel = channel[0]
+	command := []byte{c.channel, 0xA4, 0x04, 0x00, byte(len(aid))}
 	command = append(command, aid...)
-	sw, err := p.Transmit(command)
+	sw, err := c.Transmit(command)
 	if err != nil {
 		return 0, err
 	}
 	if sw[len(sw)-2] != 0x90 && sw[len(sw)-2] != 0x61 {
 		return 0, errors.New("failed to select AID")
 	}
-	return p.channel, nil
+	return c.channel, nil
 }
 
-func (p *CCIDReader) CloseLogicalChannel(channel byte) error {
+func (c *CCIDReader) CloseLogicalChannel(channel byte) error {
 	command := []byte{0x00, 0x70, 0x80, channel, 0x00}
-	_, err := p.Transmit(command)
+	_, err := c.Transmit(command)
 	return err
 }
