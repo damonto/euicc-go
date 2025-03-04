@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/damonto/euicc-go/driver"
-	"github.com/damonto/euicc-go/driver/qmi"
+	"github.com/damonto/euicc-go/driver/mbim"
 	sgp22http "github.com/damonto/euicc-go/http"
 	"github.com/damonto/euicc-go/lpa"
 	sgp22 "github.com/damonto/euicc-go/v2"
@@ -39,11 +39,11 @@ func NewDownloadHandler() lpa.DownloadHandler {
 
 func main() {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
-	pcsc, err := qmi.New("/dev/cdc-wdm0", 1)
+	ch, err := mbim.New("/dev/cdc-wdm0", 1)
 	if err != nil {
 		panic(err)
 	}
-	transmitter, err := driver.NewTransmitter(pcsc, driver.SGP22AID, 240)
+	transmitter, err := driver.NewTransmitter(ch, driver.SGP22AID, 240)
 	if err != nil {
 		panic(err)
 	}
