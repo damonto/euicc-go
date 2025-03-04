@@ -1,13 +1,12 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"time"
 
 	"github.com/damonto/euicc-go/driver"
+	"github.com/damonto/euicc-go/driver/qmi"
 	sgp22http "github.com/damonto/euicc-go/http"
 	"github.com/damonto/euicc-go/lpa"
 	sgp22 "github.com/damonto/euicc-go/v2"
@@ -40,7 +39,7 @@ func NewDownloadHandler() lpa.DownloadHandler {
 
 func main() {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
-	pcsc, err := driver.NewQMI("/dev/cdc-wdm0", 1)
+	pcsc, err := qmi.New("/dev/cdc-wdm0", 1)
 	if err != nil {
 		panic(err)
 	}
@@ -70,24 +69,24 @@ func main() {
 	// 	return
 	// }
 
-	// eid, _ := client.EID()
-	// fmt.Println(eid)
+	eid, _ := client.EID()
+	fmt.Println(eid)
 	// for _, child := range tlv.First(bertlv.ContextSpecific.Constructed(10)).Children {
 	// 	fmt.Println(hex.EncodeToString(child.Value))
 	// }
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// ctx, cancel := context.WithCancel(context.Background())
+	// defer cancel()
 
-	installResult, err := client.DownloadProfile(ctx, &lpa.ActivationCode{
-		SMDP:       &url.URL{Scheme: "https", Host: "h3a.prod.ondemandconnectivity.com"},
-		MatchingID: "8DF4634669133B4530DD05ED89804183CD797ACEF3DAD46DAFF2B942E36B46A1",
-		IMEI:       "356938035643809",
-	}, NewDownloadHandler())
-	if err != nil {
-		panic(err)
-	}
-	if installResult != nil {
-		fmt.Println(installResult.ISDPAID(), installResult.Notification)
-	}
+	// installResult, err := client.DownloadProfile(ctx, &lpa.ActivationCode{
+	// 	SMDP:       &url.URL{Scheme: "https", Host: "h3a.prod.ondemandconnectivity.com"},
+	// 	MatchingID: "8DF4634669133B4530DD05ED89804183CD797ACEF3DAD46DAFF2B942E36B46A1",
+	// 	IMEI:       "356938035643809",
+	// }, NewDownloadHandler())
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// if installResult != nil {
+	// 	fmt.Println(installResult.ISDPAID(), installResult.Notification)
+	// }
 }

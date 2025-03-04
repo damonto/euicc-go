@@ -1,6 +1,6 @@
 //go:build linux
 
-package driver
+package qmi
 
 /*
 #cgo pkg-config: glib-2.0 qmi-glib
@@ -23,13 +23,13 @@ type qmi struct {
 	qmi    *C.struct_qmi_data
 }
 
-func NewQMI(device string, uimSlot uint8) (apdu.SmartCardChannel, error) {
+func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 	q := (*C.struct_qmi_data)(C.malloc(C.sizeof_struct_qmi_data))
 	if q == nil {
 		return nil, errors.New("failed to allocate memory for QMI data")
 	}
 	C.memset(unsafe.Pointer(q), 0, C.sizeof_struct_qmi_data)
-	q.uimSlot = C.uint8_t(uimSlot)
+	q.uim_slot = C.uint8_t(slot)
 	return &qmi{
 		device: device,
 		qmi:    q,
@@ -39,14 +39,14 @@ func NewQMI(device string, uimSlot uint8) (apdu.SmartCardChannel, error) {
 func (q *qmi) Connect() error {
 	cDevice := C.CString(q.device)
 	defer C.free(unsafe.Pointer(cDevice))
-	if C.libeuicc_qmi_apdu_connect(q.qmi, cDevice) == -1 {
+	if C.go_qmi_apdu_connect(q.qmi, cDevice) == -1 {
 		return errors.New("failed to connect to QMI")
 	}
 	return nil
 }
 
 func (q *qmi) Disconnect() error {
-	C.libeuicc_qmi_apdu_disconnect(q.qmi)
+	C.go_qmi_apdu_disconnect(q.qmi)
 	if q.qmi != nil {
 		C.free(unsafe.Pointer(q.qmi))
 		q.qmi = nil
@@ -59,7 +59,7 @@ func (q *qmi) Transmit(command []byte) ([]byte, error) {
 	var cResponse *C.uint8_t
 	var cResponseLen C.uint32_t
 	defer C.free(unsafe.Pointer(cCommand))
-	if C.libeuicc_qmi_apdu_transmit(q.qmi, &cResponse, &cResponseLen, (*C.uchar)(cCommand), C.uint(len(command))) == -1 {
+	if C.go_qmi_apdu_transmit(q.qmi, &cResponse, &cResponseLen, (*C.uchar)(cCommand), C.uint(len(command))) == -1 {
 		return nil, errors.New("failed to transmit APDU")
 	}
 	defer C.free(unsafe.Pointer(cResponse))
@@ -70,7 +70,7 @@ func (q *qmi) Transmit(command []byte) ([]byte, error) {
 func (q *qmi) OpenLogicalChannel(aid []byte) (byte, error) {
 	cAID := C.CBytes(aid)
 	defer C.free(unsafe.Pointer(cAID))
-	channel := C.libeuicc_qmi_apdu_open_logical_channel(q.qmi, (*C.uchar)(cAID), C.uint8_t(len(aid)))
+	channel := C.go_qmi_apdu_open_logical_channel(q.qmi, (*C.uchar)(cAID), C.uint8_t(len(aid)))
 	if channel < 1 {
 		return 0, errors.New("failed to open logical channel")
 	}
@@ -78,7 +78,7 @@ func (q *qmi) OpenLogicalChannel(aid []byte) (byte, error) {
 }
 
 func (q *qmi) CloseLogicalChannel(channel byte) error {
-	if C.libeuicc_qmi_apdu_close_logical_channel(q.qmi, C.uint8_t(channel)) == -1 {
+	if C.go_qmi_apdu_close_logical_channel(q.qmi, C.uint8_t(channel)) == -1 {
 		return errors.New("failed to close logical channel")
 	}
 	return nil

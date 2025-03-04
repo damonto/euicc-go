@@ -1,4 +1,4 @@
-package driver
+package ccid
 
 import (
 	"errors"
@@ -7,21 +7,21 @@ import (
 	"github.com/damonto/euicc-go/apdu"
 )
 
-type PCSC interface {
+type CCID interface {
 	apdu.SmartCardChannel
 	ListReaders() ([]string, error)
 	SetReader(reader string)
 }
 
-type PCSCReader struct {
+type CCIDReader struct {
 	context goscard.Context
 	card    goscard.Card
 	channel byte
 	reader  string
 }
 
-func NewPCSC() (PCSC, error) {
-	pcsc := &PCSCReader{}
+func New() (CCID, error) {
+	pcsc := &CCIDReader{}
 	if err := goscard.Initialize(goscard.NewDefaultLogger(goscard.LogLevelNone)); err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func NewPCSC() (PCSC, error) {
 	return pcsc, nil
 }
 
-func (p *PCSCReader) ListReaders() ([]string, error) {
+func (p *CCIDReader) ListReaders() ([]string, error) {
 	readers, _, err := p.context.ListReaders(nil)
 	if err != nil {
 		return nil, err
@@ -50,11 +50,11 @@ func (p *PCSCReader) ListReaders() ([]string, error) {
 	return readers, nil
 }
 
-func (p *PCSCReader) SetReader(reader string) {
+func (p *CCIDReader) SetReader(reader string) {
 	p.reader = reader
 }
 
-func (p *PCSCReader) Connect() error {
+func (p *CCIDReader) Connect() error {
 	card, _, err := p.context.Connect(p.reader, goscard.SCardShareExclusive, goscard.SCardProtocolT0)
 	if err != nil {
 		return err
@@ -64,7 +64,7 @@ func (p *PCSCReader) Connect() error {
 	return err
 }
 
-func (p *PCSCReader) Disconnect() error {
+func (p *CCIDReader) Disconnect() error {
 	defer goscard.Finalize()
 	if _, err := p.card.Disconnect(goscard.SCardLeaveCard); err != nil {
 		return err
@@ -75,7 +75,7 @@ func (p *PCSCReader) Disconnect() error {
 	return nil
 }
 
-func (p *PCSCReader) Transmit(command []byte) ([]byte, error) {
+func (p *CCIDReader) Transmit(command []byte) ([]byte, error) {
 	resp, _, err := p.card.Transmit(&goscard.SCardIoRequestT0, command, nil)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (p *PCSCReader) Transmit(command []byte) ([]byte, error) {
 	return resp, nil
 }
 
-func (p *PCSCReader) OpenLogicalChannel(aid []byte) (byte, error) {
+func (p *CCIDReader) OpenLogicalChannel(aid []byte) (byte, error) {
 	channel, err := p.Transmit([]byte{0x00, 0x70, 0x00, 0x00, 0x01})
 	if err != nil {
 		return 0, err
@@ -104,7 +104,7 @@ func (p *PCSCReader) OpenLogicalChannel(aid []byte) (byte, error) {
 	return p.channel, nil
 }
 
-func (p *PCSCReader) CloseLogicalChannel(channel byte) error {
+func (p *CCIDReader) CloseLogicalChannel(channel byte) error {
 	command := []byte{0x00, 0x70, 0x80, channel, 0x00}
 	_, err := p.Transmit(command)
 	return err
