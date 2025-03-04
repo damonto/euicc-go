@@ -7,7 +7,6 @@
 
 struct mbim_data
 {
-    const char *device_path;
     int last_channel_id;
     gboolean use_proxy;
     guint32 uim_slot;
