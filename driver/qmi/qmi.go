@@ -47,11 +47,8 @@ func (q *qmi) Connect() error {
 }
 
 func (q *qmi) Disconnect() error {
+	defer C.free(unsafe.Pointer(q.qmi))
 	C.go_qmi_apdu_disconnect(q.qmi)
-	if q.qmi != nil {
-		C.free(unsafe.Pointer(q.qmi))
-		q.qmi = nil
-	}
 	return nil
 }
 

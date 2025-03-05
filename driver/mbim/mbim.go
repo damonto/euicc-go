@@ -47,11 +47,8 @@ func (m *mbim) Connect() error {
 }
 
 func (m *mbim) Disconnect() error {
+	defer C.free(unsafe.Pointer(m.mbim))
 	C.go_mbim_apdu_disconnect(m.mbim)
-	if m.mbim != nil {
-		C.free(unsafe.Pointer(m.mbim))
-		m.mbim = nil
-	}
 	return nil
 }
 
