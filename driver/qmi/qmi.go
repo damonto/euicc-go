@@ -29,6 +29,7 @@ func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 		return nil, errors.New("failed to allocate memory for QMI data")
 	}
 	C.memset(unsafe.Pointer(q), 0, C.sizeof_struct_qmi_data)
+	// QMI uses 1-based indexing
 	q.uim_slot = C.uint8_t(slot)
 	return &qmi{
 		device: device,
@@ -40,7 +41,7 @@ func (q *qmi) Connect() error {
 	cDevice := C.CString(q.device)
 	defer C.free(unsafe.Pointer(cDevice))
 	if C.go_qmi_apdu_connect(q.qmi, cDevice) == -1 {
-		return errors.New("failed to connect to QMI")
+		return errors.New("failed to connect to QMI device")
 	}
 	return nil
 }

@@ -1,7 +1,3 @@
-github.com/damonto/euicc-go v0.0.0-20250304064401-cce9769bc8f1 h1:oU5qVHgnF6dBpQTA0KjB6BI/lEpWQFBaS+Oz8+n8P/I=
-github.com/damonto/euicc-go v0.0.0-20250304064401-cce9769bc8f1/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
-github.com/damonto/euicc-go/driver/mbim v0.0.0-20250304064401-cce9769bc8f1 h1:Cs27l7IxIeKmXi9PSQBH06hIChdKFm0WHPPEum/eWgA=
-github.com/damonto/euicc-go/driver/mbim v0.0.0-20250304064401-cce9769bc8f1/go.mod h1:KrGRv2MuBNzF4yma7lAN7A1rB/QlpaT2gVa0St4IqP4=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

@@ -29,7 +29,8 @@ func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 		return nil, errors.New("failed to allocate memory for MBIM data")
 	}
 	C.memset(unsafe.Pointer(m), 0, C.sizeof_struct_mbim_data)
-	m.uim_slot = C.guint32(slot)
+	// MBIM uses 0-based indexing
+	m.uim_slot = C.guint32(slot - 1)
 	return &mbim{
 		device: device,
 		mbim:   m,
@@ -40,7 +41,7 @@ func (m *mbim) Connect() error {
 	cDevice := C.CString(m.device)
 	defer C.free(unsafe.Pointer(cDevice))
 	if C.go_mbim_apdu_connect(m.mbim, cDevice) == -1 {
-		return errors.New("failed to connect to QMI")
+		return errors.New("failed to connect to MBIM device")
 	}
 	return nil
 }
