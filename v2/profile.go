@@ -33,8 +33,8 @@ func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) (err error) {
 	if profileClass := tlv.First(bertlv.ContextSpecific.Primitive(21)); profileClass != nil {
 		p.ProfileClass = ProfileClass(profileClass.Value[0])
 	}
-	if ISDPAID := tlv.First(bertlv.Application.Primitive(15)); ISDPAID != nil {
-		p.ISDPAID = ISDPAID.Value
+	if id := tlv.First(bertlv.Application.Primitive(15)); id != nil {
+		p.ISDPAID = id.Value
 	}
 	if nickname := tlv.First(bertlv.ContextSpecific.Primitive(16)); nickname != nil {
 		p.ProfileNickname = string(nickname.Value)

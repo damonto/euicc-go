@@ -17,24 +17,34 @@ import (
 type ICCID []byte
 
 func NewICCID(iccid string) (ICCID, error) {
-	return GSMBCDEncode[ICCID](iccid)
+	return binaryCodedDecimalEncode[ICCID](iccid)
 }
 
 func (id ICCID) String() string {
-	return GSMBCDDecode(id)
+	return binaryCodedDecimalDecode(id)
 }
 
+// endregion
+
+// region IMEI
+
+// IMEI represents the International Mobile Equipment Identity.
+// The format is GSM-BCD
+//
+// See https://en.wikipedia.org/wiki/Binary-coded_decimal
 type IMEI []byte
 
 func NewIMEI(imei string) (IMEI, error) {
-	return GSMBCDEncode[IMEI](imei)
+	return binaryCodedDecimalEncode[IMEI](imei)
 }
 
 func (imei IMEI) String() string {
-	return GSMBCDDecode(imei)
+	return binaryCodedDecimalDecode(imei)
 }
 
-func GSMBCDEncode[T IMEI | ICCID](value string) (T, error) {
+// endregion
+
+func binaryCodedDecimalEncode[T IMEI | ICCID](value string) (T, error) {
 	for _, r := range value {
 		if (r < '0' || r > '9') && !(r == 'f' || r == 'F') {
 			return nil, errors.New("invalid value")
@@ -44,26 +54,24 @@ func GSMBCDEncode[T IMEI | ICCID](value string) (T, error) {
 		value += "F"
 	}
 	id, _ := hex.DecodeString(value)
-	for index := 0; index < len(id); index++ {
+	for index := range id {
 		id[index] = id[index]>>4 | id[index]<<4
 	}
 	return id, nil
 }
 
-func GSMBCDDecode(value []byte) string {
-	iccid := make([]byte, len(value))
+func binaryCodedDecimalDecode(value []byte) string {
+	id := make([]byte, len(value))
 	var index int
-	for index = 0; index < len(value); index++ {
-		iccid[index] = value[index]>>4 | value[index]<<4
+	for index = range value {
+		id[index] = value[index]>>4 | value[index]<<4
 	}
-	points := hex.EncodeToString(iccid)
+	points := hex.EncodeToString(id)
 	if index = strings.IndexByte(points, 'f'); index != -1 {
 		points = points[:index]
 	}
 	return points
 }
-
-// endregion
 
 // region ISD-P Application Identifier
 
@@ -71,7 +79,7 @@ func GSMBCDDecode(value []byte) string {
 type ISDPAID []byte
 
 func (id ISDPAID) String() string {
-	return hex.EncodeToString(id)
+	return strings.ToUpper(hex.EncodeToString(id))
 }
 
 // endregion
