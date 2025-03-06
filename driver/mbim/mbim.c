@@ -230,7 +230,7 @@ int go_mbim_apdu_connect(struct mbim_data *mbim_priv, char *device_path)
 
     MbimDeviceOpenFlags open_flags = MBIM_DEVICE_OPEN_FLAGS_NONE;
     if (mbim_priv->use_proxy)
-        open_flags |= MBIM_DEVICE_OPEN_FLAGS_NONE;
+        open_flags |= MBIM_DEVICE_OPEN_FLAGS_PROXY;
 
     mbim_device_open_sync(mbim_priv->device, open_flags, mbim_priv->context, &error);
     if (error)
@@ -371,6 +371,8 @@ int go_mbim_apdu_close_logical_channel(struct mbim_data *mbim_priv, uint8_t chan
 
     if (channel == mbim_priv->last_channel_id)
         mbim_priv->last_channel_id = -1;
+
+    return 0;
 }
 
 void go_mbim_apdu_disconnect(struct mbim_data *mbim_priv)
