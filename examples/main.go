@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/damonto/euicc-go/driver"
-	"github.com/damonto/euicc-go/driver/mbim"
+	"github.com/damonto/euicc-go/driver/ccid"
 	sgp22http "github.com/damonto/euicc-go/http"
 	"github.com/damonto/euicc-go/lpa"
 	sgp22 "github.com/damonto/euicc-go/v2"
@@ -39,7 +39,7 @@ func NewDownloadHandler() lpa.DownloadHandler {
 
 func main() {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
-	ch, err := mbim.New("/dev/cdc-wdm0", 1)
+	ch, err := ccid.New()
 	if err != nil {
 		panic(err)
 	}
@@ -79,8 +79,8 @@ func main() {
 	// defer cancel()
 
 	// installResult, err := client.DownloadProfile(ctx, &lpa.ActivationCode{
-	// 	SMDP:       &url.URL{Scheme: "https", Host: "h3a.prod.ondemandconnectivity.com"},
-	// 	MatchingID: "8DF4634669133B4530DD05ED89804183CD797ACEF3DAD46DAFF2B942E36B46A1",
+	// 	SMDP:       &url.URL{Scheme: "https", Host: "abc.smdp.com"},
+	// 	MatchingID: "123131313131",
 	// 	IMEI:       "356938035643809",
 	// }, NewDownloadHandler())
 	// if err != nil {

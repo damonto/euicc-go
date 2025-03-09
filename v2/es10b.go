@@ -127,7 +127,7 @@ func (r *LoadBoundProfilePackageResponse) Valid() error {
 	}
 	return &LoadBoundProfilePackageError{
 		BPPCommandID: result.First(bertlv.ContextSpecific.Primitive(0)).Value[0],
-		ErrorReason:  result.First(bertlv.ContextSpecific.Primitive(1)).Value[1],
+		ErrorReason:  result.First(bertlv.ContextSpecific.Primitive(1)).Value[0],
 	}
 }
 

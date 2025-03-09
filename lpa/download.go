@@ -97,6 +97,10 @@ func (c *Client) install(bppResponse *sgp22.ES9BoundProfilePackageResponse) (*sg
 		if err != nil {
 			return nil, err
 		}
+		// If the response is not empty, it means the installation is completed.
+		if len(sw) > 2 {
+			break
+		}
 	}
 	var tlv bertlv.TLV
 	if err := tlv.UnmarshalBinary(sw); err != nil {
