@@ -40,7 +40,7 @@ func (r *PrepareDownloadRequest) MarshalBERTLV() (*bertlv.TLV, error) {
 			return
 		}
 		if hashedConfirmationCode != nil {
-			if !yield(bertlv.NewValue(bertlv.Application.Primitive(0), hashedConfirmationCode)) {
+			if !yield(bertlv.NewValue(bertlv.Universal.Primitive(4), hashedConfirmationCode)) {
 				return
 			}
 		}

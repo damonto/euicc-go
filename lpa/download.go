@@ -52,7 +52,7 @@ func (c *Client) DownloadProfile(ctx context.Context, activationCode *Activation
 		return nil, err
 	}
 
-	if ccRequired {
+	if ccRequired && activationCode.ConfirmationCode == "" {
 		activationCode.ConfirmationCode = <-handler.ConfirmationCode()
 		if activationCode.ConfirmationCode == "" {
 			return nil, c.handleDownloadError(
