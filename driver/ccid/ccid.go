@@ -70,11 +70,8 @@ func (c *CCIDReader) Disconnect() error {
 }
 
 func (c *CCIDReader) Transmit(command []byte) ([]byte, error) {
-	resp, _, err := c.card.Transmit(&goscard.SCardIoRequestT0, command, nil)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	r, _, err := c.card.Transmit(&goscard.SCardIoRequestT0, command, nil)
+	return r, err
 }
 
 func (c *CCIDReader) OpenLogicalChannel(aid []byte) (byte, error) {
@@ -99,7 +96,6 @@ func (c *CCIDReader) OpenLogicalChannel(aid []byte) (byte, error) {
 }
 
 func (c *CCIDReader) CloseLogicalChannel(channel byte) error {
-	command := []byte{0x00, 0x70, 0x80, channel, 0x00}
-	_, err := c.Transmit(command)
+	_, err := c.Transmit([]byte{0x00, 0x70, 0x80, channel, 0x00})
 	return err
 }
