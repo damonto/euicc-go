@@ -63,7 +63,7 @@ func (n *NotificationMetadata) UnmarshalBERTLV(tlv *bertlv.TLV) (err error) {
 	*n = NotificationMetadata{
 		Address: string(tlv.First(bertlv.Universal.Primitive(12)).Value),
 	}
-	if err = primitive.UnmarshalInt(&n.SequenceNumber).UnmarshalBinary(tlv.First(bertlv.ContextSpecific.Primitive(0)).Value); err != nil {
+	if err = tlv.First(bertlv.ContextSpecific.Primitive(0)).UnmarshalValue(primitive.UnmarshalInt(&n.SequenceNumber)); err != nil {
 		return err
 	}
 	if iccid := tlv.First(bertlv.Application.Primitive(26)); iccid != nil {
