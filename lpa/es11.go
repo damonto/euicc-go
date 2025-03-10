@@ -3,18 +3,20 @@ package lpa
 import (
 	"net/url"
 
-	"github.com/damonto/euicc-go/v2"
+	sgp22 "github.com/damonto/euicc-go/v2"
 )
 
 // Discovery discovers the downloadable profiles from SM-DS.
 //
 // See https://aka.pw/sgp22/v2.5#page=212 (Section 5.8.2, ES11.AuthenticateClient)
-func (c *Client) Discovery(address *url.URL) ([]*sgp22.EventEntry, error) {
+func (c *Client) Discovery(address *url.URL, IMEI []byte) ([]*sgp22.EventEntry, error) {
 	response, err := c.InitiateAuthentication(address)
 	if err != nil {
 		return nil, err
 	}
-	request, err := sgp22.InvokeAPDU(c.APDU, response.CardRequest())
+	cardRequest := response.CardRequest()
+	cardRequest.IMEI = IMEI
+	request, err := sgp22.InvokeAPDU(c.APDU, cardRequest)
 	if err != nil {
 		return nil, err
 	}
