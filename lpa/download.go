@@ -98,7 +98,7 @@ func (c *Client) install(bppResponse *sgp22.ES9BoundProfilePackageResponse) (*sg
 			return nil, err
 		}
 		// If the response is not empty, it means the installation is completed.
-		if len(sw) > 2 {
+		if len(sw) > 0 {
 			break
 		}
 	}
@@ -117,7 +117,7 @@ func (c *Client) install(bppResponse *sgp22.ES9BoundProfilePackageResponse) (*sg
 }
 
 func (c *Client) authenticateServer(activationCode *ActivationCode, clientResponse *sgp22.ES9AuthenticateClientResponse) (*sgp22.ES9BoundProfilePackageResponse, error) {
-	response, err := c.PrepareDownload(activationCode.SMDP, &sgp22.PrepareDownloadRequest{
+	return c.PrepareDownload(activationCode.SMDP, &sgp22.PrepareDownloadRequest{
 		TransactionID:    clientResponse.TransactionID,
 		ProfileMetadata:  clientResponse.ProfileMetadata,
 		Signed2:          clientResponse.Signed2,
@@ -125,10 +125,6 @@ func (c *Client) authenticateServer(activationCode *ActivationCode, clientRespon
 		Certificate:      clientResponse.Certificate,
 		ConfirmationCode: []byte(activationCode.ConfirmationCode),
 	})
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
 }
 
 func (c *Client) authenticateClient(activationCode *ActivationCode) (*sgp22.ES9AuthenticateClientResponse, *sgp22.ProfileInfo, bool, error) {
@@ -161,8 +157,7 @@ func (c *Client) authenticateClient(activationCode *ActivationCode) (*sgp22.ES9A
 
 func (c *Client) confirmationCodeRequired(tlv *bertlv.TLV) bool {
 	var required bool
-	_ = tlv.First(bertlv.Universal.Primitive(1)).
-		UnmarshalValue(primitive.UnmarshalBool(&required))
+	tlv.First(bertlv.Universal.Primitive(1)).UnmarshalValue(primitive.UnmarshalBool(&required))
 	return required
 }
 
