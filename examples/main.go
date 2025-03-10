@@ -43,6 +43,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	readers, err := ch.ListReaders()
+	if err != nil {
+		panic(err)
+	}
+	ch.SetReader(readers[0])
 	transmitter, err := driver.NewTransmitter(ch, driver.SGP22AID, 240)
 	if err != nil {
 		panic(err)

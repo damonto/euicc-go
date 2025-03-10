@@ -25,17 +25,11 @@ func New() (CCID, error) {
 	if err := goscard.Initialize(goscard.NewDefaultLogger(goscard.LogLevelNone)); err != nil {
 		return nil, err
 	}
-
 	context, _, err := goscard.NewContext(goscard.SCardScopeSystem, nil, nil)
 	if err != nil {
 		return nil, err
 	}
 	ccid.context = context
-	readers, err := ccid.ListReaders()
-	if err != nil {
-		return nil, err
-	}
-	ccid.SetReader(readers[0])
 	return ccid, nil
 }
 
