@@ -21,7 +21,7 @@ func UnmarshalInt[Int signedInt](value *Int) encoding.BinaryUnmarshaler {
 		var n Int
 		var index int
 		if data[0] == 0x00 || data[0] == 0xff {
-			for index = 0; index < len(data)-1; index++ {
+			for index = range len(data) - 1 {
 				if data[index] != data[0] || data[index+1]>>7 != data[0]>>7 {
 					break
 				}
@@ -31,7 +31,7 @@ func UnmarshalInt[Int signedInt](value *Int) encoding.BinaryUnmarshaler {
 		if data[0] > 0x7f {
 			n = -1
 		}
-		for index = 0; index < len(data); index++ {
+		for index = range data {
 			n = Int(int64(n) << 8)
 			n ^= Int(data[index])
 		}
@@ -49,7 +49,7 @@ func MarshalInt[Int signedInt](value Int) encoding.BinaryMarshaler {
 			data[index] = byte(value)
 			value = Int(int64(value) >> 8)
 		}
-		for index = 0; index < len(data)-1; index++ {
+		for index = range len(data) - 1 {
 			if data[index] != data[0] || data[index+1]>>7 != data[0]>>7 {
 				break
 			}

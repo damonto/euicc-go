@@ -53,15 +53,15 @@ func TestTLV_MarshalValue(t *testing.T) {
 	assert.NoError(t, tlv.MarshalValue(primitive.MarshalInt[int8](-1)))
 	assert.Equal(t, []byte{0x80, 0x01, 0xff}, tlv.Bytes())
 	var value int8
-	assert.NoError(t, tlv.UnmarshalValue(primitive.UnmarshalInt[int8](&value)))
+	assert.NoError(t, tlv.UnmarshalValue(primitive.UnmarshalInt(&value)))
 	assert.Equal(t, int8(-1), value)
 }
 
 func TestTLV_MarshalValueError(t *testing.T) {
 	tlv := NewChildren(Constructed.ContextSpecific(0))
 	var value int8
-	assert.Error(t, tlv.MarshalValue(primitive.MarshalInt[int8](value)))
-	assert.Error(t, tlv.UnmarshalValue(primitive.UnmarshalInt[int8](&value)))
+	assert.Error(t, tlv.MarshalValue(primitive.MarshalInt(value)))
+	assert.Error(t, tlv.UnmarshalValue(primitive.UnmarshalInt(&value)))
 }
 
 func TestTLV_String(t *testing.T) {

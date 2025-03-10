@@ -61,15 +61,16 @@ func (n *NotificationMetadata) UnmarshalBERTLV(tlv *bertlv.TLV) (err error) {
 		return ErrUnexpectedTag
 	}
 	*n = NotificationMetadata{
-		SequenceNumber: SequenceNumber(tlv.First(bertlv.ContextSpecific.Primitive(0)).Value[0]),
-		Address:        string(tlv.First(bertlv.Universal.Primitive(12)).Value),
+		Address: string(tlv.First(bertlv.Universal.Primitive(12)).Value),
+	}
+	if err = primitive.UnmarshalInt(&n.SequenceNumber).UnmarshalBinary(tlv.First(bertlv.ContextSpecific.Primitive(0)).Value); err != nil {
+		return err
 	}
 	if iccid := tlv.First(bertlv.Application.Primitive(26)); iccid != nil {
 		n.ICCID = ICCID(iccid.Value)
 	}
-	err = tlv.First(bertlv.ContextSpecific.Primitive(1)).UnmarshalValue(&n.ProfileManagementOperation)
-	if err != nil {
-		return
+	if err := tlv.First(bertlv.ContextSpecific.Primitive(1)).UnmarshalValue(&n.ProfileManagementOperation); err != nil {
+		return err
 	}
 	return
 }
