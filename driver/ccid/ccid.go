@@ -48,11 +48,11 @@ func (c *CCIDReader) SetReader(reader string) {
 }
 
 func (c *CCIDReader) Connect() error {
-	card, _, err := c.context.Connect(c.reader, goscard.SCardShareExclusive, goscard.SCardProtocolT0)
+	var err error
+	c.card, _, err = c.context.Connect(c.reader, goscard.SCardShareExclusive, goscard.SCardProtocolT0)
 	if err != nil {
 		return err
 	}
-	c.card = card
 	_, err = c.Transmit([]byte{0x80, 0xAA, 0x00, 0x00, 0x0A, 0xA9, 0x08, 0x81, 0x00, 0x82, 0x01, 0x01, 0x83, 0x01, 0x07})
 	return err
 }
