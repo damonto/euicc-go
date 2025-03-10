@@ -21,7 +21,6 @@ type CCIDReader struct {
 }
 
 func New() (CCID, error) {
-	ccid := &CCIDReader{}
 	if err := goscard.Initialize(goscard.NewDefaultLogger(goscard.LogLevelNone)); err != nil {
 		return nil, err
 	}
@@ -29,7 +28,7 @@ func New() (CCID, error) {
 	if err != nil {
 		return nil, err
 	}
-	ccid.context = context
+	ccid := &CCIDReader{context: context}
 	return ccid, nil
 }
 
