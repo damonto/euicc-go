@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/ElMostafaIdrassi/goscard v1.0.0
-	github.com/damonto/euicc-go v0.0.1
+	github.com/damonto/euicc-go v0.0.5
 )
 
 require (
