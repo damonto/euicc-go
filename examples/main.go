@@ -48,7 +48,7 @@ func main() {
 		panic(err)
 	}
 	ch.SetReader(readers[0])
-	transmitter, err := driver.NewTransmitter(ch, driver.SGP22AID, 240)
+	transmitter, err := driver.NewTransmitter(ch, driver.ISDRAID, 240)
 	if err != nil {
 		panic(err)
 	}
