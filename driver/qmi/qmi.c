@@ -45,6 +45,7 @@ qmi_device_new_from_path(GFile *file,
 
 gboolean
 qmi_device_open_sync(QmiDevice *device,
+                     QmiDeviceOpenFlags flags,
                      GMainContext *context,
                      GError **error)
 {
@@ -54,7 +55,7 @@ qmi_device_open_sync(QmiDevice *device,
     pusher = g_main_context_pusher_new(context);
 
     qmi_device_open(device,
-                    QMI_DEVICE_OPEN_FLAGS_PROXY,
+                    flags,
                     15,
                     NULL,
                     async_result_ready,
@@ -207,7 +208,11 @@ int go_qmi_apdu_connect(struct qmi_data *qmi_priv, char *device_path)
         return -1;
     }
 
-    qmi_device_open_sync(device, qmi_priv->context, &error);
+    QmiDeviceOpenFlags open_flags = QMI_DEVICE_OPEN_FLAGS_NONE;
+    if (qmi_priv->use_proxy)
+        open_flags |= QMI_DEVICE_OPEN_FLAGS_PROXY;
+
+    qmi_device_open_sync(device, open_flags, qmi_priv->context, &error);
     if (error)
     {
         fprintf(stderr, "error: open QMI device failed: %s\n", error->message);

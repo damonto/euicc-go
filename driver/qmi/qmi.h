@@ -9,8 +9,9 @@
 
 struct qmi_data
 {
-    uint8_t last_channel_id;
-    uint8_t uim_slot;
+    guint32 last_channel_id;
+    guint32 uim_slot;
+    gboolean use_proxy;
     GMainContext *context;
     QmiClientUim *uim_client;
 };
@@ -20,6 +21,7 @@ QmiDevice *qmi_device_new_from_path(GFile *file, GMainContext *context, GError *
 gboolean
 qmi_device_open_sync(
     QmiDevice *device,
+    QmiDeviceOpenFlags flags,
     GMainContext *context,
     GError **error);
 

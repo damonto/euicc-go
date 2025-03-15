@@ -7,9 +7,9 @@
 
 struct mbim_data
 {
-    int last_channel_id;
-    gboolean use_proxy;
+    guint32 last_channel_id;
     guint32 uim_slot;
+    gboolean use_proxy;
     GMainContext *context;
     MbimDevice *device;
 };

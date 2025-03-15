@@ -23,14 +23,18 @@ type qmi struct {
 	qmi    *C.struct_qmi_data
 }
 
-func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
+func New(device string, slot uint8, useProxy bool) (apdu.SmartCardChannel, error) {
 	q := (*C.struct_qmi_data)(C.malloc(C.sizeof_struct_qmi_data))
 	if q == nil {
 		return nil, errors.New("failed to allocate memory for QMI data")
 	}
 	C.memset(unsafe.Pointer(q), 0, C.sizeof_struct_qmi_data)
 	// QMI uses 1-based indexing
-	q.uim_slot = C.uint8_t(slot)
+	q.uim_slot = C.guint32(slot)
+	// Try to open the port through the 'qmi-proxy'.
+	if useProxy {
+		q.use_proxy = C.gboolean(1)
+	}
 	return &qmi{
 		device: device,
 		qmi:    q,

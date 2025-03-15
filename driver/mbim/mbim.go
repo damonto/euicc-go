@@ -23,7 +23,7 @@ type mbim struct {
 	mbim   *C.struct_mbim_data
 }
 
-func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
+func New(device string, slot uint8, useProxy bool) (apdu.SmartCardChannel, error) {
 	m := (*C.struct_mbim_data)(C.malloc(C.sizeof_struct_mbim_data))
 	if m == nil {
 		return nil, errors.New("failed to allocate memory for MBIM data")
@@ -31,6 +31,10 @@ func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 	C.memset(unsafe.Pointer(m), 0, C.sizeof_struct_mbim_data)
 	// MBIM uses 0-based indexing
 	m.uim_slot = C.guint32(slot - 1)
+	// Try to open the port through the 'mbim-proxy'.
+	if useProxy {
+		m.use_proxy = C.gboolean(1)
+	}
 	return &mbim{
 		device: device,
 		mbim:   m,
