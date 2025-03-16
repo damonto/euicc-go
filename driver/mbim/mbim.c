@@ -151,7 +151,7 @@ static int select_sim_slot(struct mbim_data *mbim_priv, char **err)
         mbim_priv->device, mbim_priv->context, current_slot_request, &error);
     if (!current_slot_response)
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -160,7 +160,7 @@ static int select_sim_slot(struct mbim_data *mbim_priv, char **err)
     if (!mbim_message_ms_basic_connect_extensions_device_slot_mappings_response_parse(
             current_slot_response, &current_slot_count, &current_slots, &error))
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -178,7 +178,7 @@ static int select_sim_slot(struct mbim_data *mbim_priv, char **err)
         new_slot_array->len, (const MbimSlot **)new_slot_array->pdata, &error);
     if (!update_slot_request)
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -186,7 +186,7 @@ static int select_sim_slot(struct mbim_data *mbim_priv, char **err)
         mbim_priv->device, mbim_priv->context, update_slot_request, &error);
     if (!update_slot_response)
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -195,7 +195,7 @@ static int select_sim_slot(struct mbim_data *mbim_priv, char **err)
     if (!mbim_message_ms_basic_connect_extensions_device_slot_mappings_response_parse(
             update_slot_response, &slot_count, &updated_slots, &error))
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -224,7 +224,7 @@ int go_mbim_apdu_connect(struct mbim_data *mbim_priv, char *device_path, char **
     mbim_priv->device = mbim_device_new_from_path(file, mbim_priv->context, &error);
     if (!mbim_priv->device)
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -235,7 +235,7 @@ int go_mbim_apdu_connect(struct mbim_data *mbim_priv, char *device_path, char **
     mbim_device_open_sync(mbim_priv->device, open_flags, mbim_priv->context, &error);
     if (error)
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -277,7 +277,7 @@ int go_mbim_apdu_transmit(struct mbim_data *mbim_priv, uint8_t **rx, uint32_t *r
         &error);
     if (!request)
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -285,7 +285,7 @@ int go_mbim_apdu_transmit(struct mbim_data *mbim_priv, uint8_t **rx, uint32_t *r
         mbim_priv->device, mbim_priv->context, request, &error);
     if (!response)
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -296,7 +296,7 @@ int go_mbim_apdu_transmit(struct mbim_data *mbim_priv, uint8_t **rx, uint32_t *r
     if (!mbim_message_ms_uicc_low_level_access_apdu_response_parse(
             response, &status, &response_size, &response_data, &error))
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -312,7 +312,7 @@ int go_mbim_apdu_open_logical_channel(struct mbim_data *mbim_priv, const uint8_t
         aid_len, aid, 0, 1, &error);
     if (!request)
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -320,7 +320,7 @@ int go_mbim_apdu_open_logical_channel(struct mbim_data *mbim_priv, const uint8_t
         mbim_priv->device, mbim_priv->context, request, &error);
     if (!response)
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -332,7 +332,7 @@ int go_mbim_apdu_open_logical_channel(struct mbim_data *mbim_priv, const uint8_t
     if (!mbim_message_ms_uicc_low_level_access_open_channel_response_parse(
             response, &status, &channel, &response_size, &response_data, &error))
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -348,7 +348,7 @@ int go_mbim_apdu_close_logical_channel(struct mbim_data *mbim_priv, uint8_t chan
         channel, 1, &error);
     if (!request)
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -356,7 +356,7 @@ int go_mbim_apdu_close_logical_channel(struct mbim_data *mbim_priv, uint8_t chan
         mbim_priv->device, mbim_priv->context, request, &error);
     if (!response)
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -365,7 +365,7 @@ int go_mbim_apdu_close_logical_channel(struct mbim_data *mbim_priv, uint8_t chan
     if (!mbim_message_ms_uicc_low_level_access_close_channel_response_parse(
             response, &status, &error))
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         return -1;
     }
 
@@ -389,7 +389,7 @@ int go_mbim_apdu_disconnect(struct mbim_data *mbim_priv, char **err)
     mbim_device_close_sync(mbim_priv->device, mbim_priv->context, &error);
     if (error)
     {
-        *err = (error && error->message) ? strdup(error->message) : NULL;
+        *err = strdup(error->message);
         ret = -1;
     }
 
