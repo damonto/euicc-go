@@ -45,7 +45,7 @@ qmi_device_new_from_path(GFile *file,
 
 gboolean
 qmi_device_open_sync(QmiDevice *device,
-                     QmiDeviceOpenFlags flags,
+                     QmiDeviceOpenFlags open_flags,
                      GMainContext *context,
                      GError **error)
 {
@@ -55,7 +55,7 @@ qmi_device_open_sync(QmiDevice *device,
     pusher = g_main_context_pusher_new(context);
 
     qmi_device_open(device,
-                    flags,
+                    open_flags,
                     15,
                     NULL,
                     async_result_ready,
@@ -191,7 +191,7 @@ qmi_client_uim_send_apdu_sync(
     return qmi_client_uim_send_apdu_finish(client, result, error);
 }
 
-int go_qmi_apdu_connect(struct qmi_data *qmi_priv, char *device_path)
+int go_qmi_apdu_connect(struct qmi_data *qmi_priv, char *device_path, char *err)
 {
     g_autoptr(GError) error = NULL;
     QmiDevice *device = NULL;
@@ -204,7 +204,7 @@ int go_qmi_apdu_connect(struct qmi_data *qmi_priv, char *device_path)
     device = qmi_device_new_from_path(file, qmi_priv->context, &error);
     if (!device)
     {
-        fprintf(stderr, "error: create QMI device from path failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -215,14 +215,14 @@ int go_qmi_apdu_connect(struct qmi_data *qmi_priv, char *device_path)
     qmi_device_open_sync(device, open_flags, qmi_priv->context, &error);
     if (error)
     {
-        fprintf(stderr, "error: open QMI device failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
     client = qmi_device_allocate_client_sync(device, qmi_priv->context, &error);
     if (!client)
     {
-        fprintf(stderr, "error: allocate QMI client failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -231,8 +231,9 @@ int go_qmi_apdu_connect(struct qmi_data *qmi_priv, char *device_path)
     return 0;
 }
 
-void go_qmi_apdu_disconnect(struct qmi_data *qmi_priv)
+int go_qmi_apdu_disconnect(struct qmi_data *qmi_priv, char *err)
 {
+    int ret = 0;
     g_autoptr(GError) error = NULL;
     QmiClient *client = QMI_CLIENT(qmi_priv->uim_client);
     QmiDevice *device = QMI_DEVICE(qmi_client_get_device(client));
@@ -241,22 +242,27 @@ void go_qmi_apdu_disconnect(struct qmi_data *qmi_priv)
     qmi_priv->uim_client = NULL;
 
     if (error)
-        fprintf(stderr, "error: release QMI client failed: %s\n", error->message);
+    {
+        ret = -1;
+        strncpy(err, error->message, strlen(error->message));
+    }
 
     g_main_context_unref(qmi_priv->context);
     qmi_priv->context = NULL;
 
     if (qmi_priv->last_channel_id > 0)
     {
-        go_qmi_apdu_close_logical_channel(qmi_priv, qmi_priv->last_channel_id);
+        go_qmi_apdu_close_logical_channel(qmi_priv, qmi_priv->last_channel_id, err);
         qmi_priv->last_channel_id = 0;
     }
 
     qmi_priv->last_channel_id = 0;
     qmi_priv->uim_slot = 0;
+
+    return ret;
 }
 
-int go_qmi_apdu_transmit(struct qmi_data *qmi_priv, uint8_t **rx, uint32_t *rx_len, const uint8_t *tx, uint32_t tx_len)
+int go_qmi_apdu_transmit(struct qmi_data *qmi_priv, uint8_t **rx, uint32_t *rx_len, const uint8_t *tx, uint32_t tx_len, char *err)
 {
     g_autoptr(GError) error = NULL;
     g_autoptr(GArray) apdu_data = NULL;
@@ -279,14 +285,14 @@ int go_qmi_apdu_transmit(struct qmi_data *qmi_priv, uint8_t **rx, uint32_t *rx_l
 
     if (!qmi_message_uim_send_apdu_output_get_result(output, &error))
     {
-        fprintf(stderr, "error: send apdu operation failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
     GArray *apdu_res = NULL;
     if (!qmi_message_uim_send_apdu_output_get_apdu_response(output, &apdu_res, &error))
     {
-        fprintf(stderr, "error: get apdu response operation failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -303,7 +309,7 @@ int go_qmi_apdu_transmit(struct qmi_data *qmi_priv, uint8_t **rx, uint32_t *rx_l
     return 0;
 }
 
-int go_qmi_apdu_open_logical_channel(struct qmi_data *qmi_priv, const uint8_t *aid, uint8_t aid_len)
+int go_qmi_apdu_open_logical_channel(struct qmi_data *qmi_priv, const uint8_t *aid, uint8_t aid_len, char *err)
 {
     g_autoptr(GError) error = NULL;
     guint8 channel_id;
@@ -325,31 +331,29 @@ int go_qmi_apdu_open_logical_channel(struct qmi_data *qmi_priv, const uint8_t *a
 
     if (!output)
     {
-        fprintf(stderr, "error: send Open Logical Channel command failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
     if (!qmi_message_uim_open_logical_channel_output_get_result(output, &error))
     {
-        fprintf(stderr, "error: open logical channel operation failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
     if (!qmi_message_uim_open_logical_channel_output_get_channel_id(output, &channel_id, &error))
     {
-        fprintf(stderr, "error: get channel id operation failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
     qmi_priv->last_channel_id = channel_id;
-
-    g_debug("Opened logical channel with id %d", channel_id);
 
     qmi_message_uim_open_logical_channel_output_unref(output);
 
     return channel_id;
 }
 
-int go_qmi_apdu_close_logical_channel(struct qmi_data *qmi_priv, uint8_t channel)
+int go_qmi_apdu_close_logical_channel(struct qmi_data *qmi_priv, uint8_t channel, char *err)
 {
     g_autoptr(GError) error = NULL;
 
@@ -365,13 +369,13 @@ int go_qmi_apdu_close_logical_channel(struct qmi_data *qmi_priv, uint8_t channel
 
     if (error)
     {
-        fprintf(stderr, "error: send Close Logical Channel command failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
     if (!qmi_message_uim_logical_channel_output_get_result(output, &error))
     {
-        fprintf(stderr, "error: logical channel operation failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -381,7 +385,6 @@ int go_qmi_apdu_close_logical_channel(struct qmi_data *qmi_priv, uint8_t channel
         qmi_priv->last_channel_id = 0;
     }
 
-    g_debug("Closed logical channel with id %d", channel);
     qmi_message_uim_logical_channel_output_unref(output);
 
     return 0;

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/damonto/euicc-go/driver"
-	"github.com/damonto/euicc-go/driver/ccid"
+	"github.com/damonto/euicc-go/driver/qmi"
 	sgp22http "github.com/damonto/euicc-go/http"
 	"github.com/damonto/euicc-go/lpa"
 	sgp22 "github.com/damonto/euicc-go/v2"
@@ -39,18 +39,14 @@ func NewDownloadHandler() lpa.DownloadHandler {
 
 func main() {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
-	ch, err := ccid.New()
+	ch, err := qmi.New("/dev/cdc-wdm0", 1, true)
 	if err != nil {
 		panic(err)
 	}
-	readers, err := ch.ListReaders()
-	if err != nil {
-		panic(err)
-	}
-	ch.SetReader(readers[0])
 	transmitter, err := driver.NewTransmitter(ch, driver.ISDRAID, 240)
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		return
 	}
 	defer transmitter.Close()
 	client := &lpa.Client{

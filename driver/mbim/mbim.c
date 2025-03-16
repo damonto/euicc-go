@@ -140,7 +140,7 @@ static gboolean is_sim_available(struct mbim_data *mbim_priv)
     }
 }
 
-static int select_sim_slot(struct mbim_data *mbim_priv)
+static int select_sim_slot(struct mbim_data *mbim_priv, char *err)
 {
     g_autoptr(GError) error = NULL;
 
@@ -151,7 +151,7 @@ static int select_sim_slot(struct mbim_data *mbim_priv)
         mbim_priv->device, mbim_priv->context, current_slot_request, &error);
     if (!current_slot_response)
     {
-        fprintf(stderr, "error: device didn't respond: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -160,7 +160,7 @@ static int select_sim_slot(struct mbim_data *mbim_priv)
     if (!mbim_message_ms_basic_connect_extensions_device_slot_mappings_response_parse(
             current_slot_response, &current_slot_count, &current_slots, &error))
     {
-        fprintf(stderr, "error: sim select response could not be parsed: %s\n", error->message);
+        snprintf(err, strlen(error->message), "sim select response could not be parsed: %s", error->message);
         return -1;
     }
 
@@ -178,7 +178,7 @@ static int select_sim_slot(struct mbim_data *mbim_priv)
         new_slot_array->len, (const MbimSlot **)new_slot_array->pdata, &error);
     if (!update_slot_request)
     {
-        fprintf(stderr, "error: unable to select sim slot: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -186,7 +186,7 @@ static int select_sim_slot(struct mbim_data *mbim_priv)
         mbim_priv->device, mbim_priv->context, update_slot_request, &error);
     if (!update_slot_response)
     {
-        fprintf(stderr, "error: device didn't respond: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -195,7 +195,7 @@ static int select_sim_slot(struct mbim_data *mbim_priv)
     if (!mbim_message_ms_basic_connect_extensions_device_slot_mappings_response_parse(
             update_slot_response, &slot_count, &updated_slots, &error))
     {
-        fprintf(stderr, "error: sim select response could not be parsed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -208,11 +208,11 @@ static int select_sim_slot(struct mbim_data *mbim_priv)
         }
     }
 
-    fprintf(stderr, "sim did not become available\n");
+    snprintf(err, strlen("sim not available"), "sim not available");
     return -1;
 }
 
-int go_mbim_apdu_connect(struct mbim_data *mbim_priv, char *device_path)
+int go_mbim_apdu_connect(struct mbim_data *mbim_priv, char *device_path, char *err)
 {
     g_autoptr(GError) error = NULL;
     GFile *file;
@@ -224,7 +224,7 @@ int go_mbim_apdu_connect(struct mbim_data *mbim_priv, char *device_path)
     mbim_priv->device = mbim_device_new_from_path(file, mbim_priv->context, &error);
     if (!mbim_priv->device)
     {
-        fprintf(stderr, "error: create mbim device from path failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -235,11 +235,11 @@ int go_mbim_apdu_connect(struct mbim_data *mbim_priv, char *device_path)
     mbim_device_open_sync(mbim_priv->device, open_flags, mbim_priv->context, &error);
     if (error)
     {
-        fprintf(stderr, "error: open mbim device failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
-    return select_sim_slot(mbim_priv);
+    return select_sim_slot(mbim_priv, err);
 }
 
 /*
@@ -264,7 +264,7 @@ static int copy_data_with_status(
     return 0;
 }
 
-int go_mbim_apdu_transmit(struct mbim_data *mbim_priv, uint8_t **rx, uint32_t *rx_len, const uint8_t *tx, uint32_t tx_len)
+int go_mbim_apdu_transmit(struct mbim_data *mbim_priv, uint8_t **rx, uint32_t *rx_len, const uint8_t *tx, uint32_t tx_len, char *err)
 {
     g_autoptr(GError) error = NULL;
 
@@ -277,7 +277,7 @@ int go_mbim_apdu_transmit(struct mbim_data *mbim_priv, uint8_t **rx, uint32_t *r
         &error);
     if (!request)
     {
-        fprintf(stderr, "error: creating apdu message failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -285,7 +285,7 @@ int go_mbim_apdu_transmit(struct mbim_data *mbim_priv, uint8_t **rx, uint32_t *r
         mbim_priv->device, mbim_priv->context, request, &error);
     if (!response)
     {
-        fprintf(stderr, "error: no apdu response received: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -296,14 +296,14 @@ int go_mbim_apdu_transmit(struct mbim_data *mbim_priv, uint8_t **rx, uint32_t *r
     if (!mbim_message_ms_uicc_low_level_access_apdu_response_parse(
             response, &status, &response_size, &response_data, &error))
     {
-        fprintf(stderr, "error: unable to parse apdu response: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
     return copy_data_with_status(rx, rx_len, response_data, response_size, status);
 }
 
-int go_mbim_apdu_open_logical_channel(struct mbim_data *mbim_priv, const uint8_t *aid, uint8_t aid_len)
+int go_mbim_apdu_open_logical_channel(struct mbim_data *mbim_priv, const uint8_t *aid, uint8_t aid_len, char *err)
 {
     g_autoptr(GError) error = NULL;
     guint8 channel_id;
@@ -312,7 +312,7 @@ int go_mbim_apdu_open_logical_channel(struct mbim_data *mbim_priv, const uint8_t
         aid_len, aid, 0, 1, &error);
     if (!request)
     {
-        fprintf(stderr, "error: creating channel message failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -320,7 +320,7 @@ int go_mbim_apdu_open_logical_channel(struct mbim_data *mbim_priv, const uint8_t
         mbim_priv->device, mbim_priv->context, request, &error);
     if (!response)
     {
-        fprintf(stderr, "error: no channel response received: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -332,7 +332,7 @@ int go_mbim_apdu_open_logical_channel(struct mbim_data *mbim_priv, const uint8_t
     if (!mbim_message_ms_uicc_low_level_access_open_channel_response_parse(
             response, &status, &channel, &response_size, &response_data, &error))
     {
-        fprintf(stderr, "error: unable to parse channel response: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -340,7 +340,7 @@ int go_mbim_apdu_open_logical_channel(struct mbim_data *mbim_priv, const uint8_t
     return channel;
 }
 
-int go_mbim_apdu_close_logical_channel(struct mbim_data *mbim_priv, uint8_t channel)
+int go_mbim_apdu_close_logical_channel(struct mbim_data *mbim_priv, uint8_t channel, char *err)
 {
     g_autoptr(GError) error = NULL;
 
@@ -348,7 +348,7 @@ int go_mbim_apdu_close_logical_channel(struct mbim_data *mbim_priv, uint8_t chan
         channel, 1, &error);
     if (!request)
     {
-        fprintf(stderr, "error: creating channel message failed: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -356,7 +356,7 @@ int go_mbim_apdu_close_logical_channel(struct mbim_data *mbim_priv, uint8_t chan
         mbim_priv->device, mbim_priv->context, request, &error);
     if (!response)
     {
-        fprintf(stderr, "error: no channel response received: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -365,7 +365,7 @@ int go_mbim_apdu_close_logical_channel(struct mbim_data *mbim_priv, uint8_t chan
     if (!mbim_message_ms_uicc_low_level_access_close_channel_response_parse(
             response, &status, &error))
     {
-        fprintf(stderr, "error: unable to parse channel response: %s\n", error->message);
+        strncpy(err, error->message, strlen(error->message));
         return -1;
     }
 
@@ -375,19 +375,27 @@ int go_mbim_apdu_close_logical_channel(struct mbim_data *mbim_priv, uint8_t chan
     return 0;
 }
 
-void go_mbim_apdu_disconnect(struct mbim_data *mbim_priv)
+int go_mbim_apdu_disconnect(struct mbim_data *mbim_priv, char *err)
 {
     g_autoptr(GError) error = NULL;
+    int ret = 0;
 
     if (mbim_priv->last_channel_id > 0)
     {
-        fprintf(stderr, "Cleaning up leaked APDU channel %d\n", mbim_priv->last_channel_id);
-        go_mbim_apdu_close_logical_channel(mbim_priv, mbim_priv->last_channel_id);
+        go_mbim_apdu_close_logical_channel(mbim_priv, mbim_priv->last_channel_id, err);
         mbim_priv->last_channel_id = -1;
     }
 
     mbim_device_close_sync(mbim_priv->device, mbim_priv->context, &error);
+    if (error)
+    {
+        strncpy(err, error->message, strlen(error->message));
+        ret = -1;
+    }
 
     g_main_context_unref(mbim_priv->context);
     mbim_priv->context = NULL;
+    mbim_priv->uim_slot = 0;
+
+    return ret;
 }
