@@ -191,7 +191,7 @@ qmi_client_uim_send_apdu_sync(
     return qmi_client_uim_send_apdu_finish(client, result, error);
 }
 
-int go_qmi_apdu_connect(struct qmi_data *qmi_priv, char *device_path, char *err)
+int go_qmi_apdu_connect(struct qmi_data *qmi_priv, char *device_path, char **err)
 {
     g_autoptr(GError) error = NULL;
     QmiDevice *device = NULL;
@@ -204,7 +204,7 @@ int go_qmi_apdu_connect(struct qmi_data *qmi_priv, char *device_path, char *err)
     device = qmi_device_new_from_path(file, qmi_priv->context, &error);
     if (!device)
     {
-        strncpy(err, error->message, strlen(error->message));
+        *err = (error && error->message) ? strdup(error->message) : NULL;
         return -1;
     }
 
@@ -215,14 +215,14 @@ int go_qmi_apdu_connect(struct qmi_data *qmi_priv, char *device_path, char *err)
     qmi_device_open_sync(device, open_flags, qmi_priv->context, &error);
     if (error)
     {
-        strncpy(err, error->message, strlen(error->message));
+        *err = (error && error->message) ? strdup(error->message) : NULL;
         return -1;
     }
 
     client = qmi_device_allocate_client_sync(device, qmi_priv->context, &error);
     if (!client)
     {
-        strncpy(err, error->message, strlen(error->message));
+        *err = (error && error->message) ? strdup(error->message) : NULL;
         return -1;
     }
 
@@ -231,7 +231,7 @@ int go_qmi_apdu_connect(struct qmi_data *qmi_priv, char *device_path, char *err)
     return 0;
 }
 
-int go_qmi_apdu_disconnect(struct qmi_data *qmi_priv, char *err)
+int go_qmi_apdu_disconnect(struct qmi_data *qmi_priv, char **err)
 {
     int ret = 0;
     g_autoptr(GError) error = NULL;
@@ -244,7 +244,7 @@ int go_qmi_apdu_disconnect(struct qmi_data *qmi_priv, char *err)
     if (error)
     {
         ret = -1;
-        strncpy(err, error->message, strlen(error->message));
+        *err = (error && error->message) ? strdup(error->message) : NULL;
     }
 
     g_main_context_unref(qmi_priv->context);
@@ -262,7 +262,7 @@ int go_qmi_apdu_disconnect(struct qmi_data *qmi_priv, char *err)
     return ret;
 }
 
-int go_qmi_apdu_transmit(struct qmi_data *qmi_priv, uint8_t **rx, uint32_t *rx_len, const uint8_t *tx, uint32_t tx_len, char *err)
+int go_qmi_apdu_transmit(struct qmi_data *qmi_priv, uint8_t **rx, uint32_t *rx_len, const uint8_t *tx, uint32_t tx_len, char **err)
 {
     g_autoptr(GError) error = NULL;
     g_autoptr(GArray) apdu_data = NULL;
@@ -285,14 +285,14 @@ int go_qmi_apdu_transmit(struct qmi_data *qmi_priv, uint8_t **rx, uint32_t *rx_l
 
     if (!qmi_message_uim_send_apdu_output_get_result(output, &error))
     {
-        strncpy(err, error->message, strlen(error->message));
+        *err = (error && error->message) ? strdup(error->message) : NULL;
         return -1;
     }
 
     GArray *apdu_res = NULL;
     if (!qmi_message_uim_send_apdu_output_get_apdu_response(output, &apdu_res, &error))
     {
-        strncpy(err, error->message, strlen(error->message));
+        *err = (error && error->message) ? strdup(error->message) : NULL;
         return -1;
     }
 
@@ -309,7 +309,7 @@ int go_qmi_apdu_transmit(struct qmi_data *qmi_priv, uint8_t **rx, uint32_t *rx_l
     return 0;
 }
 
-int go_qmi_apdu_open_logical_channel(struct qmi_data *qmi_priv, const uint8_t *aid, uint8_t aid_len, char *err)
+int go_qmi_apdu_open_logical_channel(struct qmi_data *qmi_priv, const uint8_t *aid, uint8_t aid_len, char **err)
 {
     g_autoptr(GError) error = NULL;
     guint8 channel_id;
@@ -331,19 +331,19 @@ int go_qmi_apdu_open_logical_channel(struct qmi_data *qmi_priv, const uint8_t *a
 
     if (!output)
     {
-        strncpy(err, error->message, strlen(error->message));
+        *err = (error && error->message) ? strdup(error->message) : NULL;
         return -1;
     }
 
     if (!qmi_message_uim_open_logical_channel_output_get_result(output, &error))
     {
-        strncpy(err, error->message, strlen(error->message));
+        *err = (error && error->message) ? strdup(error->message) : NULL;
         return -1;
     }
 
     if (!qmi_message_uim_open_logical_channel_output_get_channel_id(output, &channel_id, &error))
     {
-        strncpy(err, error->message, strlen(error->message));
+        *err = (error && error->message) ? strdup(error->message) : NULL;
         return -1;
     }
     qmi_priv->last_channel_id = channel_id;
@@ -353,7 +353,7 @@ int go_qmi_apdu_open_logical_channel(struct qmi_data *qmi_priv, const uint8_t *a
     return channel_id;
 }
 
-int go_qmi_apdu_close_logical_channel(struct qmi_data *qmi_priv, uint8_t channel, char *err)
+int go_qmi_apdu_close_logical_channel(struct qmi_data *qmi_priv, uint8_t channel, char **err)
 {
     g_autoptr(GError) error = NULL;
 
@@ -369,13 +369,13 @@ int go_qmi_apdu_close_logical_channel(struct qmi_data *qmi_priv, uint8_t channel
 
     if (error)
     {
-        strncpy(err, error->message, strlen(error->message));
+        *err = (error && error->message) ? strdup(error->message) : NULL;
         return -1;
     }
 
     if (!qmi_message_uim_logical_channel_output_get_result(output, &error))
     {
-        strncpy(err, error->message, strlen(error->message));
+        *err = (error && error->message) ? strdup(error->message) : NULL;
         return -1;
     }
 

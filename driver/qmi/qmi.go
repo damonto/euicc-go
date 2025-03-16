@@ -43,13 +43,10 @@ func New(device string, slot uint8, useProxy bool) (apdu.SmartCardChannel, error
 func (q *qmi) Connect() error {
 	cDevice := C.CString(q.device)
 	defer C.free(unsafe.Pointer(cDevice))
-	cErr := (*C.char)(C.calloc(256, C.sizeof_char))
-	if cErr == nil {
-		return errors.New("failed to allocate memory for error message")
-	}
-	defer C.free(unsafe.Pointer(cErr))
-	if C.go_qmi_apdu_connect(q.qmi, cDevice, cErr) == -1 {
-		C.free(unsafe.Pointer(q.qmi))
+	var cErr *C.char
+	if C.go_qmi_apdu_connect(q.qmi, cDevice, &cErr) == -1 {
+		defer C.free(unsafe.Pointer(cErr))
+		defer C.free(unsafe.Pointer(q.qmi))
 		return errors.New(C.GoString(cErr))
 	}
 	return nil
@@ -57,12 +54,9 @@ func (q *qmi) Connect() error {
 
 func (q *qmi) Disconnect() error {
 	defer C.free(unsafe.Pointer(q.qmi))
-	cErr := (*C.char)(C.calloc(256, C.sizeof_char))
-	if cErr == nil {
-		return errors.New("failed to allocate memory for error message")
-	}
-	defer C.free(unsafe.Pointer(cErr))
-	if C.go_qmi_apdu_disconnect(q.qmi, cErr) == -1 {
+	var cErr *C.char
+	if C.go_qmi_apdu_disconnect(q.qmi, &cErr) == -1 {
+		defer C.free(unsafe.Pointer(cErr))
 		return errors.New(C.GoString(cErr))
 	}
 	return nil
@@ -73,41 +67,31 @@ func (q *qmi) Transmit(command []byte) ([]byte, error) {
 	var cResponse *C.uint8_t
 	var cResponseLen C.uint32_t
 	defer C.free(unsafe.Pointer(cCommand))
-	cErr := (*C.char)(C.calloc(256, C.sizeof_char))
-	if cErr == nil {
-		return nil, errors.New("failed to allocate memory for error message")
-	}
-	defer C.free(unsafe.Pointer(cErr))
-	if C.go_qmi_apdu_transmit(q.qmi, &cResponse, &cResponseLen, (*C.uchar)(cCommand), C.uint(len(command)), cErr) == -1 {
+	defer C.free(unsafe.Pointer(cResponse))
+	var cErr *C.char
+	if C.go_qmi_apdu_transmit(q.qmi, &cResponse, &cResponseLen, (*C.uchar)(cCommand), C.uint(len(command)), &cErr) == -1 {
+		defer C.free(unsafe.Pointer(cErr))
 		return nil, errors.New(C.GoString(cErr))
 	}
-	defer C.free(unsafe.Pointer(cResponse))
-	response := C.GoBytes(unsafe.Pointer(cResponse), C.int(cResponseLen))
-	return response, nil
+	return C.GoBytes(unsafe.Pointer(cResponse), C.int(cResponseLen)), nil
 }
 
 func (q *qmi) OpenLogicalChannel(aid []byte) (byte, error) {
 	cAID := C.CBytes(aid)
 	defer C.free(unsafe.Pointer(cAID))
-	cErr := (*C.char)(C.calloc(256, C.sizeof_char))
-	if cErr == nil {
-		return 0, errors.New("failed to allocate memory for error message")
-	}
-	defer C.free(unsafe.Pointer(cErr))
-	channel := C.go_qmi_apdu_open_logical_channel(q.qmi, (*C.uchar)(cAID), C.uint8_t(len(aid)), cErr)
+	var cErr *C.char
+	channel := C.go_qmi_apdu_open_logical_channel(q.qmi, (*C.uchar)(cAID), C.uint8_t(len(aid)), &cErr)
 	if channel < 1 {
+		defer C.free(unsafe.Pointer(cErr))
 		return 0, errors.New(C.GoString(cErr))
 	}
 	return byte(channel), nil
 }
 
 func (q *qmi) CloseLogicalChannel(channel byte) error {
-	cErr := (*C.char)(C.calloc(256, C.sizeof_char))
-	if cErr == nil {
-		return errors.New("failed to allocate memory for error message")
-	}
-	defer C.free(unsafe.Pointer(cErr))
-	if C.go_qmi_apdu_close_logical_channel(q.qmi, C.uint8_t(channel), cErr) == -1 {
+	var cErr *C.char
+	if C.go_qmi_apdu_close_logical_channel(q.qmi, C.uint8_t(channel), &cErr) == -1 {
+		defer C.free(unsafe.Pointer(cErr))
 		return errors.New(C.GoString(cErr))
 	}
 	return nil
