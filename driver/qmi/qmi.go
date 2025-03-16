@@ -72,7 +72,7 @@ func (q *qmi) Transmit(command []byte) ([]byte, error) {
 	var cResponse *C.uint8_t
 	var cResponseLen C.uint32_t
 	defer C.free(unsafe.Pointer(cCommand))
-	cErr := (*C.char)(C.calloc(0, C.sizeof_char*256))
+	cErr := (*C.char)(C.calloc(256, C.sizeof_char))
 	if cErr == nil {
 		return nil, errors.New("failed to allocate memory for error message")
 	}
