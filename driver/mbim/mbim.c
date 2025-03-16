@@ -20,7 +20,7 @@ async_result_ready(GObject *source_object,
     *result_out = g_object_ref(res);
 }
 
-MbimDevice *
+static MbimDevice *
 mbim_device_new_from_path(GFile *file,
                           GMainContext *context,
                           GError **error)
@@ -44,7 +44,7 @@ mbim_device_new_from_path(GFile *file,
     return mbim_device_new_finish(result, error);
 }
 
-gboolean
+static gboolean
 mbim_device_open_sync(MbimDevice *device,
                       MbimDeviceOpenFlags open_flags,
                       GMainContext *context,
@@ -68,7 +68,7 @@ mbim_device_open_sync(MbimDevice *device,
     return mbim_device_open_finish(device, result, error);
 }
 
-MbimMessage *
+static MbimMessage *
 mbim_device_command_sync(MbimDevice *device, GMainContext *context, MbimMessage *request, GError **error)
 {
     g_autoptr(GMainContextPusher) pusher = NULL;
@@ -96,7 +96,7 @@ mbim_device_command_sync(MbimDevice *device, GMainContext *context, MbimMessage 
     return response;
 }
 
-gboolean
+static gboolean
 mbim_device_close_sync(
     MbimDevice *device,
     GMainContext *context,

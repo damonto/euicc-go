@@ -19,7 +19,7 @@ async_result_ready(GObject *source_object,
     *result_out = g_object_ref(res);
 }
 
-QmiDevice *
+static QmiDevice *
 qmi_device_new_from_path(GFile *file,
                          GMainContext *context,
                          GError **error)
@@ -43,7 +43,7 @@ qmi_device_new_from_path(GFile *file,
     return qmi_device_new_finish(result, error);
 }
 
-gboolean
+static gboolean
 qmi_device_open_sync(QmiDevice *device,
                      QmiDeviceOpenFlags open_flags,
                      GMainContext *context,
@@ -67,7 +67,7 @@ qmi_device_open_sync(QmiDevice *device,
     return qmi_device_open_finish(device, result, error);
 }
 
-QmiClient *
+static QmiClient *
 qmi_device_allocate_client_sync(QmiDevice *device,
                                 GMainContext *context,
                                 GError **error)
@@ -91,7 +91,7 @@ qmi_device_allocate_client_sync(QmiDevice *device,
     return qmi_device_allocate_client_finish(device, result, error);
 }
 
-gboolean
+static gboolean
 qmi_device_release_client_sync(QmiDevice *device,
                                QmiClient *client,
                                GMainContext *context,
@@ -116,7 +116,7 @@ qmi_device_release_client_sync(QmiDevice *device,
     return qmi_device_release_client_finish(device, result, error);
 }
 
-QmiMessageUimOpenLogicalChannelOutput *
+static QmiMessageUimOpenLogicalChannelOutput *
 qmi_client_uim_open_logical_channel_sync(
     QmiClientUim *client,
     QmiMessageUimOpenLogicalChannelInput *input,
@@ -141,7 +141,7 @@ qmi_client_uim_open_logical_channel_sync(
     return qmi_client_uim_open_logical_channel_finish(client, result, error);
 }
 
-QmiMessageUimLogicalChannelOutput *
+static QmiMessageUimLogicalChannelOutput *
 qmi_client_uim_logical_channel_sync(
     QmiClientUim *client,
     QmiMessageUimLogicalChannelInput *input,
@@ -166,7 +166,7 @@ qmi_client_uim_logical_channel_sync(
     return qmi_client_uim_logical_channel_finish(client, result, error);
 }
 
-QmiMessageUimSendApduOutput *
+static QmiMessageUimSendApduOutput *
 qmi_client_uim_send_apdu_sync(
     QmiClientUim *client,
     QmiMessageUimSendApduInput *input,
