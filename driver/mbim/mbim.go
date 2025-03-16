@@ -49,6 +49,7 @@ func (m *mbim) Connect() error {
 	}
 	defer C.free(unsafe.Pointer(cErr))
 	if C.go_mbim_apdu_connect(m.mbim, cDevice, cErr) == -1 {
+		C.free(unsafe.Pointer(m.mbim))
 		return errors.New(C.GoString(cErr))
 	}
 	return nil

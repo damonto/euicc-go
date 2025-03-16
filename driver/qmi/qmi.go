@@ -49,6 +49,7 @@ func (q *qmi) Connect() error {
 	}
 	defer C.free(unsafe.Pointer(cErr))
 	if C.go_qmi_apdu_connect(q.qmi, cDevice, cErr) == -1 {
+		C.free(unsafe.Pointer(q.qmi))
 		return errors.New(C.GoString(cErr))
 	}
 	return nil
