@@ -29,7 +29,7 @@ func New(device string, slot uint8, useProxy bool) (apdu.SmartCardChannel, error
 		return nil, errors.New("failed to allocate memory for QMI data")
 	}
 	// QMI uses 1-based indexing
-	q.uim_slot = C.guint32(slot)
+	q.uim_slot = C.guint8(slot)
 	// Try to open the port through the 'qmi-proxy'.
 	if useProxy {
 		q.use_proxy = C.gboolean(1)

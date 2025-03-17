@@ -9,8 +9,8 @@
 
 struct qmi_data
 {
-    guint32 last_channel_id;
-    guint32 uim_slot;
+    guint8 last_channel_id;
+    guint8 uim_slot;
     gboolean use_proxy;
     GMainContext *context;
     QmiClientUim *uim_client;
