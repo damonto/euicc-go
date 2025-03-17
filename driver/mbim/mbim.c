@@ -389,8 +389,8 @@ int go_mbim_apdu_disconnect(struct mbim_data *mbim_priv, char **err)
     mbim_device_close_sync(mbim_priv->device, mbim_priv->context, &error);
     if (error)
     {
-        *err = strdup(error->message);
         ret = -1;
+        *err = strdup(error->message);
     }
 
     g_main_context_unref(mbim_priv->context);
