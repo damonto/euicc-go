@@ -43,8 +43,8 @@ func (c *Client) ListProfile(searchCriteria any) ([]*sgp22.ProfileInfo, error) {
 // - [sgp22.ISDPAID]: The ISD-P AID of the profile.
 //
 // See https://aka.pw/sgp22/v2.5#page=201 (Section 5.7.16, ES10c.EnableProfile)
-func (c *Client) EnableProfile(identifier any) error {
-	return c.setProfile(sgp22.EnableProfile, identifier)
+func (c *Client) EnableProfile(identifier any, refresh bool) error {
+	return c.setProfile(sgp22.EnableProfile, identifier, refresh)
 }
 
 // DisableProfile disables a profile.
@@ -55,8 +55,8 @@ func (c *Client) EnableProfile(identifier any) error {
 // - [sgp22.ISDPAID]: The ISD-P AID of the profile.
 //
 // See https://aka.pw/sgp22/v2.5#page=204 (Section 5.7.17, ES10c.DisableProfile)
-func (c *Client) DisableProfile(identifier any) error {
-	return c.setProfile(sgp22.DisableProfile, identifier)
+func (c *Client) DisableProfile(identifier any, refresh bool) error {
+	return c.setProfile(sgp22.DisableProfile, identifier, refresh)
 }
 
 // DeleteProfile deletes a profile.
@@ -68,10 +68,10 @@ func (c *Client) DisableProfile(identifier any) error {
 //
 // See https://aka.pw/sgp22/v2.5#page=206 (Section 5.7.18, ES10c.DeleteProfile)
 func (c *Client) DeleteProfile(identifier any) error {
-	return c.setProfile(sgp22.DeleteProfile, identifier)
+	return c.setProfile(sgp22.DeleteProfile, identifier, false)
 }
 
-func (c *Client) setProfile(operation sgp22.ProfileOperation, identifier any) (err error) {
+func (c *Client) setProfile(operation sgp22.ProfileOperation, identifier any, refresh bool) (err error) {
 	var request sgp22.ProfileOperationRequest
 	request.Operation = operation
 	switch v := identifier.(type) {
@@ -82,7 +82,7 @@ func (c *Client) setProfile(operation sgp22.ProfileOperation, identifier any) (e
 	default:
 		return errors.New("invalid profile identifier")
 	}
-	request.Refresh = true
+	request.Refresh = refresh
 	_, err = sgp22.InvokeAPDU(c.APDU, &request)
 	return
 }

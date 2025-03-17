@@ -123,10 +123,12 @@ func (r *ProfileOperationRequest) MarshalBERTLV() (*bertlv.TLV, error) {
 	request := bertlv.NewChildrenIter(
 		bertlv.ContextSpecific.Constructed(uint64(r.Operation)),
 		func(yield func(*bertlv.TLV) bool) {
+			// DeleteProfile does not require the refresh flag.
 			if r.Operation == DeleteProfile {
 				yield(r.Identifier)
 				return
 			}
+			// Refresh flag is optional for EnableProfile and DisableProfile.
 			if !yield(bertlv.NewChildren(bertlv.ContextSpecific.Constructed(0), r.Identifier)) {
 				return
 			}
