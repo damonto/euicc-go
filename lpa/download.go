@@ -42,12 +42,8 @@ func (c *Client) DownloadProfile(ctx context.Context, activationCode *Activation
 		}
 		return nil, err
 	}
-	if c.isCanceled(ctx) {
-		_, err := c.cancelSession(activationCode.SMDP, clientResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
-		return nil, err
-	}
 
-	if !<-handler.Confirm(metadata) {
+	if c.isCanceled(ctx) || !<-handler.Confirm(metadata) {
 		_, err := c.cancelSession(activationCode.SMDP, clientResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
 		return nil, err
 	}
