@@ -8,6 +8,6 @@ replace (
 )
 
 require (
-	github.com/damonto/euicc-go v0.0.6
+	github.com/damonto/euicc-go v0.0.7
 	github.com/damonto/euicc-go/driver/qmi v0.0.0-00010101000000-000000000000
 )
