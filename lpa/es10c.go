@@ -8,20 +8,6 @@ import (
 	sgp22 "github.com/damonto/euicc-go/v2"
 )
 
-// ListProfileTags is a list of default tags that are used to list profiles.
-var ListProfileTags = []bertlv.Tag{
-	sgp22.TagICCID,
-	sgp22.TagISDPAID,
-	sgp22.TagProfileState,
-	sgp22.TagNickname,
-	sgp22.TagServiceProviderName,
-	sgp22.TagProfileName,
-	sgp22.TagProfileIconType,
-	sgp22.TagProfileIcon,
-	sgp22.TagProfileClass,
-	sgp22.TagProfileOwner,
-}
-
 // ListProfile returns a list of profiles that match the search criteria.
 // If the search criteria is empty, all profiles are returned.
 //
@@ -43,7 +29,18 @@ func (c *Client) ListProfile(searchCriteria any, withTags []bertlv.Tag) ([]*sgp2
 	case sgp22.ProfileClass:
 		request.SearchCriteria, _ = bertlv.MarshalValue(bertlv.ContextSpecific.Primitive(21), v)
 	}
-	request.Tags = slices.Concat(ListProfileTags, withTags)
+	request.Tags = slices.Concat([]bertlv.Tag{
+		sgp22.TagICCID,
+		sgp22.TagISDPAID,
+		sgp22.TagProfileState,
+		sgp22.TagNickname,
+		sgp22.TagServiceProviderName,
+		sgp22.TagProfileName,
+		sgp22.TagProfileIconType,
+		sgp22.TagProfileIcon,
+		sgp22.TagProfileClass,
+		sgp22.TagProfileOwner,
+	}, withTags)
 	response, err := sgp22.InvokeAPDU(c.APDU, &request)
 	if err != nil {
 		return nil, err
