@@ -16,7 +16,7 @@ import (
 // - [sgp22.ProfileClass]: The profile class of the profile.
 //
 // See https://aka.pw/sgp22/v2.5#page=199 (Section 5.7.15, ES10c.GetProfilesInfo)
-func (c *Client) ListProfile(searchCriteria any) ([]*sgp22.ProfileInfo, error) {
+func (c *Client) ListProfile(searchCriteria any, tags []bertlv.Tag) ([]*sgp22.ProfileInfo, error) {
 	var request sgp22.ProfileInfoListRequest
 	switch v := searchCriteria.(type) {
 	case nil:
@@ -28,6 +28,7 @@ func (c *Client) ListProfile(searchCriteria any) ([]*sgp22.ProfileInfo, error) {
 	case sgp22.ProfileClass:
 		request.SearchCriteria, _ = bertlv.MarshalValue(bertlv.ContextSpecific.Primitive(21), v)
 	}
+	request.Tags = tags
 	response, err := sgp22.InvokeAPDU(c.APDU, &request)
 	if err != nil {
 		return nil, err

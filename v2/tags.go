@@ -2,6 +2,8 @@ package sgp22
 
 import "github.com/damonto/euicc-go/bertlv"
 
+// region Request Tags
+
 func (*PrepareDownloadRequest) Tag() bertlv.Tag           { return []byte{0xBF, 0x21} }
 func (*ES9BoundProfilePackageRequest) Tag() bertlv.Tag    { return []byte{0xBF, 0x21} }
 func (*ListNotificationRequest) Tag() bertlv.Tag          { return []byte{0xBF, 0x28} }
@@ -33,3 +35,26 @@ func (*SetDefaultDPAddressResponse) Tag() bertlv.Tag      { return []byte{0xBF, 
 func (*CancelSessionRequest) Tag() bertlv.Tag             { return []byte{0xBF, 0x41} }
 func (*ES9CancelSessionRequest) Tag() bertlv.Tag          { return []byte{0xBF, 0x41} }
 func (*ProfileInfo) Tag() bertlv.Tag                      { return []byte{0xE3} }
+
+// endregion
+
+// region GetProfilesInfo Tags
+
+var (
+	TagICCID                         = bertlv.Application.Primitive(26)
+	TagISDPAID                       = bertlv.Application.Primitive(15)
+	TagProfileState                  = bertlv.ContextSpecific.Primitive(112)
+	TagNickname                      = bertlv.ContextSpecific.Primitive(16)
+	TagServiceProviderName           = bertlv.ContextSpecific.Primitive(17)
+	TagProfileName                   = bertlv.ContextSpecific.Primitive(18)
+	TagProfileIconType               = bertlv.ContextSpecific.Primitive(19)
+	TagProfileIcon                   = bertlv.ContextSpecific.Primitive(20)
+	TagProfileClass                  = bertlv.ContextSpecific.Primitive(21)
+	TagNotificationConfigurationInfo = bertlv.ContextSpecific.Constructed(22)
+	TagProfileOwner                  = bertlv.ContextSpecific.Constructed(23)
+	TagSMDPProprietaryData           = bertlv.ContextSpecific.Constructed(24)
+	TagProfilePolicyRules            = bertlv.ContextSpecific.Primitive(25)
+	TagServiceSpecificData           = bertlv.ContextSpecific.Constructed(34)
+)
+
+// endregion

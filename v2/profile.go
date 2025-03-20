@@ -119,8 +119,12 @@ func (id *OperatorId) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 	}
 	*id = OperatorId{
 		PLMN: tlv.First(bertlv.ContextSpecific.Primitive(0)).Value,
-		GID1: tlv.First(bertlv.ContextSpecific.Primitive(1)).Value,
-		GID2: tlv.First(bertlv.ContextSpecific.Primitive(2)).Value,
+	}
+	if gid1 := tlv.First(bertlv.ContextSpecific.Primitive(1)); gid1 != nil {
+		id.GID1 = gid1.Value
+	}
+	if gid2 := tlv.First(bertlv.ContextSpecific.Primitive(2)); gid2 != nil {
+		id.GID2 = gid2.Value
 	}
 	return nil
 }
