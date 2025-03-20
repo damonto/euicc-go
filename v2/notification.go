@@ -88,7 +88,6 @@ func (p *PendingNotification) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 	if pendingNotification == nil {
 		pendingNotification = tlv.First(bertlv.Universal.Constructed(16))
 	}
-
 	*p = PendingNotification{PendingNotification: pendingNotification}
 	p.Notification = new(NotificationMetadata)
 	if pendingNotification.Tag.If(bertlv.ContextSpecific, bertlv.Constructed, 55) {

@@ -47,7 +47,7 @@ func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) (err error) {
 			return err
 		}
 	}
-	if owner := tlv.First(bertlv.ContextSpecific.Primitive(23)); owner != nil {
+	if owner := tlv.First(bertlv.ContextSpecific.Constructed(23)); owner != nil {
 		if err = p.ProfileOwner.UnmarshalBERTLV(owner); err != nil {
 			return err
 		}
@@ -92,6 +92,9 @@ type OperatorId struct {
 }
 
 func (id *OperatorId) MCC() string {
+	if len(id.PLMN) == 0 {
+		return ""
+	}
 	return string([]byte{
 		'0' + id.PLMN[0]&0x0f,
 		'0' + id.PLMN[0]>>4,
@@ -100,6 +103,9 @@ func (id *OperatorId) MCC() string {
 }
 
 func (id *OperatorId) MNC() string {
+	if len(id.PLMN) < 2 {
+		return ""
+	}
 	mnc := []byte{'0' + id.PLMN[2]&0x0f, '0' + id.PLMN[2]>>4}
 	if last := id.PLMN[1] >> 4; last != 0xf {
 		mnc = append(mnc, '0'+last)

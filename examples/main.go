@@ -43,7 +43,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	transmitter, err := driver.NewTransmitter(ch, driver.ISDRAID, 240)
+	transmitter, err := driver.NewTransmitter(ch, driver.GSMAISDRApplicationAID, 240)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -68,6 +68,11 @@ func main() {
 	// if err := client.HandleNotification(pn[0]); err != nil {
 	// 	fmt.Println(err)
 	// 	return
+	// }
+
+	// ps, _ := client.ListProfile(nil)
+	// for _, p := range ps {
+	// 	fmt.Println(p.ProfileOwner.MCC())
 	// }
 
 	eid, _ := client.EID()
