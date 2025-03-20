@@ -2,10 +2,25 @@ package lpa
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/damonto/euicc-go/bertlv"
 	sgp22 "github.com/damonto/euicc-go/v2"
 )
+
+// ListProfileTags is a list of default tags that are used to list profiles.
+var ListProfileTags = []bertlv.Tag{
+	sgp22.TagICCID,
+	sgp22.TagISDPAID,
+	sgp22.TagProfileState,
+	sgp22.TagNickname,
+	sgp22.TagServiceProviderName,
+	sgp22.TagProfileName,
+	sgp22.TagProfileIconType,
+	sgp22.TagProfileIcon,
+	sgp22.TagProfileClass,
+	sgp22.TagProfileOwner,
+}
 
 // ListProfile returns a list of profiles that match the search criteria.
 // If the search criteria is empty, all profiles are returned.
@@ -16,7 +31,7 @@ import (
 // - [sgp22.ProfileClass]: The profile class of the profile.
 //
 // See https://aka.pw/sgp22/v2.5#page=199 (Section 5.7.15, ES10c.GetProfilesInfo)
-func (c *Client) ListProfile(searchCriteria any, tags []bertlv.Tag) ([]*sgp22.ProfileInfo, error) {
+func (c *Client) ListProfile(searchCriteria any, withTags []bertlv.Tag) ([]*sgp22.ProfileInfo, error) {
 	var request sgp22.ProfileInfoListRequest
 	switch v := searchCriteria.(type) {
 	case nil:
@@ -28,7 +43,7 @@ func (c *Client) ListProfile(searchCriteria any, tags []bertlv.Tag) ([]*sgp22.Pr
 	case sgp22.ProfileClass:
 		request.SearchCriteria, _ = bertlv.MarshalValue(bertlv.ContextSpecific.Primitive(21), v)
 	}
-	request.Tags = tags
+	request.Tags = slices.Concat(ListProfileTags, withTags)
 	response, err := sgp22.InvokeAPDU(c.APDU, &request)
 	if err != nil {
 		return nil, err

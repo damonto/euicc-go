@@ -33,26 +33,26 @@ type DownloadHandler interface {
 	ConfirmationCode() chan string
 }
 
-func (c *Client) DownloadProfile(ctx context.Context, activationCode *ActivationCode, handler DownloadHandler) (*sgp22.LoadBoundProfilePackageResponse, error) {
+func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, handler DownloadHandler) (*sgp22.LoadBoundProfilePackageResponse, error) {
 	handler.Progress(DownloadProgressAuthenticateClient)
-	clientResponse, metadata, ccRequired, err := c.authenticateClient(activationCode)
+	clientResponse, metadata, ccRequired, err := c.authenticateClient(ac)
 	if err != nil {
 		if clientResponse.Header.ExecutionStatus.ExecutedSuccess() {
-			return nil, c.handleDownloadError(activationCode, clientResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
+			return nil, c.handleDownloadError(ac, clientResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
 		}
 		return nil, err
 	}
 
 	if c.isCanceled(ctx) || !<-handler.Confirm(metadata) {
-		_, err := c.cancelSession(activationCode.SMDP, clientResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
+		_, err := c.cancelSession(ac, clientResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
 		return nil, err
 	}
 
-	if ccRequired && activationCode.ConfirmationCode == "" {
-		activationCode.ConfirmationCode = <-handler.ConfirmationCode()
-		if activationCode.ConfirmationCode == "" {
+	if ccRequired && ac.ConfirmationCode == "" {
+		ac.ConfirmationCode = <-handler.ConfirmationCode()
+		if ac.ConfirmationCode == "" {
 			return nil, c.handleDownloadError(
-				activationCode,
+				ac,
 				clientResponse.TransactionID,
 				errors.New("confirmation code is required"),
 				sgp22.CancelSessionReasonEndUserRejection,
@@ -62,22 +62,22 @@ func (c *Client) DownloadProfile(ctx context.Context, activationCode *Activation
 
 	handler.Progress(DownloadProgressAuthenticateServer)
 	if c.isCanceled(ctx) {
-		_, err := c.cancelSession(activationCode.SMDP, clientResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
+		_, err := c.cancelSession(ac, clientResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
 		return nil, err
 	}
-	serverResponse, err := c.authenticateServer(activationCode, clientResponse)
+	serverResponse, err := c.authenticateServer(ac, clientResponse)
 	if err != nil {
-		return nil, c.handleDownloadError(activationCode, serverResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
+		return nil, c.handleDownloadError(ac, serverResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
 	}
 
 	handler.Progress(DownloadProgressLoadBPP)
 	if c.isCanceled(ctx) {
-		_, err := c.cancelSession(activationCode.SMDP, serverResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
+		_, err := c.cancelSession(ac, serverResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
 		return nil, err
 	}
 	result, err := c.install(serverResponse)
 	if err != nil {
-		return nil, c.handleDownloadError(activationCode, serverResponse.TransactionID, err, sgp22.CancelSessionReasonLoadBppExecutionError)
+		return nil, c.handleDownloadError(ac, serverResponse.TransactionID, err, sgp22.CancelSessionReasonLoadBppExecutionError)
 	}
 	return result, nil
 }
@@ -112,34 +112,34 @@ func (c *Client) install(bppResponse *sgp22.ES9BoundProfilePackageResponse) (*sg
 	return &response, nil
 }
 
-func (c *Client) authenticateServer(activationCode *ActivationCode, clientResponse *sgp22.ES9AuthenticateClientResponse) (*sgp22.ES9BoundProfilePackageResponse, error) {
-	return c.PrepareDownload(activationCode.SMDP, &sgp22.PrepareDownloadRequest{
+func (c *Client) authenticateServer(ac *ActivationCode, clientResponse *sgp22.ES9AuthenticateClientResponse) (*sgp22.ES9BoundProfilePackageResponse, error) {
+	return c.PrepareDownload(ac.SMDP, &sgp22.PrepareDownloadRequest{
 		TransactionID:    clientResponse.TransactionID,
 		ProfileMetadata:  clientResponse.ProfileMetadata,
 		Signed2:          clientResponse.Signed2,
 		Signature2:       clientResponse.Signature2,
 		Certificate:      clientResponse.Certificate,
-		ConfirmationCode: []byte(activationCode.ConfirmationCode),
+		ConfirmationCode: []byte(ac.ConfirmationCode),
 	})
 }
 
-func (c *Client) authenticateClient(activationCode *ActivationCode) (*sgp22.ES9AuthenticateClientResponse, *sgp22.ProfileInfo, bool, error) {
-	initiateAuthenticationResponse, err := c.InitiateAuthentication(activationCode.SMDP)
+func (c *Client) authenticateClient(ac *ActivationCode) (*sgp22.ES9AuthenticateClientResponse, *sgp22.ProfileInfo, bool, error) {
+	initiateAuthenticationResponse, err := c.InitiateAuthentication(ac.SMDP)
 	if err != nil {
 		return nil, nil, false, err
 	}
-	imei, err := sgp22.NewIMEI(activationCode.IMEI)
+	imei, err := sgp22.NewIMEI(ac.IMEI)
 	if err != nil {
 		return nil, nil, false, err
 	}
-	response, err := c.AuthenticateClient(activationCode.SMDP, &sgp22.AuthenticateServerRequest{
+	response, err := c.AuthenticateClient(ac.SMDP, &sgp22.AuthenticateServerRequest{
 		TransactionID: initiateAuthenticationResponse.TransactionID,
 		Signed1:       initiateAuthenticationResponse.Signed1,
 		Signature1:    initiateAuthenticationResponse.Signature1,
 		UsedIssuer:    initiateAuthenticationResponse.UsedIssuer,
 		Certificate:   initiateAuthenticationResponse.Certificate,
 		IMEI:          imei,
-		MatchingID:    []byte(activationCode.MatchingID),
+		MatchingID:    []byte(ac.MatchingID),
 	})
 	if err != nil {
 		return response, nil, false, err
@@ -174,15 +174,15 @@ func (c *Client) isCanceled(ctx context.Context) bool {
 	}
 }
 
-func (c *Client) handleDownloadError(activationCode *ActivationCode, transactionID []byte, err error, cancelReason sgp22.CancelSessionReason) error {
-	_, cancelErr := c.cancelSession(activationCode.SMDP, transactionID, cancelReason)
+func (c *Client) handleDownloadError(ac *ActivationCode, transactionID []byte, err error, cancelReason sgp22.CancelSessionReason) error {
+	_, cancelErr := c.cancelSession(ac, transactionID, cancelReason)
 	if cancelErr != nil {
 		return errors.Join(err, fmt.Errorf("cancel session error: %w", cancelErr))
 	}
 	return err
 }
 
-func (c *Client) cancelSession(address *url.URL, transactionID []byte, reason sgp22.CancelSessionReason) (*sgp22.ES9CancelSessionResponse, error) {
+func (c *Client) cancelSession(ac *ActivationCode, transactionID []byte, reason sgp22.CancelSessionReason) (*sgp22.ES9CancelSessionResponse, error) {
 	cancelSessionRequest, err := sgp22.InvokeAPDU(c.APDU, &sgp22.CancelSessionRequest{
 		TransactionID: transactionID,
 		Reason:        reason,
@@ -190,5 +190,5 @@ func (c *Client) cancelSession(address *url.URL, transactionID []byte, reason sg
 	if err != nil {
 		return nil, err
 	}
-	return sgp22.InvokeHTTP(c.HTTP, address, cancelSessionRequest)
+	return sgp22.InvokeHTTP(c.HTTP, ac.SMDP, cancelSessionRequest)
 }
