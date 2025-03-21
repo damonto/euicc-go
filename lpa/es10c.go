@@ -10,6 +10,7 @@ import (
 
 // ListProfile returns a list of profiles that match the search criteria.
 // If the search criteria is empty, all profiles are returned.
+// The tags specify which additional data objects should be returned for each profile.
 //
 // Search Criteria:
 // - [sgp22.ICCID]: The ICCID of the profile.
@@ -17,7 +18,7 @@ import (
 // - [sgp22.ProfileClass]: The profile class of the profile.
 //
 // See https://aka.pw/sgp22/v2.5#page=199 (Section 5.7.15, ES10c.GetProfilesInfo)
-func (c *Client) ListProfile(searchCriteria any, withTags []bertlv.Tag) ([]*sgp22.ProfileInfo, error) {
+func (c *Client) ListProfile(searchCriteria any, tags []bertlv.Tag) ([]*sgp22.ProfileInfo, error) {
 	var request sgp22.ProfileInfoListRequest
 	switch v := searchCriteria.(type) {
 	case nil:
@@ -40,7 +41,7 @@ func (c *Client) ListProfile(searchCriteria any, withTags []bertlv.Tag) ([]*sgp2
 		sgp22.TagProfileIcon,
 		sgp22.TagProfileClass,
 		sgp22.TagProfileOwner,
-	}, withTags)
+	}, tags)
 	response, err := sgp22.InvokeAPDU(c.APDU, &request)
 	if err != nil {
 		return nil, err
