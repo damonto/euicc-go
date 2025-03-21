@@ -10,3 +10,5 @@ github.com/damonto/euicc-go v0.0.6 h1:jBSj4KXYpapIryqvdhNT/+JR0o6UB/PUU5OHayb+jm
 github.com/damonto/euicc-go v0.0.6/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
 github.com/damonto/euicc-go v0.0.7 h1:KBESQ9Ch0TcOQhhGYk+4E3e0sirJlj0dS2sD7RLlZO8=
 github.com/damonto/euicc-go v0.0.7/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
+github.com/damonto/euicc-go v0.0.9 h1:SxNGH+pI9r7AZqvp2PGh9Uni8YnoNWNmFDjB6FjSVXc=
+github.com/damonto/euicc-go v0.0.9/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
