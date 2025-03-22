@@ -14,6 +14,10 @@ if [[ ! " ${DRIVERS[@]} " =~ " ${DRIVER} " ]]; then
     exit 1
 fi
 
+if [[ $TAG != v* ]]; then
+    TAG="v$TAG"
+fi
+
 echo "Bumping $DRIVER to $TAG"
 git tag -as "driver/$DRIVER/$TAG" -m "Bump $DRIVER to $TAG"
 git push origin "driver/$DRIVER/$TAG"
