@@ -13,8 +13,9 @@ import (
 )
 
 type AT struct {
-	f       *os.File
-	channel byte
+	f          *os.File
+	oldTermios *unix.Termios
+	channel    byte
 }
 
 func New(device string) (apdu.SmartCardChannel, error) {
@@ -32,11 +33,10 @@ func New(device string) (apdu.SmartCardChannel, error) {
 
 func (a *AT) setTermios() error {
 	fd := int(a.f.Fd())
-	oldTermios, err := unix.IoctlGetTermios(fd, unix.TCGETS)
-	if err != nil {
+	var err error
+	if a.oldTermios, err = unix.IoctlGetTermios(fd, unix.TCGETS); err != nil {
 		return err
 	}
-	defer unix.IoctlSetTermios(fd, unix.TCSETS, oldTermios)
 	t := unix.Termios{
 		Ispeed: unix.B9600,
 		Ospeed: unix.B9600,
@@ -129,5 +129,8 @@ func (a *AT) CloseLogicalChannel(channel byte) error {
 }
 
 func (a *AT) Disconnect() error {
+	if err := unix.IoctlSetTermios(int(a.f.Fd()), unix.TCSETS, a.oldTermios); err != nil {
+		return err
+	}
 	return a.f.Close()
 }
