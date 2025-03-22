@@ -57,7 +57,8 @@ func main() {
 		APDU: transmitter,
 	}
 
-	// id, _ := sgp22.NewICCID("8944840003001326791")
+	// id, _ := sgp22.NewICCID("89861234567891232113")
+	// fmt.Println(client.DeleteProfile(id))
 	// fmt.Println(client.EnableProfile(id))
 
 	// pn, err := client.RetrieveNotificationList(sgp22.SequenceNumber(89))
