@@ -1,13 +1,15 @@
 module github.com/damonto/euicc-go/examples
 
-go 1.24.0
+go 1.24.1
 
 replace (
 	github.com/damonto/euicc-go => ../
-	github.com/damonto/euicc-go/driver/qmi => ../driver/qmi
+	github.com/damonto/euicc-go/driver/at => ../driver/at
 )
 
 require (
-	github.com/damonto/euicc-go v0.0.7
-	github.com/damonto/euicc-go/driver/qmi v0.0.0-00010101000000-000000000000
+	github.com/damonto/euicc-go v0.0.9
+	github.com/damonto/euicc-go/driver/at v0.0.0-00010101000000-000000000000
 )
+
+require golang.org/x/sys v0.31.0 // indirect

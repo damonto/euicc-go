@@ -82,9 +82,7 @@ func (c *CCIDReader) OpenLogicalChannel(aid []byte) (byte, error) {
 		return 0, errors.New("failed to open logical channel")
 	}
 	c.channel = channel[0]
-	command := []byte{c.channel, 0xA4, 0x04, 0x00, byte(len(aid))}
-	command = append(command, aid...)
-	sw, err := c.Transmit(command)
+	sw, err := c.Transmit(append([]byte{c.channel, 0xA4, 0x04, 0x00, byte(len(aid))}, aid...))
 	if err != nil {
 		return 0, err
 	}

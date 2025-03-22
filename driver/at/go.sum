@@ -1,0 +1,4 @@
+github.com/damonto/euicc-go v0.0.9 h1:SxNGH+pI9r7AZqvp2PGh9Uni8YnoNWNmFDjB6FjSVXc=
+github.com/damonto/euicc-go v0.0.9/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
+golang.org/x/sys v0.31.0 h1:ioabZlmFYtWhL+TRYpcnNlLwhyxaM9kWTDEmfnprqik=
+golang.org/x/sys v0.31.0/go.mod h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k=
