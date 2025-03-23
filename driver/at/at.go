@@ -21,8 +21,7 @@ type AT struct {
 func New(device string) (apdu.SmartCardChannel, error) {
 	var at AT
 	var err error
-	at.f, err = os.OpenFile(device, os.O_RDWR|unix.O_NOCTTY, 0666)
-	if err != nil {
+	if at.f, err = os.OpenFile(device, os.O_RDWR|unix.O_NOCTTY, 0666); err != nil {
 		return nil, err
 	}
 	if err := at.setTermios(); err != nil {
