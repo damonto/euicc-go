@@ -11,11 +11,6 @@ updates:
       interval: "weekly"
 
   - package-ecosystem: "gomod" # See documentation for possible values
-    directories:
-      - "/"
-      - "/driver/at"
-      - "/driver/ccid"
-      - "/driver/mbim"
-      - "/driver/qmi"
+    directory: "/"
     schedule:
       interval: "weekly"
