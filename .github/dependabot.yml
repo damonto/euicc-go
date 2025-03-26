@@ -5,12 +5,12 @@
 
 version: 2
 updates:
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-
   - package-ecosystem: "gomod" # See documentation for possible values
-    directory: "/"
+    directories:
+      - "/"
+      - "/driver/at"
+      - "/driver/ccid"
+      - "/driver/qmi"
+      - "/driver/mbim"
     schedule:
       interval: "weekly"
