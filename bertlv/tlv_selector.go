@@ -30,7 +30,7 @@ func (tlv *TLV) Find(tag Tag) (matches []*TLV) {
 
 func (tlv *TLV) Select(tags ...Tag) *TLV {
 	next := tlv
-	for index := 0; index < len(tags); index++ {
+	for index := range tags {
 		if next = next.First(tags[index]); next == nil {
 			return nil
 		}

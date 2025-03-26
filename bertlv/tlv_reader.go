@@ -37,22 +37,6 @@ func (tlv *TLV) ReadFrom(r io.Reader) (n int64, err error) {
 	return
 }
 
-func (tlv *TLV) ParseChildren() {
-	if len(tlv.Value) == 0 || len(tlv.Children) > 0 {
-		return
-	}
-	r := bytes.NewReader(tlv.Value)
-	for r.Len() > 0 {
-		child := new(TLV)
-		if _, err := child.ReadFrom(r); err != nil {
-			tlv.Children = nil
-			return
-		}
-		tlv.Children = append(tlv.Children, child)
-	}
-	tlv.Value = nil
-}
-
 func (tlv *TLV) UnmarshalText(text []byte) error {
 	_, err := tlv.ReadFrom(base64.NewDecoder(base64.StdEncoding, bytes.NewReader(text)))
 	return err
