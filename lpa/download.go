@@ -38,7 +38,7 @@ func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, handle
 	clientResponse, metadata, ccRequired, err := c.authenticateClient(ac)
 	if err != nil {
 		if clientResponse.Header.ExecutionStatus.ExecutedSuccess() {
-			return nil, c.handleDownloadError(ac, clientResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
+			return nil, c.raiseError(ac, clientResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
 		}
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, handle
 	if ccRequired && ac.ConfirmationCode == "" {
 		ac.ConfirmationCode = <-handler.ConfirmationCode()
 		if ac.ConfirmationCode == "" {
-			return nil, c.handleDownloadError(
+			return nil, c.raiseError(
 				ac,
 				clientResponse.TransactionID,
 				errors.New("confirmation code is required"),
@@ -67,7 +67,7 @@ func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, handle
 	}
 	serverResponse, err := c.authenticateServer(ac, clientResponse)
 	if err != nil {
-		return nil, c.handleDownloadError(ac, serverResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
+		return nil, c.raiseError(ac, serverResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
 	}
 
 	handler.Progress(DownloadProgressLoadBPP)
@@ -77,7 +77,7 @@ func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, handle
 	}
 	result, err := c.install(serverResponse)
 	if err != nil {
-		return nil, c.handleDownloadError(ac, serverResponse.TransactionID, err, sgp22.CancelSessionReasonLoadBppExecutionError)
+		return nil, c.raiseError(ac, serverResponse.TransactionID, err, sgp22.CancelSessionReasonLoadBppExecutionError)
 	}
 	return result, nil
 }
@@ -87,19 +87,18 @@ func (c *Client) install(bppResponse *sgp22.ES9BoundProfilePackageResponse) (*sg
 	if err != nil {
 		return nil, err
 	}
-	var sw []byte
+	var r []byte
 	for _, command := range segments {
-		sw, err = sgp22.InvokeRawAPDU(c.APDU, command)
+		r, err = sgp22.InvokeRawAPDU(c.APDU, command)
 		if err != nil {
 			return nil, err
 		}
-		// If the response is not empty, it means the installation is completed.
-		if len(sw) > 0 {
+		if len(r) > 0 {
 			break
 		}
 	}
 	var tlv bertlv.TLV
-	if err := tlv.UnmarshalBinary(sw); err != nil {
+	if err := tlv.UnmarshalBinary(r); err != nil {
 		return nil, err
 	}
 	var response sgp22.LoadBoundProfilePackageResponse
@@ -174,7 +173,7 @@ func (c *Client) isCanceled(ctx context.Context) bool {
 	}
 }
 
-func (c *Client) handleDownloadError(ac *ActivationCode, transactionID []byte, err error, cancelReason sgp22.CancelSessionReason) error {
+func (c *Client) raiseError(ac *ActivationCode, transactionID []byte, err error, cancelReason sgp22.CancelSessionReason) error {
 	_, cancelErr := c.cancelSession(ac, transactionID, cancelReason)
 	if cancelErr != nil {
 		return errors.Join(err, fmt.Errorf("cancel session error: %w", cancelErr))

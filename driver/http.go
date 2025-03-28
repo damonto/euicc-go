@@ -39,12 +39,12 @@ func (l *LoggingRoundTripper) RoundTrip(request *http.Request) (*http.Response, 
 	if err != nil {
 		return nil, err
 	}
-	responseBody, err := io.ReadAll(response.Body)
+	rb, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}
-	response.Body = io.NopCloser(bytes.NewBuffer(responseBody))
-	l.logger.Debug("[HTTP] received response from", "url", request.URL.String(), "body", string(responseBody))
+	response.Body = io.NopCloser(bytes.NewBuffer(rb))
+	l.logger.Debug("[HTTP] received response from", "url", request.URL.String(), "body", string(rb))
 	return response, nil
 }
 
