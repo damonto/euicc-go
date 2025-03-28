@@ -1,6 +1,7 @@
 package sgp22
 
 import (
+	"errors"
 	"slices"
 
 	"github.com/damonto/euicc-go/bertlv"
@@ -83,6 +84,9 @@ type PendingNotification struct {
 func (p *PendingNotification) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 	if !tlv.Tag.If(bertlv.ContextSpecific, bertlv.Constructed, 0) {
 		return ErrUnexpectedTag
+	}
+	if len(tlv.Children) == 0 {
+		return errors.New("notification does not exist")
 	}
 	pendingNotification := tlv.First(bertlv.ContextSpecific.Constructed(55))
 	if pendingNotification == nil {

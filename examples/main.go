@@ -3,11 +3,8 @@ package main
 import (
 	"fmt"
 	"log/slog"
-	"time"
 
-	"github.com/damonto/euicc-go/driver"
 	"github.com/damonto/euicc-go/driver/at"
-	sgp22http "github.com/damonto/euicc-go/http"
 	"github.com/damonto/euicc-go/lpa"
 	sgp22 "github.com/damonto/euicc-go/v2"
 )
@@ -43,19 +40,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	transmitter, err := driver.NewTransmitter(ch, driver.GSMAISDRApplicationAID, 240)
+	client, err := lpa.New(&lpa.Option{
+		Channel: ch,
+	})
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	defer transmitter.Close()
-	client := &lpa.Client{
-		HTTP: &sgp22http.Client{
-			Client:        driver.NewHTTPClient(30 * time.Second),
-			AdminProtocol: "gsma/rsp/v2.2.0",
-		},
-		APDU: transmitter,
-	}
+	defer client.Close()
 
 	// id, _ := sgp22.NewICCID("89861234567891232113")
 	// fmt.Println(client.DeleteProfile(id))

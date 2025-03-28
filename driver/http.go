@@ -14,10 +14,12 @@ import (
 
 type LoggingRoundTripper struct {
 	transport *http.Transport
+	logger    *slog.Logger
 }
 
-func NewLoggingRoundTripper(rootci *x509.CertPool) *LoggingRoundTripper {
+func NewLoggingRoundTripper(rootci *x509.CertPool, logger *slog.Logger) *LoggingRoundTripper {
 	return &LoggingRoundTripper{
+		logger: logger,
 		transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				RootCAs: rootci,
@@ -32,8 +34,7 @@ func (l *LoggingRoundTripper) RoundTrip(request *http.Request) (*http.Response, 
 		return nil, err
 	}
 	request.Body = io.NopCloser(bytes.NewBuffer(body))
-	slog.Debug("[HTTP] sending request to", "url", request.URL.String(), "body", string(body))
-
+	l.logger.Debug("[HTTP] sending request to", "url", request.URL.String(), "body", string(body))
 	response, err := l.transport.RoundTrip(request)
 	if err != nil {
 		return nil, err
@@ -43,15 +44,16 @@ func (l *LoggingRoundTripper) RoundTrip(request *http.Request) (*http.Response, 
 		return nil, err
 	}
 	response.Body = io.NopCloser(bytes.NewBuffer(responseBody))
-	slog.Debug("[HTTP] received response from", "url", request.URL.String(), "body", string(responseBody))
+	l.logger.Debug("[HTTP] received response from", "url", request.URL.String(), "body", string(responseBody))
 	return response, nil
 }
 
-func NewHTTPClient(timeout time.Duration) *http.Client {
+func NewHTTPClient(logger *slog.Logger, timeout time.Duration) *http.Client {
 	return &http.Client{
 		Timeout: timeout,
 		Transport: NewLoggingRoundTripper(
 			rootci.TrustedRootCIs(),
+			logger,
 		),
 	}
 }
