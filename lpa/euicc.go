@@ -56,7 +56,7 @@ func (opt *Option) validateAdminProtocolVersion() error {
 	return nil
 }
 
-func (opt *Option) validateAPDUMSS() error {
+func (opt *Option) validateMSS() error {
 	if opt.MSS == 0 {
 		opt.MSS = 254
 	}
@@ -70,7 +70,7 @@ func (opt *Option) Validate() error {
 	if opt.AID == nil {
 		opt.AID = GSMAISDRApplicationAID
 	}
-	if err := opt.validateAPDUMSS(); err != nil {
+	if err := opt.validateMSS(); err != nil {
 		return err
 	}
 	if err := opt.validateAdminProtocolVersion(); err != nil {
