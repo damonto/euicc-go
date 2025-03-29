@@ -77,7 +77,7 @@ func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, handle
 	}
 	result, err := c.install(serverResponse)
 	if err != nil {
-		return nil, c.raiseError(ac, serverResponse.TransactionID, err, sgp22.CancelSessionReasonLoadBppExecutionError)
+		return result, c.raiseError(ac, serverResponse.TransactionID, err, sgp22.CancelSessionReasonLoadBppExecutionError)
 	}
 	return result, nil
 }
