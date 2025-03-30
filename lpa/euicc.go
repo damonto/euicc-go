@@ -31,7 +31,7 @@ type Option struct {
 	Channel apdu.SmartCardChannel
 	// AID is the application identifier for the GSMA ISD-R application. It defaults to GSMA ISD-R Application AID.
 	AID []byte
-	// MSS is the maximum APDU size. It defaults to 240.
+	// MSS is the maximum APDU size. It defaults to 254.
 	MSS int
 	// AdminProtocolVersion is the version of the admin protocol. It defaults to "v2.2.0".
 	AdminProtocolVersion string
