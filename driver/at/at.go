@@ -99,7 +99,10 @@ func (a *AT) sw(sw string) ([]byte, error) {
 }
 
 func (a *AT) Connect() error {
-	_, err := a.execute("AT+CSIM=?")
+	if _, err := a.execute("AT+CSIM=?"); err != nil {
+		return err
+	}
+	_, err := a.Transmit([]byte{0x80, 0xAA, 0x00, 0x00, 0x0A, 0xA9, 0x08, 0x81, 0x00, 0x82, 0x01, 0x01, 0x83, 0x01, 0x07})
 	return err
 }
 
