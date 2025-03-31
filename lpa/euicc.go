@@ -43,7 +43,7 @@ type Option struct {
 
 func (opt *Option) validateAdminProtocolVersion() error {
 	if opt.AdminProtocolVersion == "" {
-		opt.AdminProtocolVersion = "2.2.0"
+		opt.AdminProtocolVersion = "2.2.2"
 	}
 	// If the version starts with "v", remove it
 	if opt.AdminProtocolVersion[0] == 'v' {
