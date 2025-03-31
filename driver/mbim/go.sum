@@ -1,14 +1,2 @@
-github.com/damonto/euicc-go v0.0.0-20250303092930-84ab84390c27 h1:AxKJItUt6JjVxl9m1RymQLyR3ezmNCdQZQzn9U2kk+4=
-github.com/damonto/euicc-go v0.0.0-20250303092930-84ab84390c27/go.mod h1:pn+9b2mTaei6AKLDc1aVyUKK8JFRMZs1l18kNCFWmr8=
-github.com/damonto/euicc-go v0.0.0-20250304064401-cce9769bc8f1 h1:oU5qVHgnF6dBpQTA0KjB6BI/lEpWQFBaS+Oz8+n8P/I=
-github.com/damonto/euicc-go v0.0.0-20250304064401-cce9769bc8f1/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
-github.com/damonto/euicc-go v0.0.1 h1:UCOCSnqCrNuaGczzKQB0hoaJ7DznVn0hbOqPTserl/o=
-github.com/damonto/euicc-go v0.0.1/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
-github.com/damonto/euicc-go v0.0.5 h1:2rH1cS0p9MB/rFhiv3piTWHDVC0Qz4xnTAWeZHFN7SM=
-github.com/damonto/euicc-go v0.0.5/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
-github.com/damonto/euicc-go v0.0.6 h1:jBSj4KXYpapIryqvdhNT/+JR0o6UB/PUU5OHayb+jmM=
-github.com/damonto/euicc-go v0.0.6/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
-github.com/damonto/euicc-go v0.0.7 h1:KBESQ9Ch0TcOQhhGYk+4E3e0sirJlj0dS2sD7RLlZO8=
-github.com/damonto/euicc-go v0.0.7/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
-github.com/damonto/euicc-go v0.0.9 h1:SxNGH+pI9r7AZqvp2PGh9Uni8YnoNWNmFDjB6FjSVXc=
-github.com/damonto/euicc-go v0.0.9/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
+github.com/damonto/euicc-go v0.0.10 h1:UPA+m9gcVXImmGT7+SrO+wpQdLOf/qVedkzOLdVXIb8=
+github.com/damonto/euicc-go v0.0.10/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
