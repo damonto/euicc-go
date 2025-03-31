@@ -1,15 +1,7 @@
 github.com/ElMostafaIdrassi/goscard v1.0.0 h1:RDG5QrqrQBUoi5MkzM4zILdYf8qDn62daYZszqvdgx0=
 github.com/ElMostafaIdrassi/goscard v1.0.0/go.mod h1:uGOakQe2fFlW2cVlr9cv6x07uelrf0j0aKPbR7jGgfg=
-github.com/damonto/euicc-go v0.0.1 h1:UCOCSnqCrNuaGczzKQB0hoaJ7DznVn0hbOqPTserl/o=
-github.com/damonto/euicc-go v0.0.1/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
-github.com/damonto/euicc-go v0.0.5 h1:2rH1cS0p9MB/rFhiv3piTWHDVC0Qz4xnTAWeZHFN7SM=
-github.com/damonto/euicc-go v0.0.5/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
-github.com/damonto/euicc-go v0.0.6 h1:jBSj4KXYpapIryqvdhNT/+JR0o6UB/PUU5OHayb+jmM=
-github.com/damonto/euicc-go v0.0.6/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
-github.com/damonto/euicc-go v0.0.7 h1:KBESQ9Ch0TcOQhhGYk+4E3e0sirJlj0dS2sD7RLlZO8=
-github.com/damonto/euicc-go v0.0.7/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
-github.com/damonto/euicc-go v0.0.9 h1:SxNGH+pI9r7AZqvp2PGh9Uni8YnoNWNmFDjB6FjSVXc=
-github.com/damonto/euicc-go v0.0.9/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
+github.com/damonto/euicc-go v0.0.10 h1:UPA+m9gcVXImmGT7+SrO+wpQdLOf/qVedkzOLdVXIb8=
+github.com/damonto/euicc-go v0.0.10/go.mod h1:teGRRJUBWhmV8S+c/TCfjmlAJtTjb7qqPqguqu4tSCE=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/ebitengine/purego v0.8.2 h1:jPPGWs2sZ1UgOSgD2bClL0MJIqu58nOmIcBuXr62z1I=
