@@ -33,7 +33,7 @@ type Option struct {
 	AID []byte
 	// MSS is the maximum APDU size. It defaults to 254.
 	MSS int
-	// AdminProtocolVersion is the version of the admin protocol. It defaults to "v2.5.0".
+	// AdminProtocolVersion is the version of the admin protocol. It defaults to "2.5.0".
 	AdminProtocolVersion string
 	// Logger is the logger for the LPA client. It defaults to slog.Default().
 	Logger *slog.Logger
