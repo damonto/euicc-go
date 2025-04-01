@@ -8,7 +8,7 @@ replace (
 )
 
 require (
-	github.com/damonto/euicc-go v0.0.9
+	github.com/damonto/euicc-go v0.0.10
 	github.com/damonto/euicc-go/driver/at v0.0.0-00010101000000-000000000000
 )
 

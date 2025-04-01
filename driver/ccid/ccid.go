@@ -78,7 +78,7 @@ func (c *CCIDReader) OpenLogicalChannel(aid []byte) (byte, error) {
 	if err != nil {
 		return 0, err
 	}
-	if channel[1] != 0x90 {
+	if channel[len(channel)-2] != 0x90 {
 		return 0, errors.New("failed to open logical channel")
 	}
 	c.channel = channel[0]
