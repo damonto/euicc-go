@@ -2,6 +2,7 @@ package ccid
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ElMostafaIdrassi/goscard"
 	"github.com/damonto/euicc-go/apdu"
@@ -79,7 +80,7 @@ func (c *CCIDReader) OpenLogicalChannel(aid []byte) (byte, error) {
 		return 0, err
 	}
 	if channel[len(channel)-2] != 0x90 {
-		return 0, errors.New("failed to open logical channel")
+		return 0, fmt.Errorf("failed to open logical channel: %X", channel)
 	}
 	c.channel = channel[0]
 	sw, err := c.Transmit(append([]byte{c.channel, 0xA4, 0x04, 0x00, byte(len(aid))}, aid...))
@@ -87,7 +88,7 @@ func (c *CCIDReader) OpenLogicalChannel(aid []byte) (byte, error) {
 		return 0, err
 	}
 	if sw[len(sw)-2] != 0x90 && sw[len(sw)-2] != 0x61 {
-		return 0, errors.New("failed to select AID")
+		return 0, fmt.Errorf("failed to select AID: %X", sw)
 	}
 	return c.channel, nil
 }

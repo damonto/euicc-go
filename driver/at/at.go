@@ -111,8 +111,8 @@ func (a *AT) OpenLogicalChannel(aid []byte) (byte, error) {
 	if err != nil {
 		return 0, err
 	}
-	if channel[1] != 0x90 {
-		return 0, errors.New("failed to open logical channel")
+	if channel[len(channel)-2] != 0x90 {
+		return 0, fmt.Errorf("failed to open logical channel: %X", channel)
 	}
 	a.channel = channel[0]
 	sw, err := a.Transmit(append([]byte{a.channel, 0xA4, 0x04, 0x00, byte(len(aid))}, aid...))
@@ -120,7 +120,7 @@ func (a *AT) OpenLogicalChannel(aid []byte) (byte, error) {
 		return 0, err
 	}
 	if sw[len(sw)-2] != 0x90 && sw[len(sw)-2] != 0x61 {
-		return 0, errors.New("failed to select AID")
+		return 0, fmt.Errorf("failed to select AID: %X", sw)
 	}
 	return a.channel, nil
 }
