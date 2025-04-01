@@ -33,7 +33,7 @@ type Option struct {
 	AID []byte
 	// MSS is the maximum APDU size. It defaults to 254.
 	MSS int
-	// AdminProtocolVersion is the version of the admin protocol. It defaults to "v2.2.2".
+	// AdminProtocolVersion is the version of the admin protocol. It defaults to "v2.5.0".
 	AdminProtocolVersion string
 	// Logger is the logger for the LPA client. It defaults to slog.Default().
 	Logger *slog.Logger
@@ -43,7 +43,7 @@ type Option struct {
 
 func (opt *Option) validateAdminProtocolVersion() error {
 	if opt.AdminProtocolVersion == "" {
-		opt.AdminProtocolVersion = "2.2.2"
+		opt.AdminProtocolVersion = "2.5.0"
 	}
 	// If the version starts with "v", remove it
 	if opt.AdminProtocolVersion[0] == 'v' {
