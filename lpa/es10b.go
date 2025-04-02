@@ -98,6 +98,9 @@ func (c *Client) RetrieveNotificationList(searchCriteria any) ([]*sgp22.PendingN
 	return response.NotificationList, nil
 }
 
+// RemoveNotificationFromList removes a notification from the eUICC's notification list.
+//
+// See https://aka.pw/sgp22/v2.5#page=193 (Section 5.7.11, ES10b.RemoveNotificationFromList)
 func (c *Client) RemoveNotificationFromList(sequenceNumber sgp22.SequenceNumber) error {
 	_, err := sgp22.InvokeAPDU(c.APDU, &sgp22.NotificationSentRequest{
 		SequenceNumber: sequenceNumber,
