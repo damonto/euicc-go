@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/damonto/euicc-go/bertlv"
 	"github.com/damonto/euicc-go/bertlv/primitive"
@@ -190,4 +191,56 @@ func (c *Client) cancelSession(ac *ActivationCode, transactionID []byte, reason 
 		return nil, err
 	}
 	return sgp22.InvokeHTTP(c.HTTP, ac.SMDP, cancelSessionRequest)
+}
+
+func ParseActivationCode(acString string, imei string) (*ActivationCode, error) {
+	acString = strings.TrimPrefix(acString, "LPA:")
+
+	parts := strings.Split(acString, "$")
+
+	if len(parts) < 3 {
+		return nil, fmt.Errorf("activation code is invalid")
+	}
+
+	acFormat := parts[0]
+
+	if acFormat != "1" {
+		return nil, fmt.Errorf("invalid activation code format: %s", acFormat)
+	}
+
+	// Add https:// scheme if not present
+	smdpAddress := parts[1]
+	if !strings.Contains(smdpAddress, "://") {
+		smdpAddress = "https://" + smdpAddress
+	}
+	
+	smdp, err := url.Parse(smdpAddress)
+	if err != nil {
+		return nil, fmt.Errorf("smdp+ address is invalid : %w", err)
+	}
+	
+	// Validate hostname format
+	if !strings.Contains(smdp.Host, ".") || smdp.Path != "" || smdp.RawQuery != "" || smdp.Fragment != "" {
+		return nil, fmt.Errorf("smdp+ address is not a valid hostname")
+	}
+
+	acToken := parts[2]
+
+	oid := ""
+	if len(parts) > 3 {
+		oid = parts[3]
+	}
+
+	confirmationCode := ""
+	if len(parts) > 4 {
+		confirmationCode = parts[4]
+	}
+
+	return &ActivationCode{
+		SMDP:             smdp,
+		MatchingID:       acToken,
+		IMEI:             imei,
+		OID:              oid,
+		ConfirmationCode: confirmationCode,
+	}, nil
 }
