@@ -87,7 +87,7 @@ func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, handle
 	handler.Progress(DownloadProgressAuthenticateClient)
 	clientResponse, metadata, ccRequired, err := c.authenticateClient(ac)
 	if err != nil {
-		if clientResponse != nil && clientResponse.Header.ExecutionStatus.ExecutedSuccess() {
+		if clientResponse != nil && clientResponse.FunctionExecutionStatus().ExecutedSuccess() {
 			return nil, c.raiseError(ac, clientResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
 		}
 		return nil, err
