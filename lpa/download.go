@@ -5,18 +5,58 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/damonto/euicc-go/bertlv"
 	"github.com/damonto/euicc-go/bertlv/primitive"
 	sgp22 "github.com/damonto/euicc-go/v2"
 )
 
+// ActivationCode represents the activation code for downloading a profile.
+//
+// See https://aka.pw/sgp22/v2.5#page=113 (Section 4.1 Activation Code)
 type ActivationCode struct {
 	SMDP             *url.URL
 	MatchingID       string
 	IMEI             string
 	OID              string
 	ConfirmationCode string
+}
+
+func (ac *ActivationCode) MarshalText() ([]byte, error) {
+	if ac.SMDP == nil {
+		return nil, errors.New("SM-DP+ is required")
+	}
+	ccRequiredFlag := 0
+	if ac.ConfirmationCode != "" {
+		ccRequiredFlag = 1
+	}
+	return fmt.Appendf(nil, "LPA:1$%s$%s$%s$%d", ac.SMDP.Host, ac.MatchingID, ac.OID, ccRequiredFlag), nil
+}
+
+func (ac *ActivationCode) UnmarshalText(text []byte) error {
+	if text == nil {
+		return errors.New("activation code is required")
+	}
+	code := string(text)
+	if !strings.HasPrefix(code, "LPA:1") {
+		return errors.New("invalid activation code format")
+	}
+	parts := strings.Split(code, "$")
+	if len(parts) < 2 {
+		return errors.New("invalid activation code format")
+	}
+	var err error
+	if ac.SMDP, err = url.Parse("https://" + parts[1]); err != nil {
+		return err
+	}
+	if len(parts) > 2 {
+		ac.MatchingID = parts[2]
+	}
+	if len(parts) > 3 {
+		ac.OID = parts[3]
+	}
+	return nil
 }
 
 type DownloadProgress uint8
