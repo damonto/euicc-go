@@ -27,11 +27,21 @@ func (ac *ActivationCode) MarshalText() ([]byte, error) {
 	if ac.SMDP == nil {
 		return nil, errors.New("SM-DP+ is required")
 	}
-	ccRequiredFlag := 0
-	if ac.ConfirmationCode != "" {
-		ccRequiredFlag = 1
+	b := []byte("LPA:1$")
+	b = append(append(b, ac.SMDP.Host...), '$')
+	if ac.MatchingID != "" {
+		b = append(b, ac.MatchingID...)
 	}
-	return fmt.Appendf(nil, "LPA:1$%s$%s$%s$%d", ac.SMDP.Host, ac.MatchingID, ac.OID, ccRequiredFlag), nil
+	if ac.OID != "" {
+		b = append(append(b, '$'), ac.OID...)
+	}
+	if ac.ConfirmationCode != "" {
+		if ac.OID == "" {
+			b = append(b, '$')
+		}
+		b = append(b, '$', '1')
+	}
+	return b, nil
 }
 
 func (ac *ActivationCode) UnmarshalText(text []byte) error {
