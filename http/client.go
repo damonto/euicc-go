@@ -36,11 +36,10 @@ func (c *Client) SendRequest(u *url.URL, request, response any) error {
 	if httpResponse.StatusCode > 299 {
 		return fmt.Errorf("unexpected status code: %d", httpResponse.StatusCode)
 	}
+	defer httpResponse.Body.Close()
 	if err = json.NewDecoder(httpResponse.Body).Decode(response); err != nil && err != io.EOF {
-		_ = httpResponse.Body.Close()
 		return err
 	}
-	_ = httpResponse.Body.Close()
 	return nil
 }
 

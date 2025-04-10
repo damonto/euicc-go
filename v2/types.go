@@ -50,9 +50,11 @@ type HTTPResponse interface {
 
 func InvokeHTTP[I HTTPRequest[O], O HTTPResponse](client HTTPClient, address *url.URL, request I) (O, error) {
 	response := request.RemoteResponse()
-	err := client.SendRequest(request.URL(address), request, response)
+	if err := client.SendRequest(request.URL(address), request, response); err != nil {
+		return response, err
+	}
 	if !response.FunctionExecutionStatus().ExecutedSuccess() {
 		return response, errors.New(response.FunctionExecutionStatus().StatusCodeData.Error())
 	}
-	return response, err
+	return response, nil
 }
