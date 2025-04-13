@@ -44,7 +44,7 @@ func (imei IMEI) String() string {
 
 // endregion
 
-func binaryCodedDecimalEncode[T IMEI | ICCID](value string) (T, error) {
+func binaryCodedDecimalEncode[T ~[]byte](value string) (T, error) {
 	for _, r := range value {
 		if (r < '0' || r > '9') && !(r == 'f' || r == 'F') {
 			return nil, errors.New("invalid value")
