@@ -46,7 +46,7 @@ func (imei IMEI) String() string {
 
 func binaryCodedDecimalEncode[T ~[]byte](value string) (T, error) {
 	for _, r := range value {
-		if (r < '0' || r > '9') && !(r == 'f' || r == 'F') {
+		if (r < '0' || r > '9') && (r < 'A' || r > 'F') && (r < 'a' || r > 'f') {
 			return nil, errors.New("invalid value")
 		}
 	}
@@ -55,19 +55,19 @@ func binaryCodedDecimalEncode[T ~[]byte](value string) (T, error) {
 	}
 	id, _ := hex.DecodeString(value)
 	for index := range id {
-		id[index] = id[index]>>4 | id[index]<<4
+		id[index] = (id[index]>>4)&0x0F | (id[index]<<4)&0xF0
 	}
-	return id, nil
+	return T(id), nil
 }
 
 func binaryCodedDecimalDecode(value []byte) string {
 	id := make([]byte, len(value))
 	var index int
 	for index = range value {
-		id[index] = value[index]>>4 | value[index]<<4
+		id[index] = (value[index]>>4)&0x0F | (value[index]<<4)&0xF0
 	}
 	points := hex.EncodeToString(id)
-	if index = strings.IndexByte(points, 'f'); index != -1 {
+	if index := strings.LastIndexByte(points, 'f'); index != -1 {
 		points = points[:index]
 	}
 	return points
