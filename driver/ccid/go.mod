@@ -6,10 +6,10 @@ toolchain go1.24.1
 
 require (
 	github.com/ElMostafaIdrassi/goscard v1.0.0
-	github.com/damonto/euicc-go v0.0.10
+	github.com/damonto/euicc-go v0.0.11
 )
 
 require (
 	github.com/ebitengine/purego v0.8.2 // indirect
-	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
 )
