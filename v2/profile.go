@@ -9,15 +9,16 @@ import (
 )
 
 type ProfileInfo struct {
-	ICCID               ICCID
-	ISDPAID             ISDPAID
-	ProfileState        ProfileState
-	ProfileNickname     string
-	ServiceProviderName string
-	ProfileName         string
-	Icon                ProfileIcon
-	ProfileClass        ProfileClass
-	ProfileOwner        OperatorId
+	ICCID                         ICCID
+	ISDPAID                       ISDPAID
+	ProfileState                  ProfileState
+	ProfileNickname               string
+	ServiceProviderName           string
+	ProfileName                   string
+	Icon                          ProfileIcon
+	ProfileClass                  ProfileClass
+	ProfileOwner                  OperatorId
+	NotificationConfigurationInfo NotificationConfigurationInfo
 }
 
 func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) (err error) {
@@ -44,6 +45,11 @@ func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) (err error) {
 	}
 	if tlv.Tag.If(bertlv.Private, bertlv.Constructed, 3) {
 		if err = tlv.First(bertlv.ContextSpecific.Primitive(112)).UnmarshalValue(primitive.UnmarshalInt(&p.ProfileState)); err != nil {
+			return err
+		}
+	}
+	if notification := tlv.First(bertlv.ContextSpecific.Constructed(22)); notification != nil {
+		if err = p.NotificationConfigurationInfo.UnmarshalBERTLV(notification); err != nil {
 			return err
 		}
 	}
@@ -126,5 +132,28 @@ func (id *OperatorId) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 	if gid2 := tlv.First(bertlv.ContextSpecific.Primitive(2)); gid2 != nil {
 		id.GID2 = gid2.Value
 	}
+	return nil
+}
+
+type NotificationConfiguration struct {
+	ProfileManagementOperation NotificationEvent
+	Address                    string
+}
+
+type NotificationConfigurationInfo []*NotificationConfiguration
+
+func (n *NotificationConfigurationInfo) UnmarshalBERTLV(tlv *bertlv.TLV) error {
+	if !tlv.Tag.If(bertlv.ContextSpecific, bertlv.Constructed, 22) {
+		return ErrUnexpectedTag
+	}
+	configs := make(NotificationConfigurationInfo, 0, len(tlv.Children))
+	for _, child := range tlv.Children {
+		c := NotificationConfiguration{
+			Address: string(child.First(bertlv.ContextSpecific.Primitive(1)).Value),
+		}
+		c.ProfileManagementOperation.UnmarshalBinary(child.First(bertlv.ContextSpecific.Primitive(0)).Value)
+		configs = append(configs, &c)
+	}
+	*n = configs
 	return nil
 }
