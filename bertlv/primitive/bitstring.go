@@ -47,7 +47,7 @@ func MarshalBitString(bits []bool) encoding.BinaryMarshaler {
 
 		var x byte
 		var offset int
-		for index := 0; index < len(bits); index++ {
+		for index := range bits {
 			offset = index / 8
 			if x = 7 - byte(index%8); bits[index] {
 				data[1+offset] |= 0b1 << x
