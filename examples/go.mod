@@ -12,4 +12,4 @@ require (
 	github.com/damonto/euicc-go/driver/at v0.0.2
 )
 
-require golang.org/x/sys v0.32.0 // indirect
+require golang.org/x/sys v0.33.0 // indirect
