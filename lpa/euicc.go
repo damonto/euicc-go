@@ -42,9 +42,6 @@ type Option struct {
 }
 
 func (opt *Option) validateAdminProtocolVersion() error {
-	if opt.AdminProtocolVersion == "" {
-		opt.AdminProtocolVersion = "2.5.0"
-	}
 	// If the version starts with "v", remove it
 	if opt.AdminProtocolVersion[0] == 'v' {
 		opt.AdminProtocolVersion = opt.AdminProtocolVersion[1:]
@@ -57,19 +54,13 @@ func (opt *Option) validateAdminProtocolVersion() error {
 }
 
 func (opt *Option) validateMSS() error {
-	if opt.MSS == 0 {
-		opt.MSS = 254
-	}
 	if opt.MSS < 0 || opt.MSS > 254 {
 		return fmt.Errorf("invalid maximum APDU size: %d", opt.MSS)
 	}
 	return nil
 }
 
-func (opt *Option) Validate() error {
-	if opt.AID == nil {
-		opt.AID = GSMAISDRApplicationAID
-	}
+func (opt *Option) validate() error {
 	if err := opt.validateMSS(); err != nil {
 		return err
 	}
@@ -79,20 +70,38 @@ func (opt *Option) Validate() error {
 	if opt.Channel == nil {
 		return errors.New("channel is required for APDU communication")
 	}
-	if opt.Logger == nil {
-		opt.Logger = slog.Default()
+	return nil
+}
+
+func (opt *Option) setDefaults() {
+	if opt.AID == nil {
+		opt.AID = GSMAISDRApplicationAID
+	}
+	if opt.MSS == 0 {
+		opt.MSS = 254
+	}
+	if opt.AdminProtocolVersion == "" {
+		opt.AdminProtocolVersion = "2.5.0"
 	}
 	if opt.Timeout == 0 {
 		opt.Timeout = 30 * time.Second
 	}
-	return nil
+	if opt.Logger == nil {
+		opt.Logger = slog.Default()
+	}
+}
+
+// Normalize normalizes the options by setting default values and validating them.
+func (opt *Option) Normalize() error {
+	opt.setDefaults()
+	return opt.validate()
 }
 
 // New creates a new LPA client with the given options.
 func New(opt *Option) (*Client, error) {
 	var c Client
 	var err error
-	if err := opt.Validate(); err != nil {
+	if err := opt.Normalize(); err != nil {
 		return nil, err
 	}
 	if c.transmitter, err = driver.NewTransmitter(opt.Logger, opt.Channel, opt.AID, opt.MSS); err != nil {
