@@ -44,8 +44,8 @@ bump_driver_version() {
 
     echo "Bumping $driver to $tag"
 
-    # git tag -as "driver/$driver/$tag" -m "Bump $driver to $tag"
-    # git push origin "driver/$driver/$tag"
+    git tag -as "driver/$driver/$tag" -m "Bump $driver to $tag"
+    git push origin "driver/$driver/$tag"
 
     sleep 5
     refresh_go_package "$driver" "$tag"
