@@ -47,7 +47,6 @@ bump_driver_version() {
     git tag -as "driver/$driver/$tag" -m "Bump $driver to $tag"
     git push origin "driver/$driver/$tag"
 
-    sleep 5
     refresh_go_package "$driver" "$tag"
 
     echo "Successfully bumped $driver to $tag"
@@ -55,7 +54,7 @@ bump_driver_version() {
 
 refresh_go_package() {
     local driver="$1"
-    local version=$(cut -c 2- <<< "$2")
+    local version="$2"
     echo "Refreshing go package for $driver"
     local refreshURL="https://proxy.golang.org/github.com/damonto/euicc-go/driver/$driver/@v/$version.info"
     curl -s "$refreshURL" > /dev/null || {
