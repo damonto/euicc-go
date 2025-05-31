@@ -155,10 +155,7 @@ func (c *Client) install(bppResponse *sgp22.ES9BoundProfilePackageResponse) (*sg
 	if err := response.UnmarshalBERTLV(&tlv); err != nil {
 		return nil, err
 	}
-	if valid := response.Valid(); valid != nil {
-		return nil, errors.New(valid.Error())
-	}
-	return &response, nil
+	return &response, response.Valid()
 }
 
 func (c *Client) authenticateServer(ac *ActivationCode, clientResponse *sgp22.ES9AuthenticateClientResponse) (*sgp22.ES9BoundProfilePackageResponse, error) {
