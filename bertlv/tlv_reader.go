@@ -10,7 +10,7 @@ import (
 func (tlv *TLV) ReadFrom(r io.Reader) (n int64, err error) {
 	r = &countReader{Reader: r, Length: &n}
 	var t TLV
-	var length uint16
+	var length uint32
 	if _, err = t.Tag.ReadFrom(r); err != nil {
 		return
 	}
@@ -20,7 +20,7 @@ func (tlv *TLV) ReadFrom(r io.Reader) (n int64, err error) {
 	if t.Tag.Constructed() {
 		var _n int64
 		var child *TLV
-		for index := uint16(0); index < length; index += uint16(_n) {
+		for index := uint32(0); index < length; index += uint32(_n) {
 			child = new(TLV)
 			if _n, err = child.ReadFrom(r); err != nil {
 				return n, fmt.Errorf("tag %02X: invalid child object\n%w", t.Tag, err)

@@ -10,12 +10,17 @@ import (
 
 func (tlv *TLV) Len() int {
 	n := contentLength(tlv)
-	if n < 128 {
-		n += 1
-	} else if n < 256 {
-		n += 2
-	} else {
-		n += 3
+	switch {
+	case n < 128:
+		n += 1 // 1 byte length
+	case n < 256:
+		n += 2 // 0x81 + 1 byte
+	case n < 65536:
+		n += 3 // 0x82 + 2 bytes
+	case n < 16777216:
+		n += 4 // 0x83 + 3 bytes
+	default:
+		n += 5 // 0x84 + 4 bytes
 	}
 	n += len(tlv.Tag)
 	return n
@@ -29,13 +34,13 @@ func (tlv *TLV) WriteTo(w io.Writer) (n int64, err error) {
 		return 0, errors.New("tlv: constructed tag cannot have value")
 	case len(tlv.Children) > 0 && tlv.Tag.Primitive():
 		return 0, errors.New("tlv: primitive tag cannot have children")
-	case length > 0xffff:
-		return 0, fmt.Errorf("tlv: length exceeds maximum (%d), got %d", 0xffff, length)
+	case length > 0xffffffff:
+		return 0, fmt.Errorf("tlv: length exceeds maximum (%d), got %d", 0xffffffff, length)
 	}
 	if _, err = w.Write(tlv.Tag); err != nil {
 		return
 	}
-	if _, err = w.Write(marshalLength(uint16(length))); err != nil {
+	if _, err = w.Write(marshalLength(uint32(length))); err != nil {
 		return
 	}
 	if tlv.Tag.Primitive() {

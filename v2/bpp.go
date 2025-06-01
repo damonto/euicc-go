@@ -20,12 +20,17 @@ func SegmentedBoundProfilePackage(bpp *bertlv.TLV) (segments [][]byte, err error
 		}
 		var buf bytes.Buffer
 		buf.Write(tlv.Tag)
-		if n < 128 {
+		switch {
+		case n < 128:
 			buf.WriteByte(byte(n))
-		} else if n < 256 {
+		case n < 256:
 			buf.Write([]byte{0x81, byte(n)})
-		} else {
+		case n < 65536:
 			buf.Write([]byte{0x82, byte(n >> 8), byte(n)})
+		case n < 16777216:
+			buf.Write([]byte{0x83, byte(n >> 16), byte(n >> 8), byte(n)})
+		default:
+			buf.Write([]byte{0x84, byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)})
 		}
 		return buf.Bytes()
 	}
