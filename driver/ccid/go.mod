@@ -6,7 +6,7 @@ toolchain go1.24.1
 
 require (
 	github.com/ElMostafaIdrassi/goscard v1.0.0
-	github.com/damonto/euicc-go v0.0.12
+	github.com/damonto/euicc-go v0.0.13
 )
 
 require (
