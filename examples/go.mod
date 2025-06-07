@@ -8,8 +8,8 @@ replace (
 )
 
 require (
-	github.com/damonto/euicc-go v0.0.12
-	github.com/damonto/euicc-go/driver/at v0.0.3
+	github.com/damonto/euicc-go v0.0.13
+	github.com/damonto/euicc-go/driver/at v0.0.5
 )
 
 require golang.org/x/sys v0.33.0 // indirect

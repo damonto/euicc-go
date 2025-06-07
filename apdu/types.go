@@ -4,6 +4,6 @@ type SmartCardChannel interface {
 	Connect() error
 	Disconnect() error
 	OpenLogicalChannel(aid []byte) (byte, error)
-	Transmit([]byte) ([]byte, error)
-	CloseLogicalChannel(byte) error
+	Transmit(command []byte) ([]byte, error)
+	CloseLogicalChannel(channel byte) error
 }
