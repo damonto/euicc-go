@@ -91,7 +91,7 @@ func (q *QMI) Disconnect() error {
 	if err := q.releaseClientID(); err != nil {
 		return fmt.Errorf("failed to release client ID: %w", err)
 	}
-	// return q.conn.Close()
+	return q.conn.Close()
 	return nil
 }
 
