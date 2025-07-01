@@ -206,6 +206,10 @@ static int select_sim_slot(struct mbim_data *mbim_priv, char **err)
         {
             return 0;
         }
+        struct timespec ts = {
+            .tv_sec = 0,
+            .tv_nsec = 50000000};
+        nanosleep(&ts, NULL);
     }
 
     *err = strdup("SIM not available");
