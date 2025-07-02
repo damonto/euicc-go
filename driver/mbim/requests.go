@@ -9,8 +9,8 @@ import (
 // region Open Device Request
 
 type OpenDeviceRequest struct {
-	message *Message
-	TxnID   uint32
+	TxnID    uint32
+	Response *OpenDeviceResponse
 }
 
 type OpenDeviceResponse struct{}
@@ -29,16 +29,16 @@ func (p *OpenDeviceResponse) UnmarshalBinary(data []byte) error {
 }
 
 func (r *OpenDeviceRequest) Message() *Message {
-	r.message = &Message{
+	r.Response = new(OpenDeviceResponse)
+	return &Message{
 		Type:          MessageTypeOpen,
 		TransactionID: r.TxnID,
-		Payload:       new(OpenDeviceResponse),
+		Payload:       r.Response,
 	}
-	return r.message
 }
 
 func (r *OpenDeviceRequest) UnmarshalBinary(data []byte) error {
-	return r.message.UnmarshalBinary(data)
+	return r.Response.UnmarshalBinary(data)
 }
 
 // endregion
@@ -46,11 +46,11 @@ func (r *OpenDeviceRequest) UnmarshalBinary(data []byte) error {
 // region Open Logical Channel
 
 type OpenLogicalChannelRequest struct {
-	message     *Message
 	TxnID       uint32
 	AppId       []byte
 	SelectP2Arg uint32
 	Group       uint32
+	Response    *OpenLogicalChannelResponse
 }
 
 func (r *OpenLogicalChannelRequest) Message() *Message {
@@ -60,7 +60,8 @@ func (r *OpenLogicalChannelRequest) Message() *Message {
 	binary.Write(buf, binary.LittleEndian, r.SelectP2Arg)
 	binary.Write(buf, binary.LittleEndian, r.Group)
 	buf.Write(r.AppId)
-	r.message = &Message{
+	r.Response = new(OpenLogicalChannelResponse)
+	return &Message{
 		Type:          MessageTypeCommand,
 		TransactionID: r.TxnID,
 		Payload: &Command{
@@ -70,19 +71,9 @@ func (r *OpenLogicalChannelRequest) Message() *Message {
 			CID:             CIDUiccOpenChannel,
 			CommandType:     CommandTypeSet,
 			Data:            buf.Bytes(),
-			Response:        new(OpenLogicalChannelResponse),
+			Response:        r.Response,
 		},
 	}
-	return r.message
-}
-
-func (r *OpenLogicalChannelRequest) Response() *OpenLogicalChannelResponse {
-	if cmd, ok := r.message.Payload.(*Command); ok {
-		if response, ok := cmd.Response.(*OpenLogicalChannelResponse); ok {
-			return response
-		}
-	}
-	return nil
 }
 
 type OpenLogicalChannelResponse struct {
@@ -102,17 +93,18 @@ func (r *OpenLogicalChannelResponse) UnmarshalBinary(data []byte) error {
 // region Close Logical Channel
 
 type CloseLogicalChannelRequest struct {
-	message *Message
-	Channel uint32 // Channel to close
-	Group   uint32 // Channel group to close
-	TxnID   uint32
+	Channel  uint32 // Channel to close
+	Group    uint32 // Channel group to close
+	TxnID    uint32
+	Response *CloseLogicalChannelResponse
 }
 
 func (r *CloseLogicalChannelRequest) Message() *Message {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, uint32(r.Channel))
 	binary.Write(buf, binary.LittleEndian, r.Group)
-	r.message = &Message{
+	r.Response = new(CloseLogicalChannelResponse)
+	return &Message{
 		Type:          MessageTypeCommand,
 		TransactionID: r.TxnID,
 		Payload: &Command{
@@ -122,19 +114,9 @@ func (r *CloseLogicalChannelRequest) Message() *Message {
 			CID:             CIDUiccCloseChannel,
 			CommandType:     CommandTypeSet,
 			Data:            buf.Bytes(),
-			Response:        new(CloseLogicalChannelResponse),
+			Response:        r.Response,
 		},
 	}
-	return r.message
-}
-
-func (r *CloseLogicalChannelRequest) Response() *CloseLogicalChannelResponse {
-	if cmd, ok := r.message.Payload.(*Command); ok {
-		if response, ok := cmd.Response.(*CloseLogicalChannelResponse); ok {
-			return response
-		}
-	}
-	return nil
 }
 
 type CloseLogicalChannelResponse struct {
@@ -149,12 +131,12 @@ func (r *CloseLogicalChannelResponse) UnmarshalBinary(data []byte) error {
 
 // region Transmit APDU
 type TransmitAPDURequest struct {
-	message         *Message
 	TxnID           uint32
 	Channel         uint32
 	SecureMessaging uint32
 	ClassByteType   uint32
 	APDU            []byte
+	Response        *TransmitAPDUResponse
 }
 
 func (r *TransmitAPDURequest) Message() *Message {
@@ -165,8 +147,8 @@ func (r *TransmitAPDURequest) Message() *Message {
 	binary.Write(buf, binary.LittleEndian, uint32(len(r.APDU)))
 	binary.Write(buf, binary.LittleEndian, uint32(20))
 	buf.Write(r.APDU)
-
-	r.message = &Message{
+	r.Response = new(TransmitAPDUResponse)
+	return &Message{
 		Type:          MessageTypeCommand,
 		TransactionID: r.TxnID,
 		Payload: &Command{
@@ -176,19 +158,9 @@ func (r *TransmitAPDURequest) Message() *Message {
 			CID:             CIDUiccAPDU,
 			CommandType:     CommandTypeSet,
 			Data:            buf.Bytes(),
-			Response:        new(TransmitAPDUResponse),
+			Response:        r.Response,
 		},
 	}
-	return r.message
-}
-
-func (r *TransmitAPDURequest) Response() *TransmitAPDUResponse {
-	if cmd, ok := r.message.Payload.(*Command); ok {
-		if response, ok := cmd.Response.(*TransmitAPDUResponse); ok {
-			return response
-		}
-	}
-	return nil
 }
 
 type TransmitAPDUResponse struct {

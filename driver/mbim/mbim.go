@@ -82,7 +82,7 @@ func (m *MBIM) OpenLogicalChannel(aid []byte) (byte, error) {
 	if _, err := message.ReadFrom(m.conn); err != nil {
 		return 0, err
 	}
-	m.channel = request.Response().Channel
+	m.channel = request.Response.Channel
 	return byte(m.channel), nil
 }
 
@@ -103,7 +103,7 @@ func (m *MBIM) Transmit(command []byte) ([]byte, error) {
 	if _, err := message.ReadFrom(m.conn); err != nil {
 		return nil, err
 	}
-	return request.Response().APDU, nil
+	return request.Response.APDU, nil
 }
 
 // CloseLogicalChannel closes the specified logical channel
