@@ -26,7 +26,7 @@ func (t *TLV) Error() error {
 		return nil // No error, success case
 	}
 	errorCode := binary.LittleEndian.Uint16(t.Value[2:4])
-	return &QMIError{
+	return QMIError{
 		Result:    QMIResult(result),
 		ErrorCode: QMIProtocolError(errorCode),
 	}

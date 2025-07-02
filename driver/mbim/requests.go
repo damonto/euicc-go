@@ -23,7 +23,7 @@ func (p *OpenDeviceResponse) MarshalBinary() ([]byte, error) {
 
 func (p *OpenDeviceResponse) UnmarshalBinary(data []byte) error {
 	if err := MBIMStatusError(binary.LittleEndian.Uint32(data)); err != MBIMStatusErrorNone {
-		return &MBIMError{Code: err}
+		return MBIMError{Code: err}
 	}
 	return nil
 }

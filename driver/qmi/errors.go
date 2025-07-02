@@ -398,7 +398,7 @@ type QMIError struct {
 }
 
 // Error implements the error interface
-func (e *QMIError) Error() string {
+func (e QMIError) Error() string {
 	return fmt.Sprintf("QMI Error: Result=%s (%d), Error=%s (%d)",
 		e.Result.String(), uint16(e.Result),
 		e.ErrorCode.Error(), uint16(e.ErrorCode))
