@@ -70,10 +70,10 @@ func (m *MBIM) openDevice() error {
 func (m *MBIM) OpenLogicalChannel(aid []byte) (byte, error) {
 	txnID := atomic.AddUint32(&m.txnID, 1)
 	request := OpenLogicalChannelRequest{
-		TxnID:        txnID,
-		AppId:        aid,
-		SelectP2Arg:  0x00,
-		ChannelGroup: 0x01,
+		TxnID:       txnID,
+		AppId:       aid,
+		SelectP2Arg: 0x00,
+		Group:       0x01,
 	}
 	message := request.Message()
 	if _, err := message.WriteTo(m.conn); err != nil {

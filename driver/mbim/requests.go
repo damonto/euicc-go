@@ -46,11 +46,11 @@ func (r *OpenDeviceRequest) UnmarshalBinary(data []byte) error {
 // region Open Logical Channel
 
 type OpenLogicalChannelRequest struct {
-	message      *Message
-	TxnID        uint32
-	AppId        []byte
-	SelectP2Arg  uint32
-	ChannelGroup uint32
+	message     *Message
+	TxnID       uint32
+	AppId       []byte
+	SelectP2Arg uint32
+	Group       uint32
 }
 
 func (r *OpenLogicalChannelRequest) Message() *Message {
@@ -58,7 +58,7 @@ func (r *OpenLogicalChannelRequest) Message() *Message {
 	binary.Write(buf, binary.LittleEndian, uint32(len(r.AppId)))
 	binary.Write(buf, binary.LittleEndian, uint32(16))
 	binary.Write(buf, binary.LittleEndian, r.SelectP2Arg)
-	binary.Write(buf, binary.LittleEndian, r.ChannelGroup)
+	binary.Write(buf, binary.LittleEndian, r.Group)
 	buf.Write(r.AppId)
 	r.message = &Message{
 		Type:          MessageTypeCommand,
