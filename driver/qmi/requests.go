@@ -17,7 +17,7 @@ type Request interface {
 
 var mutex sync.Mutex
 
-func sendRequest[I Request](conn net.Conn, txnID uint16, request I) ([]byte, error) {
+func invoke[I Request](conn net.Conn, txnID uint16, request I) ([]byte, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	if _, err := conn.Write(request.Bytes()); err != nil {
@@ -241,10 +241,10 @@ func (r *OpenLogicalChannelRequest) Value(message *Message) ([]byte, error) {
 // region Close Logical Channel Request
 
 type CloseLogicalChannelRequest struct {
-	ClientID  uint8
-	TxnID     uint16
-	Slot      byte
-	ChannelID byte
+	ClientID uint8
+	TxnID    uint16
+	Slot     byte
+	Channel  byte
 }
 
 func (r *CloseLogicalChannelRequest) Bytes() []byte {
@@ -254,7 +254,7 @@ func (r *CloseLogicalChannelRequest) Bytes() []byte {
 		MessageID: QMIUIMCloseLogicalChannel,
 		TLVs: []TLV{
 			{Type: 0x01, Len: 1, Value: []byte{r.Slot}},
-			{Type: 0x11, Len: 1, Value: []byte{r.ChannelID}},
+			{Type: 0x11, Len: 1, Value: []byte{r.Channel}},
 			{Type: 0x13, Len: 1, Value: []byte{0x01}},
 		},
 	}
@@ -270,11 +270,11 @@ func (r *CloseLogicalChannelRequest) Value(message *Message) ([]byte, error) {
 // region Transmit APDU Request
 
 type TransmitAPDURequest struct {
-	ClientID  uint8
-	TxnID     uint16
-	Slot      byte
-	ChannelID byte
-	Command   []byte
+	ClientID uint8
+	TxnID    uint16
+	Slot     byte
+	Channel  byte
+	Command  []byte
 }
 
 func (r *TransmitAPDURequest) Bytes() []byte {
@@ -285,7 +285,7 @@ func (r *TransmitAPDURequest) Bytes() []byte {
 		TxnID:     r.TxnID,
 		MessageID: QMIUIMSendAPDU,
 		TLVs: []TLV{
-			{Type: 0x10, Len: 1, Value: []byte{r.ChannelID}},
+			{Type: 0x10, Len: 1, Value: []byte{r.Channel}},
 			{Type: 0x02, Len: uint16(len(value)), Value: value},
 			{Type: 0x01, Len: 1, Value: []byte{r.Slot}},
 		},

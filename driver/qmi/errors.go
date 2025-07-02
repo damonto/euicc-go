@@ -1,5 +1,7 @@
 package qmi
 
+import "fmt"
+
 // QMIProtocolError represents QMI protocol errors as defined in libqmi
 // These correspond to the "Error" field in QMI Result TLVs
 type QMIProtocolError uint16
@@ -387,4 +389,17 @@ func (e QMIProtocolError) Error() string {
 	default:
 		return "Unknown QMI protocol error"
 	}
+}
+
+// QMIError represents a QMI error with result and error codes
+type QMIError struct {
+	Result    QMIResult
+	ErrorCode QMIProtocolError
+}
+
+// Error implements the error interface
+func (e *QMIError) Error() string {
+	return fmt.Sprintf("QMI Error: Result=%s (%d), Error=%s (%d)",
+		e.Result.String(), uint16(e.Result),
+		e.ErrorCode.Error(), uint16(e.ErrorCode))
 }

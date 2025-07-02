@@ -32,19 +32,6 @@ func (t *TLV) Error() error {
 	}
 }
 
-// QMIError represents a QMI error with result and error codes
-type QMIError struct {
-	Result    QMIResult
-	ErrorCode QMIProtocolError
-}
-
-// Error implements the error interface
-func (e *QMIError) Error() string {
-	return fmt.Sprintf("QMI Error: Result=%s (%d), Error=%s (%d)",
-		e.Result.String(), uint16(e.Result),
-		e.ErrorCode.Error(), uint16(e.ErrorCode))
-}
-
 // QMUXHeader represents the header of a QMUX PDU
 type QMUXHeader struct {
 	IfType       uint8
@@ -83,16 +70,16 @@ func (m *Message) UnmarshalBinary(data []byte) error {
 	if len(data) < 11 {
 		return fmt.Errorf("data too short: got %d bytes", len(data))
 	}
-	reader := bytes.NewReader(data)
 
+	reader := bytes.NewReader(data)
 	// Read QMUX header
 	if err := binary.Read(reader, binary.LittleEndian, &m.QMUXHeader); err != nil {
 		return fmt.Errorf("read QMUX header: %w", err)
 	}
 
 	// Read message type
-	var msgType MessageType
-	if err := binary.Read(reader, binary.LittleEndian, &msgType); err != nil {
+	var messageType MessageType
+	if err := binary.Read(reader, binary.LittleEndian, &messageType); err != nil {
 		return fmt.Errorf("read message type: %w", err)
 	}
 
@@ -126,30 +113,25 @@ func (m *Message) UnmarshalBinary(data []byte) error {
 
 func (m *Message) toTVLs(r io.Reader) error {
 	for {
-		var tlvType uint8
-		var tlvLen uint16
-
-		if err := binary.Read(r, binary.LittleEndian, &tlvType); err != nil {
+		var t uint8
+		if err := binary.Read(r, binary.LittleEndian, &t); err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}
 			return fmt.Errorf("read TLV type: %w", err)
 		}
 
-		if err := binary.Read(r, binary.LittleEndian, &tlvLen); err != nil {
+		var n uint16
+		if err := binary.Read(r, binary.LittleEndian, &n); err != nil {
 			return fmt.Errorf("read TLV length: %w", err)
 		}
 
-		v := make([]byte, tlvLen)
+		v := make([]byte, n)
 		if _, err := io.ReadFull(r, v); err != nil {
 			return fmt.Errorf("read TLV value: %w", err)
 		}
 
-		m.TLVs[tlvType] = TLV{
-			Type:  tlvType,
-			Len:   tlvLen,
-			Value: v,
-		}
+		m.TLVs[t] = TLV{Type: t, Len: n, Value: v}
 	}
 	return nil
 }

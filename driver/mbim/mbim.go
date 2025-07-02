@@ -1,98 +1,139 @@
-//go:build linux
-
 package mbim
 
-/*
-#cgo pkg-config: glib-2.0 mbim-glib
-
-#include <stdint.h>
-#include <string.h>
-
-#include "mbim.h"
-*/
-import "C"
 import (
-	"errors"
-	"unsafe"
+	"fmt"
+	"net"
+	"os"
+	"sync/atomic"
+	"syscall"
 
 	"github.com/damonto/euicc-go/apdu"
 )
 
-type mbim struct {
-	device string
-	mbim   *C.struct_mbim_data
+type MBIM struct {
+	device  string
+	slot    uint8
+	conn    net.Conn
+	txnID   uint32
+	channel uint32
 }
 
-func New(device string, slot uint8, useProxy bool) (apdu.SmartCardChannel, error) {
-	m := (*C.struct_mbim_data)(C.calloc(1, C.sizeof_struct_mbim_data))
-	if m == nil {
-		return nil, errors.New("failed to allocate memory for MBIM data")
-	}
-	// MBIM uses 0-based indexing
-	m.uim_slot = C.guint32(slot - 1)
-	// Try to open the port through the 'mbim-proxy'.
-	if useProxy {
-		m.use_proxy = C.gboolean(1)
-	}
-	return &mbim{
+// New creates a new MBIM proxy connection to the specified device
+func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
+	m := &MBIM{
 		device: device,
-		mbim:   m,
-	}, nil
+		slot:   slot - 1,
+	}
+	if err := m.connectToProxy(); err != nil {
+		return nil, fmt.Errorf("failed to connect to mbim-proxy: %w", err)
+	}
+	return m, nil
 }
 
-func (m *mbim) Connect() error {
-	cDevice := C.CString(m.device)
-	defer C.free(unsafe.Pointer(cDevice))
-	var cErr *C.char
-	if C.go_mbim_apdu_connect(m.mbim, cDevice, &cErr) == -1 {
-		defer C.free(unsafe.Pointer(cErr))
-		defer C.free(unsafe.Pointer(m.mbim))
-		return errors.New(C.GoString(cErr))
+// connectToProxy establishes connection to mbim-proxy using abstract Unix socket
+func (m *MBIM) connectToProxy() error {
+	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
+	if err != nil {
+		return fmt.Errorf("failed to create socket: %w", err)
+	}
+	if err := syscall.Connect(fd, &syscall.SockaddrUnix{Name: "\x00mbim-proxy"}); err != nil {
+		syscall.Close(fd)
+		return fmt.Errorf("failed to connect to mbim-proxy: %w", err)
+	}
+	file := os.NewFile(uintptr(fd), "euicc-go")
+	m.conn, err = net.FileConn(file)
+	if err != nil {
+		return fmt.Errorf("failed to create net.Conn: %w", err)
 	}
 	return nil
 }
 
-func (m *mbim) Disconnect() error {
-	defer C.free(unsafe.Pointer(m.mbim))
-	var cErr *C.char
-	if C.go_mbim_apdu_disconnect(m.mbim, &cErr) == -1 {
-		defer C.free(unsafe.Pointer(cErr))
-		return errors.New(C.GoString(cErr))
+// Connect establishes MBIM session and opens device
+func (m *MBIM) Connect() error {
+	if err := m.openDevice(); err != nil {
+		return fmt.Errorf("failed to open device: %w", err)
 	}
 	return nil
 }
 
-func (m *mbim) Transmit(command []byte) ([]byte, error) {
-	cCommand := C.CBytes(command)
-	var cResponse *C.uint8_t
-	var cResponseLen C.uint32_t
-	defer C.free(unsafe.Pointer(cCommand))
-	defer C.free(unsafe.Pointer(cResponse))
-	var cErr *C.char
-	if C.go_mbim_apdu_transmit(m.mbim, &cResponse, &cResponseLen, (*C.uchar)(cCommand), C.uint(len(command)), &cErr) == -1 {
-		defer C.free(unsafe.Pointer(cErr))
-		return nil, errors.New(C.GoString(cErr))
+// openDevice sends MBIM Open message to establish connection
+func (m *MBIM) openDevice() error {
+	txnID := atomic.AddUint32(&m.txnID, 1)
+	request := OpenDeviceRequest{
+		TxnID: txnID,
 	}
-	return C.GoBytes(unsafe.Pointer(cResponse), C.int(cResponseLen)), nil
+	_, err := request.Message().WriteTo(m.conn)
+	return err
 }
 
-func (m *mbim) OpenLogicalChannel(aid []byte) (byte, error) {
-	cAID := C.CBytes(aid)
-	defer C.free(unsafe.Pointer(cAID))
-	var cErr *C.char
-	channel := C.go_mbim_apdu_open_logical_channel(m.mbim, (*C.uchar)(cAID), C.uint8_t(len(aid)), &cErr)
-	if channel < 1 {
-		defer C.free(unsafe.Pointer(cErr))
-		return 0, errors.New(C.GoString(cErr))
+// OpenLogicalChannel opens a logical channel for the specified Application ID
+func (m *MBIM) OpenLogicalChannel(aid []byte) (byte, error) {
+	txnID := atomic.AddUint32(&m.txnID, 1)
+	request := OpenLogicalChannelRequest{
+		TxnID:        txnID,
+		AppId:        aid,
+		SelectP2Arg:  0x00,
+		ChannelGroup: 0x01,
 	}
-	return byte(channel), nil
+	message := request.Message()
+	if _, err := message.WriteTo(m.conn); err != nil {
+		return 0, err
+	}
+	if _, err := message.ReadFrom(m.conn); err != nil {
+		return 0, err
+	}
+	m.channel = request.Response().Channel
+	return byte(m.channel), nil
 }
 
-func (m *mbim) CloseLogicalChannel(channel byte) error {
-	var cErr *C.char
-	if C.go_mbim_apdu_close_logical_channel(m.mbim, C.uint8_t(channel), &cErr) == -1 {
-		defer C.free(unsafe.Pointer(cErr))
-		return errors.New(C.GoString(cErr))
+// Transmit implements apdu.SmartCardChannel.
+func (m *MBIM) Transmit(command []byte) ([]byte, error) {
+	txnID := atomic.AddUint32(&m.txnID, 1)
+	request := TransmitAPDURequest{
+		TxnID:           txnID,
+		Channel:         m.channel,
+		SecureMessaging: 0,
+		ClassByteType:   0,
+		APDU:            command,
+	}
+	message := request.Message()
+	if _, err := message.WriteTo(m.conn); err != nil {
+		return nil, err
+	}
+	if _, err := message.ReadFrom(m.conn); err != nil {
+		return nil, err
+	}
+	return request.Response().APDU, nil
+}
+
+// CloseLogicalChannel closes the specified logical channel
+func (m *MBIM) CloseLogicalChannel(channel byte) error {
+	txnID := atomic.AddUint32(&m.txnID, 1)
+	request := CloseLogicalChannelRequest{
+		TxnID:   txnID,
+		Channel: uint32(channel),
+		Group:   1,
+	}
+	message := request.Message()
+	if _, err := message.WriteTo(m.conn); err != nil {
+		return err
+	}
+	if _, err := message.ReadFrom(m.conn); err != nil {
+		return err
 	}
 	return nil
+}
+
+// Disconnect closes the MBIM connection and releases resources
+func (m *MBIM) Disconnect() error {
+	txnID := atomic.AddUint32(&m.txnID, 1)
+	message := Message{
+		Type:          MessageTypeClose,
+		TransactionID: txnID,
+		Payload:       nil,
+	}
+	if _, err := message.WriteTo(m.conn); err != nil {
+		return fmt.Errorf("failed to send close message: %w", err)
+	}
+	return m.conn.Close()
 }
