@@ -1,98 +1,163 @@
-//go:build linux
-
 package qmi
 
-/*
-#cgo pkg-config: glib-2.0 qmi-glib
-
-#include <stdint.h>
-#include <string.h>
-
-#include "qmi.h"
-*/
-import "C"
 import (
-	"errors"
-	"unsafe"
+	"fmt"
+	"net"
+	"os"
+	"sync/atomic"
+	"syscall"
 
 	"github.com/damonto/euicc-go/apdu"
 )
 
-type qmi struct {
-	device string
-	qmi    *C.struct_qmi_data
+// QMI implements the apdu.SmartCardChannel interface using QMI protocol
+type QMI struct {
+	device    string
+	slot      uint8
+	conn      net.Conn
+	cid       uint8
+	txnID     uint32
+	channelID byte
 }
 
-func New(device string, slot uint8, useProxy bool) (apdu.SmartCardChannel, error) {
-	q := (*C.struct_qmi_data)(C.calloc(1, C.sizeof_struct_qmi_data))
-	if q == nil {
-		return nil, errors.New("failed to allocate memory for QMI data")
-	}
-	// QMI uses 1-based indexing
-	q.uim_slot = C.guint8(slot)
-	// Try to open the port through the 'qmi-proxy'.
-	if useProxy {
-		q.use_proxy = C.gboolean(1)
-	}
-	return &qmi{
+// New creates a new QMI connection to the specified device
+func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
+	q := &QMI{
 		device: device,
-		qmi:    q,
-	}, nil
+		slot:   slot,
+	}
+	if err := q.connectToProxy(); err != nil {
+		return nil, fmt.Errorf("failed to connect to qmi-proxy: %w", err)
+	}
+	return q, nil
 }
 
-func (q *qmi) Connect() error {
-	cDevice := C.CString(q.device)
-	defer C.free(unsafe.Pointer(cDevice))
-	var cErr *C.char
-	if C.go_qmi_apdu_connect(q.qmi, cDevice, &cErr) == -1 {
-		defer C.free(unsafe.Pointer(cErr))
-		defer C.free(unsafe.Pointer(q.qmi))
-		return errors.New(C.GoString(cErr))
+// connectToProxy establishes connection to qmi-proxy
+func (q *QMI) connectToProxy() error {
+	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
+	if err != nil {
+		return fmt.Errorf("failed to create socket: %w", err)
+	}
+
+	if err := syscall.Connect(fd, &syscall.SockaddrUnix{Name: "\x00qmi-proxy"}); err != nil {
+		syscall.Close(fd)
+		return fmt.Errorf("failed to connect to qmi-proxy: %w", err)
+	}
+
+	file := os.NewFile(uintptr(fd), "qmi-connection")
+	q.conn, err = net.FileConn(file)
+	if err != nil {
+		return fmt.Errorf("failed to create net.Conn: %w", err)
 	}
 	return nil
 }
 
-func (q *qmi) Disconnect() error {
-	defer C.free(unsafe.Pointer(q.qmi))
-	var cErr *C.char
-	if C.go_qmi_apdu_disconnect(q.qmi, &cErr) == -1 {
-		defer C.free(unsafe.Pointer(cErr))
-		return errors.New(C.GoString(cErr))
+// Connect establishes QMI session and allocates UIM client ID
+func (q *QMI) Connect() error {
+	if err := q.openProxyConnection(); err != nil {
+		return fmt.Errorf("failed to open proxy connection: %w", err)
+	}
+	if err := q.allocateClientID(); err != nil {
+		return fmt.Errorf("failed to allocate client ID: %w", err)
 	}
 	return nil
 }
 
-func (q *qmi) Transmit(command []byte) ([]byte, error) {
-	cCommand := C.CBytes(command)
-	var cResponse *C.uint8_t
-	var cResponseLen C.uint32_t
-	defer C.free(unsafe.Pointer(cCommand))
-	defer C.free(unsafe.Pointer(cResponse))
-	var cErr *C.char
-	if C.go_qmi_apdu_transmit(q.qmi, &cResponse, &cResponseLen, (*C.uchar)(cCommand), C.uint(len(command)), &cErr) == -1 {
-		defer C.free(unsafe.Pointer(cErr))
-		return nil, errors.New(C.GoString(cErr))
-	}
-	return C.GoBytes(unsafe.Pointer(cResponse), C.int(cResponseLen)), nil
+// openProxyConnection sends a request to the qmi-proxy to open a connection
+func (q *QMI) openProxyConnection() error {
+	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
+	_, err := sendRequest(q.conn, txnID, &InternalOpenRequest{
+		TxnID:      uint8(txnID),
+		DevicePath: []byte(q.device),
+	})
+	return err
 }
 
-func (q *qmi) OpenLogicalChannel(aid []byte) (byte, error) {
-	cAID := C.CBytes(aid)
-	defer C.free(unsafe.Pointer(cAID))
-	var cErr *C.char
-	channel := C.go_qmi_apdu_open_logical_channel(q.qmi, (*C.uchar)(cAID), C.uint8_t(len(aid)), &cErr)
-	if channel < 1 {
-		defer C.free(unsafe.Pointer(cErr))
-		return 0, errors.New(C.GoString(cErr))
+// allocateClientID sends a request to allocate a client ID for UIM service
+func (q *QMI) allocateClientID() error {
+	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
+	response, err := sendRequest(q.conn, txnID, &AllocateClientIDRequest{
+		TxnID: uint8(txnID),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to allocate client ID: %w", err)
 	}
-	return byte(channel), nil
+	if len(response) < 1 {
+		return fmt.Errorf("invalid response for client ID allocation")
+	}
+	q.cid = response[0]
+	return nil
 }
 
-func (q *qmi) CloseLogicalChannel(channel byte) error {
-	var cErr *C.char
-	if C.go_qmi_apdu_close_logical_channel(q.qmi, C.uint8_t(channel), &cErr) == -1 {
-		defer C.free(unsafe.Pointer(cErr))
-		return errors.New(C.GoString(cErr))
+// Disconnect releases the client ID and closes the connection
+func (q *QMI) Disconnect() error {
+	if err := q.releaseClientID(); err != nil {
+		return fmt.Errorf("failed to release client ID: %w", err)
+	}
+	return q.conn.Close()
+}
+
+// releaseClientID sends a request to release the allocated client ID
+func (q *QMI) releaseClientID() error {
+	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
+	_, err := sendRequest(q.conn, txnID, &ReleaseClientIDRequest{
+		ClientID: q.cid,
+		TxnID:    uint8(txnID),
+	})
+	return err
+}
+
+// OpenLogicalChannel opens a logical channel with the specified AID
+func (q *QMI) OpenLogicalChannel(aid []byte) (byte, error) {
+	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
+	request := OpenLogicalChannelRequest{
+		ClientID: q.cid,
+		TxnID:    txnID,
+		Slot:     q.slot,
+		AID:      aid,
+	}
+	response, err := sendRequest(q.conn, txnID, &request)
+	if err != nil {
+		return 0, fmt.Errorf("failed to open logical channel: %w", err)
+	}
+	if len(response) < 1 {
+		return 0, fmt.Errorf("invalid response for logical channel open")
+	}
+	q.channelID = response[0]
+	return q.channelID, nil
+}
+
+// CloseLogicalChannel closes the specified logical channel
+func (q *QMI) CloseLogicalChannel(channelID byte) error {
+	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
+	request := CloseLogicalChannelRequest{
+		ClientID:  q.cid,
+		TxnID:     txnID,
+		ChannelID: channelID,
+		Slot:      q.slot,
+	}
+	if _, err := sendRequest(q.conn, txnID, &request); err != nil {
+		return fmt.Errorf("failed to close logical channel: %w", err)
 	}
 	return nil
+}
+
+// Transmit sends an APDU command (basic channel implementation)
+func (q *QMI) Transmit(command []byte) ([]byte, error) {
+	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
+	request := TransmitAPDURequest{
+		ClientID:  q.cid,
+		TxnID:     txnID,
+		Slot:      q.slot,
+		ChannelID: q.channelID,
+		Command:   command,
+	}
+	response, err := sendRequest(q.conn, txnID, &request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to transmit APDU: %w", err)
+	}
+	if len(response) < 2 {
+		return nil, fmt.Errorf("invalid response for APDU transmission")
+	}
+	return response, nil
 }

@@ -1,4 +1,4 @@
-package goqmi
+package qmi
 
 import (
 	"bytes"
@@ -43,11 +43,6 @@ func (e *QMIError) Error() string {
 	return fmt.Sprintf("QMI Error: Result=%s (%d), Error=%s (%d)",
 		e.Result.String(), uint16(e.Result),
 		e.ErrorCode.Error(), uint16(e.ErrorCode))
-}
-
-// IsSuccess returns true if the result indicates success
-func (e *QMIError) Success() bool {
-	return e.Result == QMIResultSuccess
 }
 
 // QMUXHeader represents the header of a QMUX PDU

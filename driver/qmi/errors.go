@@ -1,4 +1,4 @@
-package goqmi
+package qmi
 
 // QMIProtocolError represents QMI protocol errors as defined in libqmi
 // These correspond to the "Error" field in QMI Result TLVs

@@ -1,4 +1,4 @@
-package goqmi
+package qmi
 
 import (
 	"bytes"
@@ -51,7 +51,7 @@ func waitForResponse(conn net.Conn, expectedTxnID uint16) (*Message, error) {
 			continue // Not the expected transaction ID, keep waiting
 		}
 		if err := message.Error(); err != nil {
-			return nil, fmt.Errorf("QMI error: %w", err)
+			return nil, err
 		}
 		return &message, nil
 	}
@@ -67,8 +67,6 @@ func toBytes(TLVs []TLV) []byte {
 	}
 	return buf.Bytes()
 }
-
-// region Control Requests
 
 type ControlRequest struct {
 	ClientID  uint8
@@ -102,6 +100,8 @@ func (r *ControlRequest) Bytes() []byte {
 	return requestBuf.Bytes()
 }
 
+// region Internal Open Request
+
 type InternalOpenRequest struct {
 	TxnID      uint8
 	DevicePath []byte
@@ -121,6 +121,10 @@ func (r *InternalOpenRequest) Bytes() []byte {
 func (r *InternalOpenRequest) Value(message *Message) ([]byte, error) {
 	return nil, nil
 }
+
+// endregion
+
+// region Allocate/Release Client ID Requests
 
 type AllocateClientIDRequest struct {
 	TxnID uint8
@@ -144,6 +148,10 @@ func (r *AllocateClientIDRequest) Value(message *Message) ([]byte, error) {
 	return nil, errors.New("could not find allocated client ID in response")
 }
 
+// endregion
+
+// region Release Client ID Request
+
 type ReleaseClientIDRequest struct {
 	ClientID uint8
 	TxnID    uint8
@@ -165,8 +173,6 @@ func (r *ReleaseClientIDRequest) Value(message *Message) ([]byte, error) {
 }
 
 // endregion
-
-// region UIM Requests
 
 type UIMRequest struct {
 	ClientID  uint8
@@ -199,6 +205,8 @@ func (r *UIMRequest) Bytes() []byte {
 	return requestBuf.Bytes()
 }
 
+// region Open Logical Channel Request
+
 type OpenLogicalChannelRequest struct {
 	ClientID uint8
 	TxnID    uint16
@@ -228,6 +236,10 @@ func (r *OpenLogicalChannelRequest) Value(message *Message) ([]byte, error) {
 	return value, nil
 }
 
+// endregion
+
+// region Close Logical Channel Request
+
 type CloseLogicalChannelRequest struct {
 	ClientID  uint8
 	TxnID     uint16
@@ -253,6 +265,10 @@ func (r *CloseLogicalChannelRequest) Value(message *Message) ([]byte, error) {
 	return nil, nil
 }
 
+// endregion
+
+// region Transmit APDU Request
+
 type TransmitAPDURequest struct {
 	ClientID  uint8
 	TxnID     uint16
@@ -262,7 +278,8 @@ type TransmitAPDURequest struct {
 }
 
 func (r *TransmitAPDURequest) Bytes() []byte {
-	value := append([]byte{byte(len(r.Command)), 0x00}, r.Command...)
+	length := len(r.Command)
+	value := append([]byte{byte(length), byte(length >> 8)}, r.Command...)
 	request := UIMRequest{
 		ClientID:  r.ClientID,
 		TxnID:     r.TxnID,

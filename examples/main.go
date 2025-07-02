@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/damonto/euicc-go/driver/goqmi"
+	"github.com/damonto/euicc-go/driver/qmi"
 	"github.com/damonto/euicc-go/lpa"
 	sgp22 "github.com/damonto/euicc-go/v2"
 )
@@ -36,7 +36,7 @@ func NewDownloadHandler() lpa.DownloadHandler {
 
 func main() {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
-	ch, err := goqmi.New("/dev/cdc-wdm0", 1)
+	ch, err := qmi.New("/dev/cdc-wdm0", 1)
 	if err != nil {
 		panic(err)
 	}
@@ -53,11 +53,11 @@ func main() {
 	}
 	defer client.Close()
 
-	// id, _ := sgp22.NewICCID("89861234567891232113")
+	// id, _ := sgp22.NewICCID("8944478600004240215")
 	// fmt.Println(client.DeleteProfile(id))
 	// fmt.Println(client.EnableProfile(id))
 
-	// pn, err := client.RetrieveNotificationList(sgp22.SequenceNumber(89))
+	// pn, err := client.RetrieveNotificationList(sgp22.SequenceNumber(802))
 	// if err != nil {
 	// 	fmt.Println(err)
 	// 	return
@@ -67,14 +67,14 @@ func main() {
 	// 	return
 	// }
 
-	ps, err := client.ListProfile(nil, nil)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	for _, p := range ps {
-		fmt.Println(p.ProfileName, p.ICCID)
-	}
+	// ps, err := client.ListProfile(nil, nil)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
+	// for _, p := range ps {
+	// 	fmt.Println(p.ProfileName, p.ICCID)
+	// }
 
 	eid, _ := client.EID()
 	fmt.Println(eid)
@@ -86,8 +86,8 @@ func main() {
 	// defer cancel()
 
 	// installResult, err := client.DownloadProfile(ctx, &lpa.ActivationCode{
-	// 	SMDP:       &url.URL{Scheme: "https", Host: "abc.smdp.com"},
-	// 	MatchingID: "123131313131",
+	// 	SMDP:       &url.URL{Scheme: "https", Host: "smdp.io"},
+	// 	MatchingID: "QR-G-5C-1LS-1W1Z9P7",
 	// 	IMEI:       "356938035643809",
 	// }, NewDownloadHandler())
 	// if err != nil {

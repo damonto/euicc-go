@@ -1,4 +1,4 @@
-package goqmi
+package qmi
 
 import "fmt"
 
