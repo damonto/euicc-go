@@ -5,93 +5,131 @@ package qmi
 type QMIProtocolError uint16
 
 const (
-	QMIProtocolErrorNone                        QMIProtocolError = iota // No error
-	QMIProtocolErrorMalformedMessage                                    // Malformed message
-	QMIProtocolErrorNoMemory                                            // No memory
-	QMIProtocolErrorInternal                                            // Internal error
-	QMIProtocolErrorAborted                                             // Aborted
-	QMIProtocolErrorClientIDsExhausted                                  // Client IDs exhausted
-	QMIProtocolErrorUnabortableTransaction                              // Unabortable transaction
-	QMIProtocolErrorInvalidClientID                                     // Invalid client ID
-	QMIProtocolErrorNoThresholdsProvided                                // No thresholds provided
-	QMIProtocolErrorInvalidHandle                                       // Invalid handle
-	QMIProtocolErrorInvalidProfile                                      // Invalid profile
-	QMIProtocolErrorInvalidPinID                                        // Invalid PIN ID
-	QMIProtocolErrorIncorrectPin                                        // Incorrect PIN
-	QMIProtocolErrorNoNetworkFound                                      // No network found
-	QMIProtocolErrorCallFailed                                          // Call failed
-	QMIProtocolErrorOutOfCall                                           // Out of call
-	QMIProtocolErrorNotProvisioned                                      // Not provisioned
-	QMIProtocolErrorMissingArgument                                     // Missing argument
-	QMIProtocolErrorArgumentTooLong                                     // Argument too long
-	QMIProtocolErrorInvalidTransactionID                                // Invalid transaction ID
-	QMIProtocolErrorDeviceInUse                                         // Device in use
-	QMIProtocolErrorNetworkUnsupported                                  // Network unsupported
-	QMIProtocolErrorDeviceUnsupported                                   // Device unsupported
-	QMIProtocolErrorNoEffect                                            // No effect
-	QMIProtocolErrorNoFreeProfile                                       // No free profile
-	QMIProtocolErrorInvalidPDPType                                      // Invalid PDP type
-	QMIProtocolErrorInvalidTechnologyPreference                         // Invalid technology preference
-	QMIProtocolErrorInvalidProfileType                                  // Invalid profile type
-	QMIProtocolErrorInvalidServiceType                                  // Invalid service type
-	QMIProtocolErrorInvalidRegisterAction                               // Invalid register action
-	QMIProtocolErrorInvalidPSAttachAction                               // Invalid PS attach action
-	QMIProtocolErrorAuthenticationFailed                                // Authentication failed
-	QMIProtocolErrorPinBlocked                                          // PIN blocked
-	QMIProtocolErrorPinAlwaysBlocked                                    // PIN always blocked
-	QMIProtocolErrorUIMUninitialized                                    // UIM uninitialized
-	QMIProtocolErrorMaximumQoSRequestsInUse                             // Maximum QoS requests in use
-	QMIProtocolErrorIncorrectFlowFilter                                 // Incorrect flow filter
-	QMIProtocolErrorNetworkQoSUnaware                                   // Network QoS unaware
-	QMIProtocolErrorInvalidQoSID                                        // Invalid QoS ID
-	QMIProtocolErrorRequestedNumberUnsupported                          // Requested number unsupported
-	QMIProtocolErrorInterfaceNotFound                                   // Interface not found
-	QMIProtocolErrorFlowSuspended                                       // Flow suspended
-	QMIProtocolErrorInvalidDataFormat                                   // Invalid data format
-	QMIProtocolErrorGeneralError                                        // General error
-	QMIProtocolErrorUnknownError                                        // Unknown error
-	QMIProtocolErrorInvalidArgument                                     // Invalid argument (commonly seen!)
-	QMIProtocolErrorInvalidIndex                                        // Invalid index
-	QMIProtocolErrorNoEntry                                             // No entry
-	QMIProtocolErrorDeviceStorageFull                                   // Device storage full
-	QMIProtocolErrorDeviceNotReady                                      // Device not ready
-	QMIProtocolErrorNetworkNotReady                                     // Network not ready
-	QMIProtocolErrorWMSCauseCode                                        // WMS cause code
-	QMIProtocolErrorWMSMessageNotSent                                   // WMS message not sent
-	QMIProtocolErrorWMSMessageDeliveryFailure                           // WMS message delivery failure
-	QMIProtocolErrorWMSInvalidMessageID                                 // WMS invalid message ID
-	QMIProtocolErrorWMSEncoding                                         // WMS encoding
-	QMIProtocolErrorAuthenticationLock                                  // Authentication lock
-	QMIProtocolErrorInvalidTransition                                   // Invalid transition
-	QMIProtocolErrorSIMFileNotFound                                     // SIM file not found
-	QMIProtocolErrorAccessDenied                                        // Access denied
-	QMIProtocolErrorHardwareRestricted                                  // Hardware restricted
-	QMIProtocolErrorIncompatibleState                                   // Incompatible state
-	QMIProtocolErrorFDNRestrict                                         // FDN restrict
-	QMIProtocolErrorNotSupported                                        // Not supported
-	QMIProtocolErrorNoSubscription                                      // No subscription
-	QMIProtocolErrorCardCallControlFailed                               // Card call control failed
-	QMIProtocolErrorNetworkAborted                                      // Network aborted
-	QMIProtocolErrorMsgBlocked                                          // Message blocked
-	QMIProtocolErrorInvalidSessionType                                  // Invalid session type
-	QMIProtocolErrorInvalidPBType                                       // Invalid PB type
-	QMIProtocolErrorNoSIM                                               // No SIM
-	QMIProtocolErrorPBNotReady                                          // PB not ready
-	QMIProtocolErrorPinRestriction                                      // PIN restriction
-	QMIProtocolErrorPin2Restriction                                     // PIN2 restriction
-	QMIProtocolErrorPUKRestriction                                      // PUK restriction
-	QMIProtocolErrorPUK2Restriction                                     // PUK2 restriction
-	QMIProtocolErrorPBAccessRestricted                                  // PB access restricted
-	QMIProtocolErrorPBDeleteInProgress                                  // PB delete in progress
-	QMIProtocolErrorPBTextTooLong                                       // PB text too long
-	QMIProtocolErrorPBNumberTooLong                                     // PB number too long
-	QMIProtocolErrorPBHiddenKeyRestriction                              // PB hidden key restriction
-	QMIProtocolErrorPBNotAvailable                                      // PB not available
-	QMIProtocolErrorDeviceMemoryError                                   // Device memory error
-	QMIProtocolErrorNoPermission                                        // No permission
-	QMIProtocolErrorTooSoon                                             // Too soon
-	QMIProtocolErrorTimeNotAcquired                                     // Time not acquired
-	QMIProtocolErrorOperationInProgress                                 // Operation in progress
+	QMIProtocolErrorNone                        QMIProtocolError = iota  /*< nick=None >*/
+	QMIProtocolErrorMalformedMessage                                     /*< nick=MalformedMessage >*/
+	QMIProtocolErrorNoMemory                                             /*< nick=NoMemory >*/
+	QMIProtocolErrorInternal                                             /*< nick=Internal >*/
+	QMIProtocolErrorAborted                                              /*< nick=Aborted >*/
+	QMIProtocolErrorClientIdsExhausted                                   /*< nick=ClientIdsExhausted >*/
+	QMIProtocolErrorUnabortableTransaction                               /*< nick=UnabortableTransaction >*/
+	QMIProtocolErrorInvalidClientId                                      /*< nick=InvalidClientId >*/
+	QMIProtocolErrorNoThresholdsProvided                                 /*< nick=NoThresholdsProvided >*/
+	QMIProtocolErrorInvalidHandle                                        /*< nick=InvalidHandle >*/
+	QMIProtocolErrorInvalidProfile                                       /*< nick=InvalidProfile >*/
+	QMIProtocolErrorInvalidPinId                                         /*< nick=InvalidPinId >*/
+	QMIProtocolErrorIncorrectPin                                         /*< nick=IncorrectPin >*/
+	QMIProtocolErrorNoNetworkFound                                       /*< nick=NoNetworkFound >*/
+	QMIProtocolErrorCallFailed                                           /*< nick=CallFailed >*/
+	QMIProtocolErrorOutOfCall                                            /*< nick=OutOfCall >*/
+	QMIProtocolErrorNotProvisioned                                       /*< nick=NotProvisioned >*/
+	QMIProtocolErrorMissingArgument                                      /*< nick=MissingArgument >*/
+	QMIProtocolErrorArgumentTooLong                                      /*< nick=ArgumentTooLong >*/
+	QMIProtocolErrorInvalidTransactionId                                 /*< nick=InvalidTransactionId >*/
+	QMIProtocolErrorDeviceInUse                                          /*< nick=DeviceInUse >*/
+	QMIProtocolErrorNetworkUnsupported                                   /*< nick=NetworkUnsupported >*/
+	QMIProtocolErrorDeviceUnsupported                                    /*< nick=DeviceUnsupported >*/
+	QMIProtocolErrorNoEffect                                             /*< nick=NoEffect >*/
+	QMIProtocolErrorNoFreeProfile                                        /*< nick=NoFreeProfile >*/
+	QMIProtocolErrorInvalidPdpType                                       /*< nick=InvalidPdpType >*/
+	QMIProtocolErrorInvalidTechnologyPreference                          /*< nick=InvalidTechnologyPreference >*/
+	QMIProtocolErrorInvalidProfileType                                   /*< nick=InvalidProfileType >*/
+	QMIProtocolErrorInvalidServiceType                                   /*< nick=InvalidServiceType >*/
+	QMIProtocolErrorInvalidRegisterAction                                /*< nick=InvalidRegisterAction >*/
+	QMIProtocolErrorInvalidPsAttachAction                                /*< nick=InvalidPsAttachAction >*/
+	QMIProtocolErrorAuthenticationFailed                                 /*< nick=AuthenticationFailed >*/
+	QMIProtocolErrorPinBlocked                                           /*< nick=PinBlocked >*/
+	QMIProtocolErrorPinAlwaysBlocked                                     /*< nick=PinAlwaysBlocked >*/
+	QMIProtocolErrorUimUninitialized                                     /*< nick=UimUninitialized >*/
+	QMIProtocolErrorMaximumQosRequestsInUse                              /*< nick=MaximumQosRequestsInUse >*/
+	QMIProtocolErrorIncorrectFlowFilter                                  /*< nick=IncorrectFlowFilter >*/
+	QMIProtocolErrorNetworkQosUnaware                                    /*< nick=NetworkQosUnaware >*/
+	QMIProtocolErrorInvalidQosId                                         /*< nick=InvalidQosId >*/
+	QMIProtocolErrorRequestedNumberUnsupported                           /*< nick=RequestedNumberUnsupported >*/
+	QMIProtocolErrorInterfaceNotFound                                    /*< nick=InterfaceNotFound >*/
+	QMIProtocolErrorFlowSuspended                                        /*< nick=FlowSuspended >*/
+	QMIProtocolErrorInvalidDataFormat                                    /*< nick=InvalidDataFormat >*/
+	QMIProtocolErrorGeneralError                                         /*< nick=GeneralError >*/
+	QMIProtocolErrorUnknownError                                         /*< nick=UnknownError >*/
+	QMIProtocolErrorInvalidArgument                                      /*< nick=InvalidArgument >*/
+	QMIProtocolErrorInvalidIndex                                         /*< nick=InvalidIndex >*/
+	QMIProtocolErrorNoEntry                                              /*< nick=NoEntry >*/
+	QMIProtocolErrorDeviceStorageFull                                    /*< nick=DeviceStorageFull >*/
+	QMIProtocolErrorDeviceNotReady                                       /*< nick=DeviceNotReady >*/
+	QMIProtocolErrorNetworkNotReady                                      /*< nick=NetworkNotReady >*/
+	QMIProtocolErrorWmsCauseCode                                         /*< nick=WmsCauseCode >*/
+	QMIProtocolErrorWmsMessageNotSent                                    /*< nick=WmsMessageNotSent >*/
+	QMIProtocolErrorWmsMessageDeliveryFailure                            /*< nick=WmsMessageDeliveryFailure >*/
+	QMIProtocolErrorWmsInvalidMessageId                                  /*< nick=WmsInvalidMessageId >*/
+	QMIProtocolErrorWmsEncoding                                          /*< nick=WmsEncoding >*/
+	QMIProtocolErrorAuthenticationLock                                   /*< nick=AuthenticationLock >*/
+	QMIProtocolErrorInvalidTransition                                    /*< nick=InvalidTransition >*/
+	QMIProtocolErrorNotMcastInterface                                    /*< nick=NotMcastInterface >*/
+	QMIProtocolErrorMaximumMcastRequestsInUse                            /*< nick=MaximumMcastRequestsInUse >*/
+	QMIProtocolErrorInvalidMcastHandle                                   /*< nick=InvalidMcastHandle >*/
+	QMIProtocolErrorInvalidIpFamilyPreference                            /*< nick=InvalidIpFamilyPreference >*/
+	QMIProtocolErrorSessionInactive                                      /*< nick=SessionInactive >*/
+	QMIProtocolErrorSessionInvalid                                       /*< nick=SessionInvalid >*/
+	QMIProtocolErrorSessionOwnership                                     /*< nick=SessionOwnership >*/
+	QMIProtocolErrorInsufficientResources                                /*< nick=InsufficientResources >*/
+	QMIProtocolErrorDisabled                                             /*< nick=Disabled >*/
+	QMIProtocolErrorInvalidOperation                                     /*< nick=InvalidOperation >*/
+	QMIProtocolErrorInvalidQmiCommand                                    /*< nick=InvalidQmiCommand >*/
+	QMIProtocolErrorWmsTPduType                                          /*< nick=WmsTPduType >*/
+	QMIProtocolErrorWmsSmscAddress                                       /*< nick=WmsSmscAddress >*/
+	QMIProtocolErrorInformationUnavailable                               /*< nick=InformationUnavailable >*/
+	QMIProtocolErrorSegmentTooLong                                       /*< nick=SegmentTooLong >*/
+	QMIProtocolErrorSegmentOrder                                         /*< nick=SegmentOrder >*/
+	QMIProtocolErrorBundlingNotSupported                                 /*< nick=BundlingNotSupported >*/
+	QMIProtocolErrorOperationPartialFailure                              /*< nick=OperationPartialFailure >*/
+	QMIProtocolErrorPolicyMismatch                                       /*< nick=PolicyMismatch >*/
+	QMIProtocolErrorSimFileNotFound                                      /*< nick=SimFileNotFound >*/
+	QMIProtocolErrorExtendedInternal                                     /*< nick=ExtendedInternal >*/
+	QMIProtocolErrorAccessDenied                                         /*< nick=AccessDenied >*/
+	QMIProtocolErrorHardwareRestricted                                   /*< nick=HardwareRestricted >*/
+	QMIProtocolErrorAckNotSent                                           /*< nick=AckNotSent >*/
+	QMIProtocolErrorInjectTimeout                                        /*< nick=InjectTimeout >*/
+	QMIProtocolErrorIncompatibleState                                    /*< nick=IncompatibleState >*/
+	QMIProtocolErrorFdnRestrict                                          /*< nick=FdnRestrict >*/
+	QMIProtocolErrorSupsFailureCase                                      /*< nick=SupsFailureCase >*/
+	QMIProtocolErrorNoRadio                                              /*< nick=NoRadio >*/
+	QMIProtocolErrorNotSupported                                         /*< nick=NotSupported >*/
+	QMIProtocolErrorNoSubscription                                       /*< nick=NoSubscription >*/
+	QMIProtocolErrorCardCallControlFailed                                /*< nick=CardCallControlFailed >*/
+	QMIProtocolErrorNetworkAborted                                       /*< nick=NetworkAborted >*/
+	QMIProtocolErrorMsgBlocked                                           /*< nick=MsgBlocked >*/
+	QMIProtocolErrorInvalidSessionType                                   /*< nick=InvalidSessionType >*/
+	QMIProtocolErrorInvalidPbType                                        /*< nick=InvalidPbType >*/
+	QMIProtocolErrorNoSim                                                /*< nick=NoSim >*/
+	QMIProtocolErrorPbNotReady                                           /*< nick=PbNotReady >*/
+	QMIProtocolErrorPinRestriction                                       /*< nick=PinRestriction >*/
+	QMIProtocolErrorPin2Restriction                                      /*< nick=Pin1Restriction >*/
+	QMIProtocolErrorPukRestriction                                       /*< nick=PukRestriction >*/
+	QMIProtocolErrorPuk2Restriction                                      /*< nick=Puk2Restriction >*/
+	QMIProtocolErrorPbAccessRestricted                                   /*< nick=PbAccessRestricted >*/
+	QMIProtocolErrorPbDeleteInProgress                                   /*< nick=PbDeleteInProgress >*/
+	QMIProtocolErrorPbTextTooLong                                        /*< nick=PbTextTooLong >*/
+	QMIProtocolErrorPbNumberTooLong                                      /*< nick=PbNumberTooLong >*/
+	QMIProtocolErrorPbHiddenKeyRestriction                               /*< nick=PbHiddenKeyRestriction >*/
+	QMIProtocolErrorPbNotAvailable                                       /*< nick=PbNotAvailable >*/
+	QMIProtocolErrorDeviceMemoryError                                    /*< nick=DeviceMemoryError >*/
+	QMIProtocolErrorNoPermission                                         /*< nick=NoPermission >*/
+	QMIProtocolErrorTooSoon                                              /*< nick=TooSoon >*/
+	QMIProtocolErrorTimeNotAcquired                                      /*< nick=TimeNotAcquired >*/
+	QMIProtocolErrorOperationInProgress                                  /*< nick=OperationInProgress >*/
+	QMIProtocolErrorFwWriteFailed               QMIProtocolError = 388   /*< nick=FwWriteFailed >*/
+	QMIProtocolErrorFwInfoReadFailed            QMIProtocolError = 389   /*< nick=FwInfoReadFailed >*/
+	QMIProtocolErrorFwFileNotFound              QMIProtocolError = 390   /*< nick=FwFileNotFound >*/
+	QMIProtocolErrorFwDirNotFound               QMIProtocolError = 391   /*< nick=FwDirNotFound >*/
+	QMIProtocolErrorFwAlreadyActivated          QMIProtocolError = 392   /*< nick=FwAlreadyActivated >*/
+	QMIProtocolErrorFwCannotGenericImage        QMIProtocolError = 393   /*< nick=FwCannotGenericImage >*/
+	QMIProtocolErrorFwFileOpenFailed            QMIProtocolError = 400   /*< nick=FwFileOpenFailed >*/
+	QMIProtocolErrorFwUpdateDiscontinuousFrame  QMIProtocolError = 401   /*< nick=FwUpdateDiscontinuousFrame >*/
+	QMIProtocolErrorFwUpdateFailed              QMIProtocolError = 402   /*< nick=FwUpdateFailed >*/
+	QMIProtocolErrorCatEventRegistrationFailed  QMIProtocolError = 61441 /*< nick=CatEventRegistrationFailed >*/
+	QMIProtocolErrorCatInvalidTerminalResponse  QMIProtocolError = 61442 /*< nick=CatInvalidTerminalResponse >*/
+	QMIProtocolErrorCatInvalidEnvelopeCommand   QMIProtocolError = 61443 /*< nick=CatInvalidEnvelopeCommand >*/
+	QMIProtocolErrorCatEnvelopeCommandBusy      QMIProtocolError = 61444 /*< nick=CatEnvelopeCommandBusy >*/
+	QMIProtocolErrorCatEnvelopeCommandFailed    QMIProtocolError = 61445 /*< nick=CatEnvelopeCommandFailed >*/
 )
 
 func (e QMIProtocolError) Error() string {
@@ -105,12 +143,12 @@ func (e QMIProtocolError) Error() string {
 	case QMIProtocolErrorInternal:
 		return "Internal error"
 	case QMIProtocolErrorAborted:
-		return "Aborted"
-	case QMIProtocolErrorClientIDsExhausted:
+		return "Operation aborted"
+	case QMIProtocolErrorClientIdsExhausted:
 		return "Client IDs exhausted"
 	case QMIProtocolErrorUnabortableTransaction:
 		return "Unabortable transaction"
-	case QMIProtocolErrorInvalidClientID:
+	case QMIProtocolErrorInvalidClientId:
 		return "Invalid client ID"
 	case QMIProtocolErrorNoThresholdsProvided:
 		return "No thresholds provided"
@@ -118,7 +156,7 @@ func (e QMIProtocolError) Error() string {
 		return "Invalid handle"
 	case QMIProtocolErrorInvalidProfile:
 		return "Invalid profile"
-	case QMIProtocolErrorInvalidPinID:
+	case QMIProtocolErrorInvalidPinId:
 		return "Invalid PIN ID"
 	case QMIProtocolErrorIncorrectPin:
 		return "Incorrect PIN"
@@ -134,7 +172,7 @@ func (e QMIProtocolError) Error() string {
 		return "Missing argument"
 	case QMIProtocolErrorArgumentTooLong:
 		return "Argument too long"
-	case QMIProtocolErrorInvalidTransactionID:
+	case QMIProtocolErrorInvalidTransactionId:
 		return "Invalid transaction ID"
 	case QMIProtocolErrorDeviceInUse:
 		return "Device in use"
@@ -145,8 +183,8 @@ func (e QMIProtocolError) Error() string {
 	case QMIProtocolErrorNoEffect:
 		return "No effect"
 	case QMIProtocolErrorNoFreeProfile:
-		return "No free profile"
-	case QMIProtocolErrorInvalidPDPType:
+		return "No free profile available"
+	case QMIProtocolErrorInvalidPdpType:
 		return "Invalid PDP type"
 	case QMIProtocolErrorInvalidTechnologyPreference:
 		return "Invalid technology preference"
@@ -156,7 +194,7 @@ func (e QMIProtocolError) Error() string {
 		return "Invalid service type"
 	case QMIProtocolErrorInvalidRegisterAction:
 		return "Invalid register action"
-	case QMIProtocolErrorInvalidPSAttachAction:
+	case QMIProtocolErrorInvalidPsAttachAction:
 		return "Invalid PS attach action"
 	case QMIProtocolErrorAuthenticationFailed:
 		return "Authentication failed"
@@ -164,15 +202,15 @@ func (e QMIProtocolError) Error() string {
 		return "PIN blocked"
 	case QMIProtocolErrorPinAlwaysBlocked:
 		return "PIN always blocked"
-	case QMIProtocolErrorUIMUninitialized:
+	case QMIProtocolErrorUimUninitialized:
 		return "UIM uninitialized"
-	case QMIProtocolErrorMaximumQoSRequestsInUse:
+	case QMIProtocolErrorMaximumQosRequestsInUse:
 		return "Maximum QoS requests in use"
 	case QMIProtocolErrorIncorrectFlowFilter:
 		return "Incorrect flow filter"
-	case QMIProtocolErrorNetworkQoSUnaware:
+	case QMIProtocolErrorNetworkQosUnaware:
 		return "Network QoS unaware"
-	case QMIProtocolErrorInvalidQoSID:
+	case QMIProtocolErrorInvalidQosId:
 		return "Invalid QoS ID"
 	case QMIProtocolErrorRequestedNumberUnsupported:
 		return "Requested number unsupported"
@@ -198,30 +236,78 @@ func (e QMIProtocolError) Error() string {
 		return "Device not ready"
 	case QMIProtocolErrorNetworkNotReady:
 		return "Network not ready"
-	case QMIProtocolErrorWMSCauseCode:
+	case QMIProtocolErrorWmsCauseCode:
 		return "WMS cause code"
-	case QMIProtocolErrorWMSMessageNotSent:
+	case QMIProtocolErrorWmsMessageNotSent:
 		return "WMS message not sent"
-	case QMIProtocolErrorWMSMessageDeliveryFailure:
+	case QMIProtocolErrorWmsMessageDeliveryFailure:
 		return "WMS message delivery failure"
-	case QMIProtocolErrorWMSInvalidMessageID:
+	case QMIProtocolErrorWmsInvalidMessageId:
 		return "WMS invalid message ID"
-	case QMIProtocolErrorWMSEncoding:
-		return "WMS encoding"
+	case QMIProtocolErrorWmsEncoding:
+		return "WMS encoding error"
 	case QMIProtocolErrorAuthenticationLock:
 		return "Authentication lock"
 	case QMIProtocolErrorInvalidTransition:
 		return "Invalid transition"
-	case QMIProtocolErrorSIMFileNotFound:
+	case QMIProtocolErrorNotMcastInterface:
+		return "Not a multicast interface"
+	case QMIProtocolErrorMaximumMcastRequestsInUse:
+		return "Maximum multicast requests in use"
+	case QMIProtocolErrorInvalidMcastHandle:
+		return "Invalid multicast handle"
+	case QMIProtocolErrorInvalidIpFamilyPreference:
+		return "Invalid IP family preference"
+	case QMIProtocolErrorSessionInactive:
+		return "Session inactive"
+	case QMIProtocolErrorSessionInvalid:
+		return "Session invalid"
+	case QMIProtocolErrorSessionOwnership:
+		return "Session ownership error"
+	case QMIProtocolErrorInsufficientResources:
+		return "Insufficient resources"
+	case QMIProtocolErrorDisabled:
+		return "Disabled"
+	case QMIProtocolErrorInvalidOperation:
+		return "Invalid operation"
+	case QMIProtocolErrorInvalidQmiCommand:
+		return "Invalid QMI command"
+	case QMIProtocolErrorWmsTPduType:
+		return "WMS TPDU type error"
+	case QMIProtocolErrorWmsSmscAddress:
+		return "WMS SMSC address error"
+	case QMIProtocolErrorInformationUnavailable:
+		return "Information unavailable"
+	case QMIProtocolErrorSegmentTooLong:
+		return "Segment too long"
+	case QMIProtocolErrorSegmentOrder:
+		return "Segment order error"
+	case QMIProtocolErrorBundlingNotSupported:
+		return "Bundling not supported"
+	case QMIProtocolErrorOperationPartialFailure:
+		return "Operation partial failure"
+	case QMIProtocolErrorPolicyMismatch:
+		return "Policy mismatch"
+	case QMIProtocolErrorSimFileNotFound:
 		return "SIM file not found"
+	case QMIProtocolErrorExtendedInternal:
+		return "Extended internal error"
 	case QMIProtocolErrorAccessDenied:
 		return "Access denied"
 	case QMIProtocolErrorHardwareRestricted:
 		return "Hardware restricted"
+	case QMIProtocolErrorAckNotSent:
+		return "Acknowledgment not sent"
+	case QMIProtocolErrorInjectTimeout:
+		return "Inject timeout"
 	case QMIProtocolErrorIncompatibleState:
 		return "Incompatible state"
-	case QMIProtocolErrorFDNRestrict:
-		return "FDN restrict"
+	case QMIProtocolErrorFdnRestrict:
+		return "Fdn restrict"
+	case QMIProtocolErrorSupsFailureCase:
+		return "Sups failure case"
+	case QMIProtocolErrorNoRadio:
+		return "No radio"
 	case QMIProtocolErrorNotSupported:
 		return "Not supported"
 	case QMIProtocolErrorNoSubscription:
@@ -234,32 +320,32 @@ func (e QMIProtocolError) Error() string {
 		return "Message blocked"
 	case QMIProtocolErrorInvalidSessionType:
 		return "Invalid session type"
-	case QMIProtocolErrorInvalidPBType:
-		return "Invalid PB type"
-	case QMIProtocolErrorNoSIM:
-		return "No SIM"
-	case QMIProtocolErrorPBNotReady:
-		return "PB not ready"
+	case QMIProtocolErrorInvalidPbType:
+		return "Invalid phonebook type"
+	case QMIProtocolErrorNoSim:
+		return "No SIM card"
+	case QMIProtocolErrorPbNotReady:
+		return "Phonebook not ready"
 	case QMIProtocolErrorPinRestriction:
 		return "PIN restriction"
 	case QMIProtocolErrorPin2Restriction:
 		return "PIN2 restriction"
-	case QMIProtocolErrorPUKRestriction:
+	case QMIProtocolErrorPukRestriction:
 		return "PUK restriction"
-	case QMIProtocolErrorPUK2Restriction:
+	case QMIProtocolErrorPuk2Restriction:
 		return "PUK2 restriction"
-	case QMIProtocolErrorPBAccessRestricted:
-		return "PB access restricted"
-	case QMIProtocolErrorPBDeleteInProgress:
-		return "PB delete in progress"
-	case QMIProtocolErrorPBTextTooLong:
-		return "PB text too long"
-	case QMIProtocolErrorPBNumberTooLong:
-		return "PB number too long"
-	case QMIProtocolErrorPBHiddenKeyRestriction:
-		return "PB hidden key restriction"
-	case QMIProtocolErrorPBNotAvailable:
-		return "PB not available"
+	case QMIProtocolErrorPbAccessRestricted:
+		return "Phonebook access restricted"
+	case QMIProtocolErrorPbDeleteInProgress:
+		return "Phonebook delete in progress"
+	case QMIProtocolErrorPbTextTooLong:
+		return "Phonebook text too long"
+	case QMIProtocolErrorPbNumberTooLong:
+		return "Phonebook number too long"
+	case QMIProtocolErrorPbHiddenKeyRestriction:
+		return "Phonebook hidden key restriction"
+	case QMIProtocolErrorPbNotAvailable:
+		return "Phonebook not available"
 	case QMIProtocolErrorDeviceMemoryError:
 		return "Device memory error"
 	case QMIProtocolErrorNoPermission:
@@ -270,6 +356,34 @@ func (e QMIProtocolError) Error() string {
 		return "Time not acquired"
 	case QMIProtocolErrorOperationInProgress:
 		return "Operation in progress"
+	case QMIProtocolErrorFwWriteFailed:
+		return "Firmware write failed"
+	case QMIProtocolErrorFwInfoReadFailed:
+		return "Firmware info read failed"
+	case QMIProtocolErrorFwFileNotFound:
+		return "Firmware file not found"
+	case QMIProtocolErrorFwDirNotFound:
+		return "Firmware directory not found"
+	case QMIProtocolErrorFwAlreadyActivated:
+		return "Firmware already activated"
+	case QMIProtocolErrorFwCannotGenericImage:
+		return "Firmware cannot generic image"
+	case QMIProtocolErrorFwFileOpenFailed:
+		return "Firmware file open failed"
+	case QMIProtocolErrorFwUpdateDiscontinuousFrame:
+		return "Firmware update discontinuous frame"
+	case QMIProtocolErrorFwUpdateFailed:
+		return "Firmware update failed"
+	case QMIProtocolErrorCatEventRegistrationFailed:
+		return "CAT event registration failed"
+	case QMIProtocolErrorCatInvalidTerminalResponse:
+		return "CAT invalid terminal response"
+	case QMIProtocolErrorCatInvalidEnvelopeCommand:
+		return "CAT invalid envelope command"
+	case QMIProtocolErrorCatEnvelopeCommandBusy:
+		return "CAT envelope command busy"
+	case QMIProtocolErrorCatEnvelopeCommandFailed:
+		return "CAT envelope command failed"
 	default:
 		return "Unknown QMI protocol error"
 	}

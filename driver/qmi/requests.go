@@ -25,7 +25,7 @@ func sendRequest[I Request](conn net.Conn, txnID uint16, request I) ([]byte, err
 	}
 	message, err := waitForResponse(conn, txnID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to wait for response: %w", err)
+		return nil, err
 	}
 	return request.Value(message)
 }
@@ -34,7 +34,7 @@ func waitForResponse(conn net.Conn, expectedTxnID uint16) (*Message, error) {
 	deadline := time.Now().Add(5 * time.Second)
 
 	for time.Now().Before(deadline) {
-		buf := make([]byte, 1500)
+		buf := make([]byte, 4096)
 		conn.SetReadDeadline(time.Now().Add(100 * time.Microsecond))
 		if _, err := conn.Read(buf); err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {

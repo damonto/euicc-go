@@ -35,6 +35,9 @@ func NewDownloadHandler() lpa.DownloadHandler {
 }
 
 func main() {
+	// m, err := gombim.New("/dev/wdm0", 1)
+	// fmt.Println(m.Connect(), err)
+
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 	ch, err := qmi.New("/dev/cdc-wdm0", 1)
 	if err != nil {
