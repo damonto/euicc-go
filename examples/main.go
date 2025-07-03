@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/damonto/euicc-go/driver/qmi"
+	"github.com/damonto/euicc-go/driver/mbim"
 	"github.com/damonto/euicc-go/lpa"
 	sgp22 "github.com/damonto/euicc-go/v2"
 )
@@ -35,14 +35,16 @@ func NewDownloadHandler() lpa.DownloadHandler {
 }
 
 func main() {
-	// m, err := gombim.New("/dev/wdm0", 1)
-	// fmt.Println(m.Connect(), err)
-
 	slog.SetLogLoggerLevel(slog.LevelDebug)
-	ch, err := qmi.New("/dev/cdc-wdm0", 1)
+
+	ch, err := mbim.New("/dev/cdc-wdm1", 1)
 	if err != nil {
 		panic(err)
 	}
+	// ch, err := qmi.New("/dev/cdc-wdm0", 1)
+	// if err != nil {
+	// 	panic(err)
+	// }
 	// ch, err := at.New("/dev/ttyUSB2")
 	// if err != nil {
 	// 	panic(err)

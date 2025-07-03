@@ -4,41 +4,107 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"unicode/utf16"
 )
+
+// region Proxy Configuration
+
+type ProxyConfigRequest struct {
+	TxnID      uint32
+	DevicePath string
+	Timeout    uint32
+	Response   *ProxyConfigResponse
+}
+
+func (r *ProxyConfigRequest) Message() *Message {
+	// MBIM Proxy Config format based on libmbim source:
+	// - String descriptor for device path at offset 0 (8 bytes: offset + length)
+	// - Timeout value at offset 8 (4 bytes)
+	// - String data follows
+
+	utf16s := utf16.Encode([]rune(r.DevicePath))
+	utf16s = append(utf16s, 0) // null terminator
+	pb := new(bytes.Buffer)
+	_ = binary.Write(pb, binary.LittleEndian, utf16s)
+	devicePathUTF16 := pb.Bytes()
+
+	// String data will be placed after the timeout field
+	stringDataOffset := uint32(12) // after string descriptor (8 bytes) + timeout (4 bytes)
+	stringDataLength := uint32(len(devicePathUTF16))
+
+	buf := new(bytes.Buffer)
+
+	// Write string descriptor for device path
+	binary.Write(buf, binary.LittleEndian, stringDataOffset)
+	binary.Write(buf, binary.LittleEndian, stringDataLength)
+
+	// Write timeout at offset 8
+	binary.Write(buf, binary.LittleEndian, r.Timeout)
+
+	// Write the string data
+	buf.Write(devicePathUTF16)
+
+	r.Response = new(ProxyConfigResponse)
+	return &Message{
+		Type:          MessageTypeCommand,
+		TransactionID: r.TxnID,
+		Payload: &Command{
+			FragmentTotal:   1,
+			FragmentCurrent: 0,
+			Service:         ServiceMbimProxyControl,
+			CID:             CIDProxyControlConfiguration,
+			CommandType:     CommandTypeSet,
+			Data:            buf.Bytes(),
+			Response:        r.Response,
+		},
+	}
+}
+
+type ProxyConfigResponse struct {
+	Status uint32
+}
+
+func (r *ProxyConfigResponse) UnmarshalBinary(data []byte) error {
+	return nil
+}
+
+// endregion
 
 // region Open Device Request
 
 type OpenDeviceRequest struct {
-	TxnID    uint32
-	Response *OpenDeviceResponse
+	TxnID   uint32
+	Payload *OpenDevicePayload
 }
 
-type OpenDeviceResponse struct {
-	Status uint32
+type OpenDevicePayload struct {
+	MaxControlTransfer uint32
 }
 
-func (p *OpenDeviceResponse) MarshalBinary() ([]byte, error) {
+func (p *OpenDevicePayload) MarshalBinary() ([]byte, error) {
 	buf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buf, 4096)
+	binary.LittleEndian.PutUint32(buf, p.MaxControlTransfer)
 	return buf, nil
 }
 
-func (p *OpenDeviceResponse) UnmarshalBinary(data []byte) error {
-	binary.LittleEndian.PutUint32(data[0:4], p.Status)
+func (p *OpenDevicePayload) UnmarshalBinary(data []byte) error {
+	p.MaxControlTransfer = binary.LittleEndian.Uint32(data[0:4])
 	return nil
 }
 
 func (r *OpenDeviceRequest) Message() *Message {
-	r.Response = new(OpenDeviceResponse)
+	r.Payload = &OpenDevicePayload{
+		MaxControlTransfer: 4096,
+	}
 	return &Message{
 		Type:          MessageTypeOpen,
 		TransactionID: r.TxnID,
-		Payload:       r.Response,
+		Payload:       r.Payload,
 	}
 }
 
 func (r *OpenDeviceRequest) UnmarshalBinary(data []byte) error {
-	return r.Response.UnmarshalBinary(data)
+	return r.Payload.UnmarshalBinary(data)
 }
 
 // endregion

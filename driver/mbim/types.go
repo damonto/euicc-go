@@ -41,6 +41,7 @@ func (m *Message) WriteTo(w net.Conn) (int, error) {
 
 func (m *Message) ReadFrom(r net.Conn) (int, error) {
 	txnId := m.TransactionID
+	sourceType := m.Type
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		buf := make([]byte, 4096)
@@ -49,6 +50,9 @@ func (m *Message) ReadFrom(r net.Conn) (int, error) {
 			return 0, fmt.Errorf("failed to read message: %w", err)
 		}
 		if err := m.UnmarshalBinary(buf[:n]); err != nil {
+			if sourceType != m.Type {
+				continue // Ignore messages from other sources
+			}
 			return 0, fmt.Errorf("failed to unmarshal message: %w", err)
 		}
 		if m.TransactionID != txnId {
@@ -149,7 +153,7 @@ type CommandDoneResponse struct {
 }
 
 func (r *CommandDoneResponse) UnmarshalBinary(data []byte) error {
-	if len(data) < 40 {
+	if len(data) < 36 {
 		return errors.New("command done response data too short")
 	}
 

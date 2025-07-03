@@ -1,6 +1,7 @@
 package mbim
 
 import (
+	"encoding/binary"
 	"fmt"
 	"net"
 	"os"
@@ -27,6 +28,9 @@ func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 	if err := m.connectToProxy(); err != nil {
 		return nil, fmt.Errorf("failed to connect to mbim-proxy: %w", err)
 	}
+	if err := m.Connect(); err != nil {
+		return nil, fmt.Errorf("failed to connect to device: %w", err)
+	}
 	return m, nil
 }
 
@@ -50,8 +54,29 @@ func (m *MBIM) connectToProxy() error {
 
 // Connect establishes MBIM session and opens device
 func (m *MBIM) Connect() error {
+	if err := m.configureProxy(); err != nil {
+		return fmt.Errorf("failed to configure proxy: %w", err)
+	}
 	if err := m.openDevice(); err != nil {
 		return fmt.Errorf("failed to open device: %w", err)
+	}
+	return nil
+}
+
+// configureProxy sends proxy configuration request with device path using the libmbim proxy protocol
+func (m *MBIM) configureProxy() error {
+	txnID := atomic.AddUint32(&m.txnID, 1)
+	request := ProxyConfigRequest{
+		TxnID:      txnID,
+		DevicePath: m.device,
+		Timeout:    30,
+	}
+	message := request.Message()
+	if _, err := message.WriteTo(m.conn); err != nil {
+		return err
+	}
+	if _, err := message.ReadFrom(m.conn); err != nil {
+		return err
 	}
 	return nil
 }
@@ -62,8 +87,14 @@ func (m *MBIM) openDevice() error {
 	request := OpenDeviceRequest{
 		TxnID: txnID,
 	}
-	_, err := request.Message().WriteTo(m.conn)
-	return err
+	message := request.Message()
+	if _, err := message.WriteTo(m.conn); err != nil {
+		return err
+	}
+	if _, err := message.ReadFrom(m.conn); err != nil {
+		return err
+	}
+	return nil
 }
 
 // OpenLogicalChannel opens a logical channel for the specified Application ID
@@ -103,7 +134,10 @@ func (m *MBIM) Transmit(command []byte) ([]byte, error) {
 	if _, err := message.ReadFrom(m.conn); err != nil {
 		return nil, err
 	}
-	return request.Response.APDU, nil
+	sw := make([]byte, 2)
+	binary.LittleEndian.PutUint16(sw, uint16(request.Response.Status&0xFFFF))
+	response := append(request.Response.APDU, sw...)
+	return response, nil
 }
 
 // CloseLogicalChannel closes the specified logical channel
@@ -126,14 +160,5 @@ func (m *MBIM) CloseLogicalChannel(channel byte) error {
 
 // Disconnect closes the MBIM connection and releases resources
 func (m *MBIM) Disconnect() error {
-	txnID := atomic.AddUint32(&m.txnID, 1)
-	message := Message{
-		Type:          MessageTypeClose,
-		TransactionID: txnID,
-		Payload:       nil,
-	}
-	if _, err := message.WriteTo(m.conn); err != nil {
-		return fmt.Errorf("failed to send close message: %w", err)
-	}
 	return m.conn.Close()
 }
