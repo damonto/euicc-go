@@ -5,56 +5,31 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"os"
+	"io"
 	"strings"
 
 	"github.com/damonto/euicc-go/apdu"
-	"golang.org/x/sys/unix"
 )
 
 type AT struct {
-	f          *os.File
-	oldTermios *unix.Termios
-	channel    byte
+	s       io.ReadWriteCloser
+	channel byte
 }
 
 func New(device string) (apdu.SmartCardChannel, error) {
 	var at AT
 	var err error
-	if at.f, err = os.OpenFile(device, os.O_RDWR|unix.O_NOCTTY, 0666); err != nil {
-		return nil, err
-	}
-	if err := at.setTermios(); err != nil {
-		return nil, err
+	if at.s, err = OpenSerialPort(device); err != nil {
+		return nil, fmt.Errorf("failed to open serial port %s: %w", device, err)
 	}
 	return &at, nil
 }
 
-func (a *AT) setTermios() error {
-	fd := int(a.f.Fd())
-	var err error
-	if a.oldTermios, err = unix.IoctlGetTermios(fd, unix.TCGETS); err != nil {
-		return err
-	}
-	t := unix.Termios{
-		Ispeed: unix.B9600,
-		Ospeed: unix.B9600,
-	}
-	t.Iflag &^= unix.IGNBRK | unix.BRKINT | unix.PARMRK | unix.ISTRIP | unix.INLCR | unix.IGNCR | unix.ICRNL | unix.IXON
-	t.Oflag &^= unix.OPOST
-	t.Lflag &^= unix.ECHO | unix.ECHONL | unix.ICANON | unix.ISIG | unix.IEXTEN
-	t.Cflag &^= unix.CSIZE | unix.PARENB
-	t.Cflag |= unix.CS8
-	t.Cc[unix.VMIN] = 1
-	t.Cc[unix.VTIME] = 0
-	return unix.IoctlSetTermios(fd, unix.TCSETS, &t)
-}
-
 func (a *AT) execute(command string) (string, error) {
-	if _, err := a.f.WriteString(command + "\r\n"); err != nil {
+	if _, err := a.s.Write([]byte(command + "\r\n")); err != nil {
 		return "", err
 	}
-	reader := bufio.NewReader(a.f)
+	reader := bufio.NewReader(a.s)
 	var sb strings.Builder
 	for {
 		line, err := reader.ReadString('\n')
@@ -131,8 +106,5 @@ func (a *AT) CloseLogicalChannel(channel byte) error {
 }
 
 func (a *AT) Disconnect() error {
-	if err := unix.IoctlSetTermios(int(a.f.Fd()), unix.TCSETS, a.oldTermios); err != nil {
-		return err
-	}
-	return a.f.Close()
+	return a.s.Close()
 }
