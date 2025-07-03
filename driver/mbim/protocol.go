@@ -13,7 +13,9 @@ type OpenDeviceRequest struct {
 	Response *OpenDeviceResponse
 }
 
-type OpenDeviceResponse struct{}
+type OpenDeviceResponse struct {
+	Status uint32
+}
 
 func (p *OpenDeviceResponse) MarshalBinary() ([]byte, error) {
 	buf := make([]byte, 4)
@@ -22,9 +24,7 @@ func (p *OpenDeviceResponse) MarshalBinary() ([]byte, error) {
 }
 
 func (p *OpenDeviceResponse) UnmarshalBinary(data []byte) error {
-	if err := MBIMStatusError(binary.LittleEndian.Uint32(data)); err != MBIMStatusErrorNone {
-		return MBIMError{Code: err}
-	}
+	binary.LittleEndian.PutUint32(data[0:4], p.Status)
 	return nil
 }
 
@@ -77,14 +77,19 @@ func (r *OpenLogicalChannelRequest) Message() *Message {
 }
 
 type OpenLogicalChannelResponse struct {
-	Status  uint32
-	Channel uint32
+	Status   uint32
+	Channel  uint32
+	Response []byte
 }
 
 func (r *OpenLogicalChannelResponse) UnmarshalBinary(data []byte) error {
-	offset := 8
-	r.Status = binary.LittleEndian.Uint32(data[offset : offset+4])
-	r.Channel = binary.LittleEndian.Uint32(data[offset+4 : offset+8])
+	r.Status = binary.LittleEndian.Uint32(data[0:4])
+	r.Channel = binary.LittleEndian.Uint32(data[4:8])
+	n := binary.LittleEndian.Uint32(data[8:12])
+	if len(data) < int(16+n) {
+		return errors.New("APDU response buffer too short")
+	}
+	r.Response = data[16 : 16+n]
 	return nil
 }
 
@@ -124,6 +129,7 @@ type CloseLogicalChannelResponse struct {
 }
 
 func (r *CloseLogicalChannelResponse) UnmarshalBinary(data []byte) error {
+	r.Status = binary.LittleEndian.Uint32(data[0:4])
 	return nil
 }
 
@@ -174,10 +180,10 @@ func (r *TransmitAPDUResponse) UnmarshalBinary(data []byte) error {
 	}
 	r.Status = binary.LittleEndian.Uint32(data[0:4])
 	n := binary.LittleEndian.Uint32(data[4:8])
-	if len(data) < int(8+n) {
+	if len(data) < int(12+n) {
 		return errors.New("APDU response buffer too short")
 	}
-	r.APDU = data[8 : 8+n]
+	r.APDU = data[12 : 12+n]
 	return nil
 }
 

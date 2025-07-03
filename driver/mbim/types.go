@@ -131,7 +131,6 @@ func (c *Command) MarshalBinary() ([]byte, error) {
 // UnmarshalBinary parses binary data into MBIM command
 func (c *Command) UnmarshalBinary(data []byte) error {
 	response := CommandDoneResponse{
-		Service:  c.Service,
 		Response: c.Response,
 	}
 	return response.UnmarshalBinary(data)
@@ -164,9 +163,8 @@ func (r *CommandDoneResponse) UnmarshalBinary(data []byte) error {
 	binary.Read(buf, binary.LittleEndian, &r.TransactionID)
 	binary.Read(buf, binary.LittleEndian, &r.FragmentTotal)
 	binary.Read(buf, binary.LittleEndian, &r.FragmentCurrent)
-
-	copy(r.Service[:], data[20:36])
-	r.CID = binary.LittleEndian.Uint32(data[36:40])
+	binary.Read(buf, binary.LittleEndian, &r.Service)
+	binary.Read(buf, binary.LittleEndian, &r.CID)
 
 	if isExtendedService(r.Service) {
 		// Extended service: read 16-byte GUID
