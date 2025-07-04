@@ -100,8 +100,8 @@ func (m *MBIM) OpenLogicalChannel(aid []byte) (byte, error) {
 	request := OpenLogicalChannelRequest{
 		TxnID:       atomic.AddUint32(&m.txnID, 1),
 		AppId:       aid,
-		SelectP2Arg: 0x00,
-		Group:       0x01,
+		SelectP2Arg: 0,
+		Group:       1,
 	}
 	message := request.Message()
 	if _, err := message.WriteTo(m.conn); err != nil {
