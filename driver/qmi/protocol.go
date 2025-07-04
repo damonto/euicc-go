@@ -1,150 +1,66 @@
 package qmi
 
-import (
-	"bytes"
-	"encoding/binary"
-	"errors"
-	"fmt"
-	"net"
-	"sync"
-	"time"
-)
-
-type Request interface {
-	Bytes() []byte
-	Value(message *Message) ([]byte, error)
-}
-
-var mutex sync.Mutex
-
-func invoke[I Request](conn net.Conn, cid uint8, txnID uint16, request I) ([]byte, error) {
-	mutex.Lock()
-	defer mutex.Unlock()
-	if _, err := conn.Write(request.Bytes()); err != nil {
-		return nil, fmt.Errorf("failed to write request: %w", err)
-	}
-	message, err := waitForResponse(conn, cid, txnID)
-	if err != nil {
-		return nil, err
-	}
-	return request.Value(message)
-}
-
-func waitForResponse(conn net.Conn, cid uint8, expectedTxnID uint16) (*Message, error) {
-	deadline := time.Now().Add(30 * time.Second)
-	for time.Now().Before(deadline) {
-		buf := make([]byte, 4096)
-		conn.SetReadDeadline(time.Now().Add(1 * time.Second))
-		if _, err := conn.Read(buf); err != nil {
-			if ne, ok := err.(net.Error); ok && ne.Timeout() {
-				continue // Timeout, try again
-			}
-			return nil, fmt.Errorf("failed to read from connection: %w", err)
-		}
-		n := int(binary.LittleEndian.Uint16(buf[1:3])) + 1
-		var message Message
-		if err := message.UnmarshalBinary(buf[:n]); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal message: %w", err)
-		}
-		if cid != message.ClientID && message.TransactionID != expectedTxnID {
-			continue // Not the expected transaction ID, keep waiting
-		}
-		if err := message.Error(); err != nil {
-			return nil, err
-		}
-		return &message, nil
-	}
-	return nil, fmt.Errorf("timed out waiting for response for transaction ID %d", expectedTxnID)
-}
-
-func toBytes(TLVs []TLV) []byte {
-	buf := new(bytes.Buffer)
-	for _, tlv := range TLVs {
-		binary.Write(buf, binary.LittleEndian, tlv.Type)
-		binary.Write(buf, binary.LittleEndian, tlv.Len)
-		buf.Write(tlv.Value)
-	}
-	return buf.Bytes()
-}
-
-type ControlRequest struct {
-	ClientID  uint8
-	TxnID     uint8
-	MessageID MessageID
-	TLVs      []TLV
-}
-
-func (r *ControlRequest) Bytes() []byte {
-	value := toBytes(r.TLVs)
-
-	headerBuf := new(bytes.Buffer)
-	binary.Write(headerBuf, binary.LittleEndian, CTLSDUHeader{
-		MessageType:   QMIMessageTypeRequest,
-		TransactionID: r.TxnID,
-		MessageID:     r.MessageID,
-		MessageLength: uint16(len(value)),
-	})
-	headerBuf.Write(value)
-
-	sduBytes := headerBuf.Bytes()
-	requestBuf := new(bytes.Buffer)
-	binary.Write(requestBuf, binary.LittleEndian, QMUXHeader{
-		IfType:       QMUXHeaderIfType,
-		Length:       uint16(len(sduBytes) + 5),
-		ControlFlags: QMUXHeaderControlFlagRequest,
-		ServiceType:  QMIServiceCtl,
-		ClientID:     r.ClientID,
-	})
-	requestBuf.Write(sduBytes)
-	return requestBuf.Bytes()
-}
+import "fmt"
 
 // region Internal Open Request
 
 type InternalOpenRequest struct {
-	TxnID      uint8
-	DevicePath []byte
+	TransactionID uint16
+	DevicePath    []byte
+	Response      *InternalOpenResponse
 }
 
-func (r *InternalOpenRequest) Bytes() []byte {
-	request := ControlRequest{
-		TxnID:     r.TxnID,
-		MessageID: QMICtlInternalProxyOpen,
+func (r *InternalOpenRequest) Request() *Request {
+	r.Response = new(InternalOpenResponse)
+	request := Request{
+		TransactionID: r.TransactionID,
+		MessageID:     QMICtlInternalProxyOpen,
+		ServiceType:   QMIServiceCtl,
 		TLVs: []TLV{
 			{Type: 0x01, Len: uint16(len(r.DevicePath)), Value: r.DevicePath},
 		},
+		Response: r.Response,
 	}
-	return request.Bytes()
+	return &request
 }
 
-func (r *InternalOpenRequest) Value(message *Message) ([]byte, error) {
-	return nil, nil
-}
+type InternalOpenResponse struct{}
+
+func (r *InternalOpenResponse) UnmarshalResponse(TLVs map[uint8]TLV) error { return nil }
 
 // endregion
 
 // region Allocate/Release Client ID Requests
 
 type AllocateClientIDRequest struct {
-	TxnID uint8
+	TransactionID uint16
+	Response      *AllocateClientIDResponse
 }
 
-func (r *AllocateClientIDRequest) Bytes() []byte {
-	request := ControlRequest{
-		TxnID:     r.TxnID,
-		MessageID: QMICtlCmdAllocateClientID,
+func (r *AllocateClientIDRequest) Request() *Request {
+	r.Response = new(AllocateClientIDResponse)
+	request := Request{
+		TransactionID: r.TransactionID,
+		MessageID:     QMICtlCmdAllocateClientID,
+		ServiceType:   QMIServiceCtl,
 		TLVs: []TLV{
 			{Type: 0x01, Len: 1, Value: []byte{byte(QMIServiceUIM)}},
 		},
+		Response: r.Response,
 	}
-	return request.Bytes()
+	return &request
 }
 
-func (r *AllocateClientIDRequest) Value(message *Message) ([]byte, error) {
-	if value, ok := message.TLVs[0x01]; ok && len(value.Value) >= 2 {
-		return []byte{value.Value[1]}, nil
+type AllocateClientIDResponse struct {
+	ClientID uint8
+}
+
+func (r *AllocateClientIDResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
+	if value, ok := TLVs[0x01]; ok && len(value.Value) >= 2 {
+		r.ClientID = value.Value[1]
+		return nil
 	}
-	return nil, errors.New("could not find allocated client ID in response")
+	return fmt.Errorf("could not find allocated client ID in response")
 }
 
 // endregion
@@ -152,87 +68,76 @@ func (r *AllocateClientIDRequest) Value(message *Message) ([]byte, error) {
 // region Release Client ID Request
 
 type ReleaseClientIDRequest struct {
-	ClientID uint8
-	TxnID    uint8
+	ClientID      uint8
+	TransactionID uint16
+	Response      *ReleaseClientIDResponse
 }
 
-func (r *ReleaseClientIDRequest) Bytes() []byte {
-	request := ControlRequest{
-		TxnID:     r.TxnID,
-		MessageID: QMICtlCmdReleaseClientID,
+func (r *ReleaseClientIDRequest) Request() *Request {
+	r.Response = new(ReleaseClientIDResponse)
+	request := Request{
+		TransactionID: r.TransactionID,
+		MessageID:     QMICtlCmdReleaseClientID,
+		ServiceType:   QMIServiceCtl,
 		TLVs: []TLV{
 			{Type: 0x01, Len: 2, Value: []byte{byte(QMIServiceUIM), r.ClientID}},
 		},
+		Response: r.Response,
 	}
-	return request.Bytes()
+	return &request
 }
 
-func (r *ReleaseClientIDRequest) Value(message *Message) ([]byte, error) {
-	return nil, nil
+type ReleaseClientIDResponse struct {
+	ClientID uint8
+}
+
+func (r *ReleaseClientIDResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
+	if value, ok := TLVs[0x01]; ok && len(value.Value) >= 2 {
+		r.ClientID = value.Value[1]
+		return nil
+	}
+	return fmt.Errorf("could not find released client ID in response")
 }
 
 // endregion
 
-type UIMRequest struct {
-	ClientID  uint8
-	TxnID     uint16
-	MessageID MessageID
-	TLVs      []TLV
-}
-
-func (r *UIMRequest) Bytes() []byte {
-	value := toBytes(r.TLVs)
-	headerBuf := new(bytes.Buffer)
-	binary.Write(headerBuf, binary.LittleEndian, SDUHeader{
-		MessageType:   QMIMessageTypeRequest,
-		TransactionID: r.TxnID,
-		MessageID:     r.MessageID,
-		MessageLength: uint16(len(value)),
-	})
-	headerBuf.Write(value)
-	sduBytes := headerBuf.Bytes()
-
-	requestBuf := new(bytes.Buffer)
-	binary.Write(requestBuf, binary.LittleEndian, QMUXHeader{
-		IfType:       QMUXHeaderIfType,
-		Length:       uint16(len(sduBytes) + 5),
-		ControlFlags: QMUXHeaderControlFlagRequest,
-		ServiceType:  QMIServiceUIM,
-		ClientID:     r.ClientID,
-	})
-	requestBuf.Write(sduBytes)
-	return requestBuf.Bytes()
-}
-
 // region Open Logical Channel Request
 
 type OpenLogicalChannelRequest struct {
-	ClientID uint8
-	TxnID    uint16
-	Slot     byte
-	AID      []byte
+	ClientID      uint8
+	TransactionID uint16
+	Slot          byte
+	AID           []byte
+	Response      *OpenLogicalChannelResponse
 }
 
-func (r *OpenLogicalChannelRequest) Bytes() []byte {
+func (r *OpenLogicalChannelRequest) Request() *Request {
 	value := append([]byte{byte(len(r.AID))}, r.AID...)
-	request := UIMRequest{
-		ClientID:  r.ClientID,
-		TxnID:     r.TxnID,
-		MessageID: QMIUIMOpenLogicalChannel,
+	r.Response = new(OpenLogicalChannelResponse)
+	request := Request{
+		ClientID:      r.ClientID,
+		TransactionID: r.TransactionID,
+		MessageID:     QMIUIMOpenLogicalChannel,
+		ServiceType:   QMIServiceUIM,
 		TLVs: []TLV{
 			{Type: 0x10, Len: uint16(len(value)), Value: value},
 			{Type: 0x01, Len: 1, Value: []byte{r.Slot}},
 		},
+		Response: r.Response,
 	}
-	return request.Bytes()
+	return &request
 }
 
-func (r *OpenLogicalChannelRequest) Value(message *Message) ([]byte, error) {
-	value, err := message.Value()
-	if err != nil {
-		return nil, err
+type OpenLogicalChannelResponse struct {
+	Channel byte
+}
+
+func (r *OpenLogicalChannelResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
+	if value, ok := TLVs[0x10]; ok && len(value.Value) >= 1 {
+		r.Channel = value.Value[0]
+		return nil
 	}
-	return value, nil
+	return fmt.Errorf("could not find logical channel in response")
 }
 
 // endregion
@@ -240,28 +145,46 @@ func (r *OpenLogicalChannelRequest) Value(message *Message) ([]byte, error) {
 // region Close Logical Channel Request
 
 type CloseLogicalChannelRequest struct {
-	ClientID uint8
-	TxnID    uint16
-	Slot     byte
-	Channel  byte
+	ClientID      uint8
+	TransactionID uint16
+	Slot          byte
+	Channel       byte
+	Response      *CloseLogicalChannelResponse
 }
 
-func (r *CloseLogicalChannelRequest) Bytes() []byte {
-	request := UIMRequest{
-		ClientID:  r.ClientID,
-		TxnID:     r.TxnID,
-		MessageID: QMIUIMCloseLogicalChannel,
+func (r *CloseLogicalChannelRequest) Request() *Request {
+	r.Response = new(CloseLogicalChannelResponse)
+	request := Request{
+		ClientID:      r.ClientID,
+		TransactionID: r.TransactionID,
+		MessageID:     QMIUIMCloseLogicalChannel,
+		ServiceType:   QMIServiceUIM,
 		TLVs: []TLV{
 			{Type: 0x01, Len: 1, Value: []byte{r.Slot}},
 			{Type: 0x11, Len: 1, Value: []byte{r.Channel}},
 			{Type: 0x13, Len: 1, Value: []byte{0x01}},
 		},
+		Response: r.Response,
 	}
-	return request.Bytes()
+	return &request
 }
 
-func (r *CloseLogicalChannelRequest) Value(message *Message) ([]byte, error) {
-	return nil, nil
+type CloseLogicalChannelResponse struct {
+	Slot    byte
+	Channel byte
+}
+
+func (r *CloseLogicalChannelResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
+	if value, ok := TLVs[0x01]; ok && len(value.Value) >= 1 {
+		r.Slot = value.Value[0]
+	} else {
+		return fmt.Errorf("could not find slot in response")
+	}
+	if value, ok := TLVs[0x11]; ok && len(value.Value) >= 1 {
+		r.Channel = value.Value[0]
+		return nil
+	}
+	return fmt.Errorf("could not find channel in response")
 }
 
 // endregion
@@ -269,39 +192,46 @@ func (r *CloseLogicalChannelRequest) Value(message *Message) ([]byte, error) {
 // region Transmit APDU Request
 
 type TransmitAPDURequest struct {
-	ClientID uint8
-	TxnID    uint16
-	Slot     byte
-	Channel  byte
-	Command  []byte
+	ClientID      uint8
+	TransactionID uint16
+	Slot          byte
+	Channel       byte
+	Command       []byte
+	Response      *TransmitAPDUResponse
 }
 
-func (r *TransmitAPDURequest) Bytes() []byte {
+func (r *TransmitAPDURequest) Request() *Request {
 	length := len(r.Command)
 	value := append([]byte{byte(length), byte(length >> 8)}, r.Command...)
-	request := UIMRequest{
-		ClientID:  r.ClientID,
-		TxnID:     r.TxnID,
-		MessageID: QMIUIMSendAPDU,
+	r.Response = new(TransmitAPDUResponse)
+	request := Request{
+		ClientID:      r.ClientID,
+		TransactionID: r.TransactionID,
+		MessageID:     QMIUIMSendAPDU,
+		ServiceType:   QMIServiceUIM,
 		TLVs: []TLV{
 			{Type: 0x10, Len: 1, Value: []byte{r.Channel}},
 			{Type: 0x02, Len: uint16(len(value)), Value: value},
 			{Type: 0x01, Len: 1, Value: []byte{r.Slot}},
 		},
+		Response: r.Response,
 	}
-	return request.Bytes()
+	return &request
 }
 
-func (r *TransmitAPDURequest) Value(message *Message) ([]byte, error) {
-	value, err := message.Value()
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract APDU response: %w", err)
+type TransmitAPDUResponse struct {
+	Response []byte
+}
+
+func (r *TransmitAPDUResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
+	if value, ok := TLVs[0x10]; ok && len(value.Value) >= 2 {
+		n := int(value.Value[0]) | (int(value.Value[1]) << 8)
+		if len(value.Value) >= 2+n {
+			r.Response = value.Value[2 : 2+n]
+			return nil
+		}
 	}
-	n := int(value[0]) | (int(value[1]) << 8)
-	if len(value) >= 2+n {
-		return value[2 : 2+n], nil
-	}
-	return nil, fmt.Errorf("could not find APDU response in message")
+	return fmt.Errorf("could not find APDU response in message")
 }
 
 // endregion

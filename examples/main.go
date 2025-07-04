@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/damonto/euicc-go/driver/qmi"
 	"github.com/damonto/euicc-go/lpa"
 	sgp22 "github.com/damonto/euicc-go/v2"
 )
@@ -41,10 +40,10 @@ func main() {
 	// if err != nil {
 	// 	panic(err)
 	// }
-	ch, err := qmi.New("/dev/wwan0qmi0", 1)
-	if err != nil {
-		panic(err)
-	}
+	// ch, err := qmi.New("/dev/cdc-wdm1", 1)
+	// if err != nil {
+	// 	panic(err)
+	// }
 	// ch, err := at.New("/dev/ttyUSB7")
 	// if err != nil {
 	// 	panic(err)
@@ -67,15 +66,15 @@ func main() {
 	// fmt.Println(client.DeleteProfile(id))
 	// fmt.Println(client.EnableProfile(id))
 
-	pn, err := client.RetrieveNotificationList(sgp22.SequenceNumber(50))
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	if err := client.HandleNotification(pn[0]); err != nil {
-		fmt.Println(err)
-		return
-	}
+	// pn, err := client.RetrieveNotificationList(sgp22.SequenceNumber(50))
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
+	// if err := client.HandleNotification(pn[0]); err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
 
 	// ps, err := client.ListProfile(nil, nil)
 	// if err != nil {

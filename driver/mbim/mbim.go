@@ -63,24 +63,17 @@ func (m *MBIM) Connect() error {
 // configureProxy sends proxy configuration request with device path using the libmbim proxy protocol
 func (m *MBIM) configureProxy() error {
 	request := ProxyConfigRequest{
-		TxnID:      atomic.AddUint32(&m.txnID, 1),
-		DevicePath: m.device,
-		Timeout:    30,
+		TransactionID: atomic.AddUint32(&m.txnID, 1),
+		DevicePath:    m.device,
+		Timeout:       30,
 	}
-	message := request.Message()
-	if _, err := message.WriteTo(m.conn); err != nil {
-		return err
-	}
-	if _, err := message.ReadFrom(m.conn); err != nil {
-		return err
-	}
-	return nil
+	return request.Message().Transmit(m.conn)
 }
 
 // openDevice sends MBIM Open message to establish connection
 func (m *MBIM) openDevice() error {
 	request := OpenDeviceRequest{
-		TxnID: atomic.AddUint32(&m.txnID, 1),
+		TransactionID: atomic.AddUint32(&m.txnID, 1),
 	}
 	message := request.Message()
 	if _, err := message.WriteTo(m.conn); err != nil {
@@ -89,23 +82,19 @@ func (m *MBIM) openDevice() error {
 	if _, err := message.ReadFrom(m.conn); err != nil {
 		return err
 	}
-	return nil
+	return request.Message().Transmit(m.conn)
 }
 
 // OpenLogicalChannel opens a logical channel for the specified Application ID
 func (m *MBIM) OpenLogicalChannel(aid []byte) (byte, error) {
 	request := OpenLogicalChannelRequest{
-		TxnID:       atomic.AddUint32(&m.txnID, 1),
-		AppId:       aid,
-		SelectP2Arg: 0,
-		Group:       1,
+		TransactionID: atomic.AddUint32(&m.txnID, 1),
+		AppId:         aid,
+		SelectP2Arg:   0,
+		Group:         1,
 	}
-	message := request.Message()
-	if _, err := message.WriteTo(m.conn); err != nil {
-		return 0, err
-	}
-	if _, err := message.ReadFrom(m.conn); err != nil {
-		return 0, err
+	if err := request.Message().Transmit(m.conn); err != nil {
+		return 0, fmt.Errorf("failed to open logical channel: %w", err)
 	}
 	m.channel = request.Response.Channel
 	return byte(m.channel), nil
@@ -114,40 +103,29 @@ func (m *MBIM) OpenLogicalChannel(aid []byte) (byte, error) {
 // Transmit implements apdu.SmartCardChannel.
 func (m *MBIM) Transmit(command []byte) ([]byte, error) {
 	request := TransmitAPDURequest{
-		TxnID:           atomic.AddUint32(&m.txnID, 1),
+		TransactionID:   atomic.AddUint32(&m.txnID, 1),
 		Channel:         m.channel,
 		SecureMessaging: 0,
 		ClassByteType:   0,
 		APDU:            command,
 	}
-	message := request.Message()
-	if _, err := message.WriteTo(m.conn); err != nil {
-		return nil, err
-	}
-	if _, err := message.ReadFrom(m.conn); err != nil {
-		return nil, err
+	if err := request.Message().Transmit(m.conn); err != nil {
+		return nil, fmt.Errorf("failed to transmit APDU: %w", err)
 	}
 	sw := make([]byte, 2)
 	binary.LittleEndian.PutUint16(sw, uint16(request.Response.Status&0xFFFF))
-	response := append(request.Response.APDU, sw...)
+	response := append(request.Response.Response, sw...)
 	return response, nil
 }
 
 // CloseLogicalChannel closes the specified logical channel
 func (m *MBIM) CloseLogicalChannel(channel byte) error {
 	request := CloseLogicalChannelRequest{
-		TxnID:   atomic.AddUint32(&m.txnID, 1),
-		Channel: uint32(channel),
-		Group:   1,
+		TransactionID: atomic.AddUint32(&m.txnID, 1),
+		Channel:       uint32(channel),
+		Group:         1,
 	}
-	message := request.Message()
-	if _, err := message.WriteTo(m.conn); err != nil {
-		return err
-	}
-	if _, err := message.ReadFrom(m.conn); err != nil {
-		return err
-	}
-	return nil
+	return request.Message().Transmit(m.conn)
 }
 
 // Disconnect closes the MBIM connection and releases resources

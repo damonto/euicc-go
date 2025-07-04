@@ -37,7 +37,7 @@ func (m *Message) WriteTo(w net.Conn) (int, error) {
 }
 
 func (m *Message) ReadFrom(r net.Conn) (int, error) {
-	sourceTxnID := m.TransactionID
+	sourceTransactionID := m.TransactionID
 	sourceType := m.Type
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
@@ -56,12 +56,22 @@ func (m *Message) ReadFrom(r net.Conn) (int, error) {
 			}
 			return 0, fmt.Errorf("failed to unmarshal message: %w", err)
 		}
-		if m.TransactionID != sourceTxnID {
+		if m.TransactionID != sourceTransactionID {
 			continue
 		}
 		return n, nil
 	}
-	return 0, fmt.Errorf("transaction ID %d not found in response", sourceTxnID)
+	return 0, fmt.Errorf("transaction ID %d not found in response", sourceTransactionID)
+}
+
+func (m *Message) Transmit(conn net.Conn) error {
+	if _, err := m.WriteTo(conn); err != nil {
+		return fmt.Errorf("failed to write message: %w", err)
+	}
+	if _, err := m.ReadFrom(conn); err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+	return nil
 }
 
 // UnmarshalBinary parses a binary MBIM message

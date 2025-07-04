@@ -66,26 +66,23 @@ func (q *QMI) Connect() error {
 // openProxyConnection sends a request to the qmi-proxy to open a connection
 func (q *QMI) openProxyConnection() error {
 	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
-	_, err := invoke(q.conn, q.cid, txnID, &InternalOpenRequest{
-		TxnID:      uint8(txnID),
-		DevicePath: []byte(q.device),
-	})
-	return err
+	request := &InternalOpenRequest{
+		TransactionID: txnID,
+		DevicePath:    []byte(q.device),
+	}
+	return request.Request().Transmit(q.conn)
 }
 
 // allocateClientID sends a request to allocate a client ID for UIM service
 func (q *QMI) allocateClientID() error {
 	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
-	response, err := invoke(q.conn, q.cid, txnID, &AllocateClientIDRequest{
-		TxnID: uint8(txnID),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to allocate client ID: %w", err)
+	request := AllocateClientIDRequest{
+		TransactionID: txnID,
 	}
-	if len(response) < 1 {
-		return fmt.Errorf("invalid response for client ID allocation")
+	if err := request.Request().Transmit(q.conn); err != nil {
+		return fmt.Errorf("failed to send allocate client ID request: %w", err)
 	}
-	q.cid = response[0]
+	q.cid = request.Response.ClientID
 	return nil
 }
 
@@ -100,30 +97,29 @@ func (q *QMI) Disconnect() error {
 // releaseClientID sends a request to release the allocated client ID
 func (q *QMI) releaseClientID() error {
 	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
-	_, err := invoke(q.conn, q.cid, txnID, &ReleaseClientIDRequest{
-		ClientID: q.cid,
-		TxnID:    uint8(txnID),
-	})
-	return err
+	request := ReleaseClientIDRequest{
+		ClientID:      q.cid,
+		TransactionID: txnID,
+	}
+	if err := request.Request().Transmit(q.conn); err != nil {
+		return fmt.Errorf("failed to send release client ID request: %w", err)
+	}
+	return nil
 }
 
 // OpenLogicalChannel opens a logical channel with the specified AID
 func (q *QMI) OpenLogicalChannel(aid []byte) (byte, error) {
 	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
 	request := OpenLogicalChannelRequest{
-		ClientID: q.cid,
-		TxnID:    txnID,
-		Slot:     q.slot,
-		AID:      aid,
+		ClientID:      q.cid,
+		TransactionID: txnID,
+		Slot:          q.slot,
+		AID:           aid,
 	}
-	response, err := invoke(q.conn, q.cid, txnID, &request)
-	if err != nil {
-		return 0, fmt.Errorf("failed to open logical channel: %w", err)
+	if err := request.Request().Transmit(q.conn); err != nil {
+		return 0, fmt.Errorf("failed to send open logical channel request: %w", err)
 	}
-	if len(response) < 1 {
-		return 0, fmt.Errorf("invalid response for logical channel open")
-	}
-	q.channel = response[0]
+	q.channel = request.Response.Channel
 	return q.channel, nil
 }
 
@@ -131,33 +127,26 @@ func (q *QMI) OpenLogicalChannel(aid []byte) (byte, error) {
 func (q *QMI) CloseLogicalChannel(channel byte) error {
 	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
 	request := CloseLogicalChannelRequest{
-		ClientID: q.cid,
-		TxnID:    txnID,
-		Channel:  channel,
-		Slot:     q.slot,
+		ClientID:      q.cid,
+		TransactionID: txnID,
+		Channel:       channel,
+		Slot:          q.slot,
 	}
-	if _, err := invoke(q.conn, q.cid, txnID, &request); err != nil {
-		return fmt.Errorf("failed to close logical channel: %w", err)
-	}
-	return nil
+	return request.Request().Transmit(q.conn)
 }
 
 // Transmit sends an APDU command (basic channel implementation)
 func (q *QMI) Transmit(command []byte) ([]byte, error) {
 	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
 	request := TransmitAPDURequest{
-		ClientID: q.cid,
-		TxnID:    txnID,
-		Slot:     q.slot,
-		Channel:  q.channel,
-		Command:  command,
+		ClientID:      q.cid,
+		TransactionID: txnID,
+		Slot:          q.slot,
+		Channel:       q.channel,
+		Command:       command,
 	}
-	response, err := invoke(q.conn, q.cid, txnID, &request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to transmit APDU: %w", err)
+	if err := request.Request().Transmit(q.conn); err != nil {
+		return nil, fmt.Errorf("failed to send transmit APDU request: %w", err)
 	}
-	if len(response) < 2 {
-		return nil, fmt.Errorf("invalid response for APDU transmission")
-	}
-	return response, nil
+	return request.Response.Response, nil
 }

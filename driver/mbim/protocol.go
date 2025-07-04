@@ -10,10 +10,10 @@ import (
 // region Proxy Configuration
 
 type ProxyConfigRequest struct {
-	TxnID      uint32
-	DevicePath string
-	Timeout    uint32
-	Response   *ProxyConfigResponse
+	TransactionID uint32
+	DevicePath    string
+	Timeout       uint32
+	Response      *ProxyConfigResponse
 }
 
 func (r *ProxyConfigRequest) Message() *Message {
@@ -32,7 +32,7 @@ func (r *ProxyConfigRequest) Message() *Message {
 	r.Response = new(ProxyConfigResponse)
 	return &Message{
 		Type:          MessageTypeCommand,
-		TransactionID: r.TxnID,
+		TransactionID: r.TransactionID,
 		Payload: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
@@ -55,8 +55,8 @@ func (r *ProxyConfigResponse) UnmarshalBinary(data []byte) error { return nil }
 // region Open Device Request
 
 type OpenDeviceRequest struct {
-	TxnID   uint32
-	Payload *OpenDevicePayload
+	TransactionID uint32
+	Payload       *OpenDevicePayload
 }
 
 type OpenDevicePayload struct {
@@ -80,7 +80,7 @@ func (r *OpenDeviceRequest) Message() *Message {
 	}
 	return &Message{
 		Type:          MessageTypeOpen,
-		TransactionID: r.TxnID,
+		TransactionID: r.TransactionID,
 		Payload:       r.Payload,
 	}
 }
@@ -94,11 +94,11 @@ func (r *OpenDeviceRequest) UnmarshalBinary(data []byte) error {
 // region Open Logical Channel
 
 type OpenLogicalChannelRequest struct {
-	TxnID       uint32
-	AppId       []byte
-	SelectP2Arg uint32
-	Group       uint32
-	Response    *OpenLogicalChannelResponse
+	TransactionID uint32
+	AppId         []byte
+	SelectP2Arg   uint32
+	Group         uint32
+	Response      *OpenLogicalChannelResponse
 }
 
 func (r *OpenLogicalChannelRequest) Message() *Message {
@@ -111,7 +111,7 @@ func (r *OpenLogicalChannelRequest) Message() *Message {
 	r.Response = new(OpenLogicalChannelResponse)
 	return &Message{
 		Type:          MessageTypeCommand,
-		TransactionID: r.TxnID,
+		TransactionID: r.TransactionID,
 		Payload: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
@@ -146,10 +146,10 @@ func (r *OpenLogicalChannelResponse) UnmarshalBinary(data []byte) error {
 // region Close Logical Channel
 
 type CloseLogicalChannelRequest struct {
-	Channel  uint32 // Channel to close
-	Group    uint32 // Channel group to close
-	TxnID    uint32
-	Response *CloseLogicalChannelResponse
+	Channel       uint32 // Channel to close
+	Group         uint32 // Channel group to close
+	TransactionID uint32
+	Response      *CloseLogicalChannelResponse
 }
 
 func (r *CloseLogicalChannelRequest) Message() *Message {
@@ -159,7 +159,7 @@ func (r *CloseLogicalChannelRequest) Message() *Message {
 	r.Response = new(CloseLogicalChannelResponse)
 	return &Message{
 		Type:          MessageTypeCommand,
-		TransactionID: r.TxnID,
+		TransactionID: r.TransactionID,
 		Payload: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
@@ -185,7 +185,7 @@ func (r *CloseLogicalChannelResponse) UnmarshalBinary(data []byte) error {
 
 // region Transmit APDU
 type TransmitAPDURequest struct {
-	TxnID           uint32
+	TransactionID   uint32
 	Channel         uint32
 	SecureMessaging uint32
 	ClassByteType   uint32
@@ -204,7 +204,7 @@ func (r *TransmitAPDURequest) Message() *Message {
 	r.Response = new(TransmitAPDUResponse)
 	return &Message{
 		Type:          MessageTypeCommand,
-		TransactionID: r.TxnID,
+		TransactionID: r.TransactionID,
 		Payload: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
@@ -218,8 +218,8 @@ func (r *TransmitAPDURequest) Message() *Message {
 }
 
 type TransmitAPDUResponse struct {
-	Status uint32
-	APDU   []byte
+	Status   uint32
+	Response []byte
 }
 
 func (r *TransmitAPDUResponse) UnmarshalBinary(data []byte) error {
@@ -231,7 +231,7 @@ func (r *TransmitAPDUResponse) UnmarshalBinary(data []byte) error {
 	if len(data) < int(12+n) {
 		return errors.New("APDU response buffer too short")
 	}
-	r.APDU = data[12 : 12+n]
+	r.Response = data[12 : 12+n]
 	return nil
 }
 
