@@ -40,7 +40,7 @@ func (m *Message) WriteTo(w net.Conn) (int, error) {
 }
 
 func (m *Message) ReadFrom(r net.Conn) (int, error) {
-	txnId := m.TransactionID
+	sourceTxnID := m.TransactionID
 	sourceType := m.Type
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -55,12 +55,12 @@ func (m *Message) ReadFrom(r net.Conn) (int, error) {
 			}
 			return 0, fmt.Errorf("failed to unmarshal message: %w", err)
 		}
-		if m.TransactionID != txnId {
+		if m.TransactionID != sourceTxnID {
 			continue
 		}
 		return n, nil
 	}
-	return 0, fmt.Errorf("transaction ID %d not found in response", txnId)
+	return 0, fmt.Errorf("transaction ID %d not found in response", sourceTxnID)
 }
 
 // UnmarshalBinary parses a binary MBIM message
@@ -83,7 +83,6 @@ func (m *Message) UnmarshalBinary(data []byte) error {
 	}
 	// Parse Transaction ID
 	binary.Read(buf, binary.LittleEndian, &m.TransactionID)
-
 	return m.Payload.UnmarshalBinary(data[12 : 12+int(m.Length)-12])
 }
 
@@ -140,6 +139,7 @@ func (c *Command) UnmarshalBinary(data []byte) error {
 	return response.UnmarshalBinary(data)
 }
 
+// CommandDoneResponse represents the response to a command
 type CommandDoneResponse struct {
 	Type            MessageType
 	Length          uint32
@@ -152,6 +152,7 @@ type CommandDoneResponse struct {
 	Response        Unmarshaller
 }
 
+// UnmarshalBinary parses binary data into MBIM command done response
 func (r *CommandDoneResponse) UnmarshalBinary(data []byte) error {
 	if len(data) < 36 {
 		return errors.New("command done response data too short")

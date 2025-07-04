@@ -1,9 +1,10 @@
-//go:build linux || unix
-// +build linux unix
+//go:build linux
+// +build linux
 
 package at
 
 import (
+	"io"
 	"os"
 
 	"golang.org/x/sys/unix"
@@ -14,13 +15,13 @@ type SerialPort struct {
 	oldTermios *unix.Termios
 }
 
-func OpenSerialPort(name string) (*SerialPort, error) {
+func Open(name string) (io.ReadWriteCloser, error) {
 	f, err := os.OpenFile(name, os.O_RDWR|unix.O_NOCTTY, 0666)
 	if err != nil {
 		return nil, err
 	}
 	sp := &SerialPort{f: f}
-	if err := sp.setTermios(unix.B9600); err != nil {
+	if err := sp.setTermios(unix.B115200); err != nil {
 		f.Close()
 		return nil, err
 	}

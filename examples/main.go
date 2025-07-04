@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/damonto/euicc-go/driver/at"
 	"github.com/damonto/euicc-go/lpa"
 	sgp22 "github.com/damonto/euicc-go/v2"
 )
@@ -37,18 +36,18 @@ func NewDownloadHandler() lpa.DownloadHandler {
 func main() {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
-	// ch, err := mbim.New("/dev/cdc-wdm1", 1)
+	// ch, err := mbim.New("/dev/cdc-wdm0", 1)
 	// if err != nil {
 	// 	panic(err)
 	// }
-	// ch, err := qmi.New("/dev/cdc-wdm0", 1)
+	// ch, err := qmi.New("/dev/cdc-wdm1", 1)
 	// if err != nil {
 	// 	panic(err)
 	// }
-	ch, err := at.New("/dev/ttyUSB7")
-	if err != nil {
-		panic(err)
-	}
+	// ch, err := at.New("/dev/ttyUSB7")
+	// if err != nil {
+	// 	panic(err)
+	// }
 	client, err := lpa.New(&lpa.Option{
 		Channel: ch,
 	})
@@ -72,14 +71,14 @@ func main() {
 	// 	return
 	// }
 
-	// ps, err := client.ListProfile(nil, nil)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
-	// for _, p := range ps {
-	// 	fmt.Println(p.ProfileName, p.ICCID)
-	// }
+	ps, err := client.ListProfile(nil, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	for _, p := range ps {
+		fmt.Println(p.ProfileName, p.ICCID)
+	}
 
 	eid, _ := client.EID()
 	fmt.Println(eid)

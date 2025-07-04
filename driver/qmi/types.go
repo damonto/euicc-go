@@ -77,7 +77,7 @@ func (m *Message) UnmarshalBinary(data []byte) error {
 		return fmt.Errorf("read QMUX header: %w", err)
 	}
 
-	// Read message type
+	// Read message type (not used yet)
 	var messageType MessageType
 	if err := binary.Read(reader, binary.LittleEndian, &messageType); err != nil {
 		return fmt.Errorf("read message type: %w", err)

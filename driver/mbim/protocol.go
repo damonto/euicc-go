@@ -29,18 +29,13 @@ func (r *ProxyConfigRequest) Message() *Message {
 	devicePathUTF16 := pb.Bytes()
 
 	// String data will be placed after the timeout field
-	stringDataOffset := uint32(12) // after string descriptor (8 bytes) + timeout (4 bytes)
-	stringDataLength := uint32(len(devicePathUTF16))
-
 	buf := new(bytes.Buffer)
 
 	// Write string descriptor for device path
-	binary.Write(buf, binary.LittleEndian, stringDataOffset)
-	binary.Write(buf, binary.LittleEndian, stringDataLength)
-
+	binary.Write(buf, binary.LittleEndian, uint32(12))
+	binary.Write(buf, binary.LittleEndian, uint32(len(devicePathUTF16)))
 	// Write timeout at offset 8
 	binary.Write(buf, binary.LittleEndian, r.Timeout)
-
 	// Write the string data
 	buf.Write(devicePathUTF16)
 
@@ -60,13 +55,10 @@ func (r *ProxyConfigRequest) Message() *Message {
 	}
 }
 
-type ProxyConfigResponse struct {
-	Status uint32
-}
+// ProxyConfigResponse is empty for now
+type ProxyConfigResponse struct{}
 
-func (r *ProxyConfigResponse) UnmarshalBinary(data []byte) error {
-	return nil
-}
+func (r *ProxyConfigResponse) UnmarshalBinary(data []byte) error { return nil }
 
 // endregion
 

@@ -65,9 +65,8 @@ func (m *MBIM) Connect() error {
 
 // configureProxy sends proxy configuration request with device path using the libmbim proxy protocol
 func (m *MBIM) configureProxy() error {
-	txnID := atomic.AddUint32(&m.txnID, 1)
 	request := ProxyConfigRequest{
-		TxnID:      txnID,
+		TxnID:      atomic.AddUint32(&m.txnID, 1),
 		DevicePath: m.device,
 		Timeout:    30,
 	}
@@ -83,9 +82,8 @@ func (m *MBIM) configureProxy() error {
 
 // openDevice sends MBIM Open message to establish connection
 func (m *MBIM) openDevice() error {
-	txnID := atomic.AddUint32(&m.txnID, 1)
 	request := OpenDeviceRequest{
-		TxnID: txnID,
+		TxnID: atomic.AddUint32(&m.txnID, 1),
 	}
 	message := request.Message()
 	if _, err := message.WriteTo(m.conn); err != nil {
@@ -99,9 +97,8 @@ func (m *MBIM) openDevice() error {
 
 // OpenLogicalChannel opens a logical channel for the specified Application ID
 func (m *MBIM) OpenLogicalChannel(aid []byte) (byte, error) {
-	txnID := atomic.AddUint32(&m.txnID, 1)
 	request := OpenLogicalChannelRequest{
-		TxnID:       txnID,
+		TxnID:       atomic.AddUint32(&m.txnID, 1),
 		AppId:       aid,
 		SelectP2Arg: 0x00,
 		Group:       0x01,
@@ -119,9 +116,8 @@ func (m *MBIM) OpenLogicalChannel(aid []byte) (byte, error) {
 
 // Transmit implements apdu.SmartCardChannel.
 func (m *MBIM) Transmit(command []byte) ([]byte, error) {
-	txnID := atomic.AddUint32(&m.txnID, 1)
 	request := TransmitAPDURequest{
-		TxnID:           txnID,
+		TxnID:           atomic.AddUint32(&m.txnID, 1),
 		Channel:         m.channel,
 		SecureMessaging: 0,
 		ClassByteType:   0,
@@ -142,9 +138,8 @@ func (m *MBIM) Transmit(command []byte) ([]byte, error) {
 
 // CloseLogicalChannel closes the specified logical channel
 func (m *MBIM) CloseLogicalChannel(channel byte) error {
-	txnID := atomic.AddUint32(&m.txnID, 1)
 	request := CloseLogicalChannelRequest{
-		TxnID:   txnID,
+		TxnID:   atomic.AddUint32(&m.txnID, 1),
 		Channel: uint32(channel),
 		Group:   1,
 	}

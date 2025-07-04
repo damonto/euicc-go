@@ -1,137 +1,162 @@
-//go:build windows
-// +build windows
-
 package at
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"syscall"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
 
-type DCB struct {
-	DCBlength  uint32
-	BaudRate   uint32
-	Flags      uint32
-	wReserved  uint16
-	XonLim     uint16
-	XoffLim    uint16
-	ByteSize   byte
-	Parity     byte
-	StopBits   byte
-	XonChar    byte
-	XoffChar   byte
-	ErrorChar  byte
-	EofChar    byte
-	EvtChar    byte
-	wReserved1 uint16
-}
-
-type COMMTIMEOUTS struct {
-	ReadIntervalTimeout         uint32
-	ReadTotalTimeoutMultiplier  uint32
-	ReadTotalTimeoutConstant    uint32
-	WriteTotalTimeoutMultiplier uint32
-	WriteTotalTimeoutConstant   uint32
-}
-
-var (
-	modKernel32         = windows.NewLazySystemDLL("kernel32.dll")
-	procGetCommState    = modKernel32.NewProc("GetCommState")
-	procSetCommState    = modKernel32.NewProc("SetCommState")
-	procSetCommTimeouts = modKernel32.NewProc("SetCommTimeouts")
-)
-
 type SerialPort struct {
-	handle windows.Handle
+	handle     windows.Handle
+	portName   string
+	readEvent  windows.Handle
+	writeEvent windows.Handle
 }
 
-func OpenSerialPort(name string) (io.ReadWriteCloser, error) {
-	path := `\\.\` + name
-	ptr, _ := syscall.UTF16PtrFromString(path)
-
-	h, err := windows.CreateFile(
-		ptr,
+func Open(port string) (io.ReadWriteCloser, error) {
+	comPort := windows.StringToUTF16Ptr("\\\\.\\" + port)
+	handle, err := windows.CreateFile(comPort,
 		windows.GENERIC_READ|windows.GENERIC_WRITE,
-		0,
-		nil,
+		0, nil,
 		windows.OPEN_EXISTING,
-		0,
-		0,
-	)
+		windows.FILE_FLAG_OVERLAPPED,
+		0)
 	if err != nil {
-		return nil, fmt.Errorf("CreateFile: %w", err)
+		return nil, fmt.Errorf("CreateFile failed: %w", err)
 	}
 
-	sp := &SerialPort{handle: h}
-
-	if err := sp.setCommState(9600); err != nil {
-		sp.Close()
-		return nil, err
-	}
-	if err := sp.setCommTimeouts(); err != nil {
-		sp.Close()
-		return nil, err
-	}
-
-	return sp, nil
-}
-
-func (sp *SerialPort) setCommState(baudRate uint32) error {
-	var dcb DCB
+	// Configure DCB
+	var dcb windows.DCB
 	dcb.DCBlength = uint32(unsafe.Sizeof(dcb))
-	ret, _, err := procGetCommState.Call(uintptr(sp.handle), uintptr(unsafe.Pointer(&dcb)))
-	if ret == 0 {
-		return fmt.Errorf("GetCommState failed: %w", err)
+	if err := windows.GetCommState(handle, &dcb); err != nil {
+		windows.CloseHandle(handle)
+		return nil, fmt.Errorf("GetCommState failed: %w", err)
 	}
-	dcb.BaudRate = baudRate
+	dcb.BaudRate = 115200
 	dcb.ByteSize = 8
-	dcb.Parity = 0
-	dcb.StopBits = 0
-	dcb.Flags = 0x0001 // fBinary
-	ret, _, err = procSetCommState.Call(uintptr(sp.handle), uintptr(unsafe.Pointer(&dcb)))
-	if ret == 0 {
-		return fmt.Errorf("SetCommState failed: %w", err)
-	}
-	return nil
-}
+	dcb.Parity = windows.NOPARITY
+	dcb.StopBits = windows.ONESTOPBIT
+	dcb.Flags = dcb.Flags | 0x00000001 // fBinary = 1
+	dcb.Flags &^= 0x00000002           // fParity = 0
+	// dcb.Flags |= 0x00000010         // fDtrControl = DTR_CONTROL_ENABLE (bit 4)
+	// Use DTR_CONTROL_HANDSHAKE or disable it if you control it manually
+	dcb.Flags &^= (1 << 4) | (1 << 5) // Clear DTR and RTS control bits before setting
 
-func (sp *SerialPort) setCommTimeouts() error {
-	timeouts := COMMTIMEOUTS{
+	if err := windows.SetCommState(handle, &dcb); err != nil {
+		windows.CloseHandle(handle)
+		return nil, fmt.Errorf("SetCommState failed: %w", err)
+	}
+
+	// Manually assert DTR after setting state
+	if err := windows.EscapeCommFunction(handle, windows.SETDTR); err != nil {
+		windows.CloseHandle(handle)
+		return nil, fmt.Errorf("SetDTR failed: %w", err)
+	}
+
+	// Set timeouts
+	timeouts := windows.CommTimeouts{
 		ReadIntervalTimeout:         50,
+		ReadTotalTimeoutConstant:    50,
 		ReadTotalTimeoutMultiplier:  10,
-		ReadTotalTimeoutConstant:    100,
+		WriteTotalTimeoutConstant:   50,
 		WriteTotalTimeoutMultiplier: 10,
-		WriteTotalTimeoutConstant:   100,
 	}
-	ret, _, err := procSetCommTimeouts.Call(uintptr(sp.handle), uintptr(unsafe.Pointer(&timeouts)))
-	if ret == 0 {
-		return fmt.Errorf("SetCommTimeouts failed: %w", err)
+	if err := windows.SetCommTimeouts(handle, &timeouts); err != nil {
+		windows.CloseHandle(handle)
+		return nil, fmt.Errorf("SetCommTimeouts failed: %w", err)
 	}
-	return nil
+
+	// Purge any stale data (important for USB modem)
+	windows.PurgeComm(handle, windows.PURGE_RXCLEAR|windows.PURGE_TXCLEAR)
+
+	readEvent, _ := windows.CreateEvent(nil, 1, 0, nil)
+	writeEvent, _ := windows.CreateEvent(nil, 1, 0, nil)
+
+	return &SerialPort{
+		handle:     handle,
+		portName:   port,
+		readEvent:  readEvent,
+		writeEvent: writeEvent,
+	}, nil
 }
 
-func (sp *SerialPort) Read(buf []byte) (int, error) {
-	var n uint32
-	err := windows.ReadFile(sp.handle, buf, &n, nil)
-	if err != nil {
-		return 0, fmt.Errorf("ReadFile: %w", err)
+func (sp *SerialPort) Read(p []byte) (int, error) {
+	overlapped := windows.Overlapped{HEvent: sp.readEvent}
+	var bytesRead uint32
+
+	err := windows.ReadFile(sp.handle, p, &bytesRead, &overlapped)
+	if err != nil && err != windows.ERROR_IO_PENDING {
+		return 0, fmt.Errorf("ReadFile failed: %w", err)
 	}
-	return int(n), nil
+
+	s, _ := windows.WaitForSingleObject(sp.readEvent, 3000) // increase timeout
+	switch s {
+	case uint32(windows.WAIT_OBJECT_0):
+		err = windows.GetOverlappedResult(sp.handle, &overlapped, &bytesRead, false)
+		if err != nil {
+			return 0, fmt.Errorf("GetOverlappedResult failed: %w", err)
+		}
+		return int(bytesRead), nil
+	case uint32(windows.WAIT_TIMEOUT):
+		return 0, errors.New("read timeout")
+	default:
+		return 0, fmt.Errorf("unexpected wait result: %d", s)
+	}
 }
 
-func (sp *SerialPort) Write(data []byte) (int, error) {
-	var n uint32
-	err := windows.WriteFile(sp.handle, data, &n, nil)
-	if err != nil {
-		return 0, fmt.Errorf("WriteFile: %w", err)
+func (sp *SerialPort) Write(p []byte) (int, error) {
+	overlapped := windows.Overlapped{HEvent: sp.writeEvent}
+	var bytesWritten uint32
+
+	err := windows.WriteFile(sp.handle, p, &bytesWritten, &overlapped)
+	if err != nil && err != windows.ERROR_IO_PENDING {
+		return 0, fmt.Errorf("WriteFile failed: %w", err)
 	}
-	return int(n), nil
+
+	s, _ := windows.WaitForSingleObject(sp.writeEvent, 3000)
+	switch s {
+	case uint32(windows.WAIT_OBJECT_0):
+		err = windows.GetOverlappedResult(sp.handle, &overlapped, &bytesWritten, false)
+		if err != nil {
+			return 0, fmt.Errorf("GetOverlappedResult failed: %w", err)
+		}
+		return int(bytesWritten), nil
+	case uint32(windows.WAIT_TIMEOUT):
+		return 0, errors.New("write timeout")
+	default:
+		return 0, fmt.Errorf("unexpected wait result: %d", s)
+	}
 }
 
 func (sp *SerialPort) Close() error {
+	if err := windows.EscapeCommFunction(sp.handle, windows.CLRDTR); err != nil {
+		// Log this error but continue with the rest of the closing sequence
+		fmt.Printf("Warning: Failed to clear DTR: %v\n", err)
+	}
+
+	// Give the modem a moment to process the DTR change
+	time.Sleep(100 * time.Millisecond)
+
+	// Cancel any pending I/O operations
+	windows.CancelIoEx(sp.handle, nil)
+
+	// Purge all communication buffers and abort pending I/O
+	windows.PurgeComm(sp.handle, windows.PURGE_RXABORT|windows.PURGE_TXABORT|windows.PURGE_RXCLEAR|windows.PURGE_TXCLEAR)
+
+	// Close the event handles
+	if sp.readEvent != 0 {
+		windows.CloseHandle(sp.readEvent)
+		sp.readEvent = 0
+	}
+	if sp.writeEvent != 0 {
+		windows.CloseHandle(sp.writeEvent)
+		sp.writeEvent = 0
+	}
+
+	// Finally, close the serial port handle
 	return windows.CloseHandle(sp.handle)
 }

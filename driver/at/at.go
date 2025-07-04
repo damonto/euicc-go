@@ -19,13 +19,13 @@ type AT struct {
 func New(device string) (apdu.SmartCardChannel, error) {
 	var at AT
 	var err error
-	if at.s, err = OpenSerialPort(device); err != nil {
+	if at.s, err = Open(device); err != nil {
 		return nil, fmt.Errorf("failed to open serial port %s: %w", device, err)
 	}
 	return &at, nil
 }
 
-func (a *AT) execute(command string) (string, error) {
+func (a *AT) run(command string) (string, error) {
 	if _, err := a.s.Write([]byte(command + "\r\n")); err != nil {
 		return "", err
 	}
@@ -51,7 +51,7 @@ func (a *AT) execute(command string) (string, error) {
 func (a *AT) Transmit(command []byte) ([]byte, error) {
 	cmd := fmt.Sprintf("%X", command)
 	cmd = fmt.Sprintf("AT+CSIM=%d,\"%s\"", len(cmd), cmd)
-	r, err := a.execute(cmd)
+	r, err := a.run(cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (a *AT) sw(sw string) ([]byte, error) {
 }
 
 func (a *AT) Connect() error {
-	if _, err := a.execute("AT+CSIM=?"); err != nil {
+	if _, err := a.run("AT+CSIM=?"); err != nil {
 		return err
 	}
 	_, err := a.Transmit([]byte{0x80, 0xAA, 0x00, 0x00, 0x0A, 0xA9, 0x08, 0x81, 0x00, 0x82, 0x01, 0x01, 0x83, 0x01, 0x07})
