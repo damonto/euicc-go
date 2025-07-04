@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/damonto/euicc-go/driver/at"
 	"github.com/damonto/euicc-go/lpa"
 	sgp22 "github.com/damonto/euicc-go/v2"
 )
@@ -44,10 +45,10 @@ func main() {
 	// if err != nil {
 	// 	panic(err)
 	// }
-	// ch, err := at.New("/dev/ttyUSB7")
-	// if err != nil {
-	// 	panic(err)
-	// }
+	ch, err := at.New("/dev/ttyUSB7")
+	if err != nil {
+		panic(err)
+	}
 	client, err := lpa.New(&lpa.Option{
 		Channel: ch,
 	})
