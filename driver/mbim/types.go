@@ -2,6 +2,7 @@ package mbim
 
 import (
 	"bytes"
+	"encoding"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -10,13 +11,9 @@ import (
 	"time"
 )
 
-type Marshaller interface {
-	MarshalBinary() ([]byte, error)
-	UnmarshalBinary(data []byte) error
-}
-
-type Unmarshaller interface {
-	UnmarshalBinary(data []byte) error
+type Payload interface {
+	encoding.BinaryMarshaler
+	encoding.BinaryUnmarshaler
 }
 
 // Message represents a standard MBIM message
@@ -24,7 +21,7 @@ type Message struct {
 	Type          MessageType
 	Length        uint32
 	TransactionID uint32
-	Payload       Marshaller
+	Payload       Payload
 }
 
 func (m *Message) WriteTo(w net.Conn) (int, error) {
@@ -116,7 +113,7 @@ type Command struct {
 	CommandType     uint32 // 0=Query, 1=Set
 	DataLength      uint32
 	Data            []byte
-	Response        Unmarshaller
+	Response        encoding.BinaryUnmarshaler
 }
 
 // MarshalBinary creates binary representation of the MBIM command
@@ -153,7 +150,7 @@ type CommandDoneResponse struct {
 	Service         [16]byte
 	CID             uint32
 	Status          MBIMStatusError
-	Response        Unmarshaller
+	Response        encoding.BinaryUnmarshaler
 }
 
 // UnmarshalBinary parses binary data into MBIM command done response

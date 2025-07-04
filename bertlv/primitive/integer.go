@@ -41,20 +41,19 @@ func UnmarshalInt[Int signedInt](value *Int) encoding.BinaryUnmarshaler {
 }
 
 func MarshalInt[Int signedInt](value Int) encoding.BinaryMarshaler {
-	size := int(unsafe.Sizeof(value))
-	return Marshaler(func() (data []byte, err error) {
-		data = make([]byte, size)
-		var index int
-		for index = len(data) - 1; index >= 0; index-- {
-			data[index] = byte(value)
+	return Marshaler(func() ([]byte, error) {
+		var buf [8]byte
+		size := len(buf)
+		for i := size - 1; i >= 0; i-- {
+			buf[i] = byte(value)
 			value = Int(int64(value) >> 8)
 		}
-		for index = range len(data) - 1 {
-			if data[index] != data[0] || data[index+1]>>7 != data[0]>>7 {
-				break
-			}
+		start := 0
+		for start < size-1 &&
+			((buf[start] == 0x00 && buf[start+1]&0x80 == 0x00) ||
+				(buf[start] == 0xFF && buf[start+1]&0x80 == 0x80)) {
+			start++
 		}
-		data = data[index:]
-		return
+		return buf[start:], nil
 	})
 }
