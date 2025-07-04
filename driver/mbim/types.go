@@ -42,10 +42,10 @@ func (m *Message) WriteTo(w net.Conn) (int, error) {
 func (m *Message) ReadFrom(r net.Conn) (int, error) {
 	sourceTxnID := m.TransactionID
 	sourceType := m.Type
-	deadline := time.Now().Add(60 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		buf := make([]byte, 4096)
-		r.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+		r.SetReadDeadline(time.Now().Add(1 * time.Second))
 		n, err := r.Read(buf)
 		if err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {

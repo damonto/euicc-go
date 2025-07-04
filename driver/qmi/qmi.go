@@ -66,7 +66,7 @@ func (q *QMI) Connect() error {
 // openProxyConnection sends a request to the qmi-proxy to open a connection
 func (q *QMI) openProxyConnection() error {
 	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
-	_, err := invoke(q.conn, txnID, &InternalOpenRequest{
+	_, err := invoke(q.conn, q.cid, txnID, &InternalOpenRequest{
 		TxnID:      uint8(txnID),
 		DevicePath: []byte(q.device),
 	})
@@ -76,7 +76,7 @@ func (q *QMI) openProxyConnection() error {
 // allocateClientID sends a request to allocate a client ID for UIM service
 func (q *QMI) allocateClientID() error {
 	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
-	response, err := invoke(q.conn, txnID, &AllocateClientIDRequest{
+	response, err := invoke(q.conn, q.cid, txnID, &AllocateClientIDRequest{
 		TxnID: uint8(txnID),
 	})
 	if err != nil {
@@ -100,7 +100,7 @@ func (q *QMI) Disconnect() error {
 // releaseClientID sends a request to release the allocated client ID
 func (q *QMI) releaseClientID() error {
 	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
-	_, err := invoke(q.conn, txnID, &ReleaseClientIDRequest{
+	_, err := invoke(q.conn, q.cid, txnID, &ReleaseClientIDRequest{
 		ClientID: q.cid,
 		TxnID:    uint8(txnID),
 	})
@@ -116,7 +116,7 @@ func (q *QMI) OpenLogicalChannel(aid []byte) (byte, error) {
 		Slot:     q.slot,
 		AID:      aid,
 	}
-	response, err := invoke(q.conn, txnID, &request)
+	response, err := invoke(q.conn, q.cid, txnID, &request)
 	if err != nil {
 		return 0, fmt.Errorf("failed to open logical channel: %w", err)
 	}
@@ -136,7 +136,7 @@ func (q *QMI) CloseLogicalChannel(channel byte) error {
 		Channel:  channel,
 		Slot:     q.slot,
 	}
-	if _, err := invoke(q.conn, txnID, &request); err != nil {
+	if _, err := invoke(q.conn, q.cid, txnID, &request); err != nil {
 		return fmt.Errorf("failed to close logical channel: %w", err)
 	}
 	return nil
@@ -152,7 +152,7 @@ func (q *QMI) Transmit(command []byte) ([]byte, error) {
 		Channel:  q.channel,
 		Command:  command,
 	}
-	response, err := invoke(q.conn, txnID, &request)
+	response, err := invoke(q.conn, q.cid, txnID, &request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to transmit APDU: %w", err)
 	}

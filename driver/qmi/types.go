@@ -15,9 +15,6 @@ type TLV struct {
 }
 
 func (t *TLV) Error() error {
-	if t.Type != TLVTypeResult {
-		return fmt.Errorf("not a result TLV, got type %d", t.Type)
-	}
 	if len(t.Value) < 4 {
 		return fmt.Errorf("result TLV too short, expected 4 bytes, got %d", len(t.Value))
 	}
@@ -148,7 +145,7 @@ func (m *Message) Value() ([]byte, error) {
 }
 
 func (m *Message) Error() error {
-	tlv, ok := m.TLVs[TLVTypeResult]
+	tlv, ok := m.TLVs[0x02]
 	if !ok {
 		return errors.New("no result TLV found")
 	}

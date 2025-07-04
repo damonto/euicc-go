@@ -17,24 +17,24 @@ type Request interface {
 
 var mutex sync.Mutex
 
-func invoke[I Request](conn net.Conn, txnID uint16, request I) ([]byte, error) {
+func invoke[I Request](conn net.Conn, cid uint8, txnID uint16, request I) ([]byte, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	if _, err := conn.Write(request.Bytes()); err != nil {
 		return nil, fmt.Errorf("failed to write request: %w", err)
 	}
-	message, err := waitForResponse(conn, txnID)
+	message, err := waitForResponse(conn, cid, txnID)
 	if err != nil {
 		return nil, err
 	}
 	return request.Value(message)
 }
 
-func waitForResponse(conn net.Conn, expectedTxnID uint16) (*Message, error) {
-	deadline := time.Now().Add(60 * time.Second)
+func waitForResponse(conn net.Conn, cid uint8, expectedTxnID uint16) (*Message, error) {
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		buf := make([]byte, 4096)
-		conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+		conn.SetReadDeadline(time.Now().Add(1 * time.Second))
 		if _, err := conn.Read(buf); err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
 				continue // Timeout, try again
@@ -46,7 +46,7 @@ func waitForResponse(conn net.Conn, expectedTxnID uint16) (*Message, error) {
 		if err := message.UnmarshalBinary(buf[:n]); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal message: %w", err)
 		}
-		if message.TransactionID != expectedTxnID {
+		if cid != message.ClientID && message.TransactionID != expectedTxnID {
 			continue // Not the expected transaction ID, keep waiting
 		}
 		if err := message.Error(); err != nil {

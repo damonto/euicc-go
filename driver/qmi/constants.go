@@ -38,9 +38,6 @@ const (
 const (
 	QMUXHeaderIfType             = 0x01
 	QMUXHeaderControlFlagRequest = 0x00
-
-	// TLV type constants
-	TLVTypeResult = 0x02 // Result TLV type (mandatory in most responses)
 )
 
 // QMIResult represents the result code in QMI responses
