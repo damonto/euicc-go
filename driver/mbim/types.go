@@ -42,7 +42,7 @@ func (m *Message) WriteTo(w net.Conn) (int, error) {
 func (m *Message) ReadFrom(r net.Conn) (int, error) {
 	sourceTxnID := m.TransactionID
 	sourceType := m.Type
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		buf := make([]byte, 4096)
 		n, err := r.Read(buf)

@@ -31,8 +31,7 @@ func invoke[I Request](conn net.Conn, txnID uint16, request I) ([]byte, error) {
 }
 
 func waitForResponse(conn net.Conn, expectedTxnID uint16) (*Message, error) {
-	deadline := time.Now().Add(5 * time.Second)
-
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		buf := make([]byte, 4096)
 		conn.SetReadDeadline(time.Now().Add(100 * time.Microsecond))

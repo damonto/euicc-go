@@ -17,26 +17,16 @@ type ProxyConfigRequest struct {
 }
 
 func (r *ProxyConfigRequest) Message() *Message {
-	// MBIM Proxy Config format based on libmbim source:
-	// - String descriptor for device path at offset 0 (8 bytes: offset + length)
-	// - Timeout value at offset 8 (4 bytes)
-	// - String data follows
-
 	utf16s := utf16.Encode([]rune(r.DevicePath))
 	utf16s = append(utf16s, 0) // null terminator
 	pb := new(bytes.Buffer)
 	_ = binary.Write(pb, binary.LittleEndian, utf16s)
 	devicePathUTF16 := pb.Bytes()
 
-	// String data will be placed after the timeout field
 	buf := new(bytes.Buffer)
-
-	// Write string descriptor for device path
 	binary.Write(buf, binary.LittleEndian, uint32(12))
 	binary.Write(buf, binary.LittleEndian, uint32(len(devicePathUTF16)))
-	// Write timeout at offset 8
 	binary.Write(buf, binary.LittleEndian, r.Timeout)
-	// Write the string data
 	buf.Write(devicePathUTF16)
 
 	r.Response = new(ProxyConfigResponse)
