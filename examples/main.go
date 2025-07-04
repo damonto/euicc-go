@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/damonto/euicc-go/driver/at"
+	"github.com/damonto/euicc-go/driver/qmi"
 	"github.com/damonto/euicc-go/lpa"
 	sgp22 "github.com/damonto/euicc-go/v2"
 )
@@ -41,14 +41,14 @@ func main() {
 	// if err != nil {
 	// 	panic(err)
 	// }
-	// ch, err := qmi.New("/dev/cdc-wdm1", 1)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	ch, err := at.New("/dev/ttyUSB7")
+	ch, err := qmi.New("/dev/wwan0qmi0", 1)
 	if err != nil {
 		panic(err)
 	}
+	// ch, err := at.New("/dev/ttyUSB7")
+	// if err != nil {
+	// 	panic(err)
+	// }
 	client, err := lpa.New(&lpa.Option{
 		Channel: ch,
 	})
@@ -58,28 +58,33 @@ func main() {
 	}
 	defer client.Close()
 
+	// ns, _ := client.ListNotification()
+	// for _, n := range ns {
+	// 	fmt.Println(n.SequenceNumber, n.ICCID, n.ProfileManagementOperation)
+	// }
+
 	// id, _ := sgp22.NewICCID("8944478600004240215")
 	// fmt.Println(client.DeleteProfile(id))
 	// fmt.Println(client.EnableProfile(id))
 
-	// pn, err := client.RetrieveNotificationList(sgp22.SequenceNumber(802))
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
-	// if err := client.HandleNotification(pn[0]); err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
-
-	ps, err := client.ListProfile(nil, nil)
+	pn, err := client.RetrieveNotificationList(sgp22.SequenceNumber(50))
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	for _, p := range ps {
-		fmt.Println(p.ProfileName, p.ICCID)
+	if err := client.HandleNotification(pn[0]); err != nil {
+		fmt.Println(err)
+		return
 	}
+
+	// ps, err := client.ListProfile(nil, nil)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
+	// for _, p := range ps {
+	// 	fmt.Println(p.ProfileName, p.ICCID)
+	// }
 
 	eid, _ := client.EID()
 	fmt.Println(eid)

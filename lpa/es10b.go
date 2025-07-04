@@ -66,6 +66,14 @@ func (c *Client) PrepareDownload(address *url.URL, request *sgp22.PrepareDownloa
 func (c *Client) ListNotification(filters ...sgp22.NotificationEvent) ([]*sgp22.NotificationMetadata, error) {
 	var request sgp22.ListNotificationRequest
 	request.Filter = make(map[sgp22.NotificationEvent]bool)
+	if len(filters) == 0 {
+		filters = []sgp22.NotificationEvent{
+			sgp22.NotificationEventInstall,
+			sgp22.NotificationEventEnable,
+			sgp22.NotificationEventDisable,
+			sgp22.NotificationEventDelete,
+		}
+	}
 	for _, event := range filters {
 		request.Filter[event] = true
 	}

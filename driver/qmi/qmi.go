@@ -44,7 +44,7 @@ func (q *QMI) connectToProxy() error {
 		return fmt.Errorf("failed to connect to qmi-proxy: %w", err)
 	}
 
-	file := os.NewFile(uintptr(fd), "qmi-connection")
+	file := os.NewFile(uintptr(fd), "euicc-go-qmi-proxy")
 	q.conn, err = net.FileConn(file)
 	if err != nil {
 		return fmt.Errorf("failed to create net.Conn: %w", err)

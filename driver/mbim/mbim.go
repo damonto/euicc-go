@@ -28,9 +28,6 @@ func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 	if err := m.connectToProxy(); err != nil {
 		return nil, fmt.Errorf("failed to connect to mbim-proxy: %w", err)
 	}
-	if err := m.Connect(); err != nil {
-		return nil, fmt.Errorf("failed to connect to device: %w", err)
-	}
 	return m, nil
 }
 
@@ -44,7 +41,7 @@ func (m *MBIM) connectToProxy() error {
 		syscall.Close(fd)
 		return fmt.Errorf("failed to connect to mbim-proxy: %w", err)
 	}
-	file := os.NewFile(uintptr(fd), "euicc-go")
+	file := os.NewFile(uintptr(fd), "euicc-go-mbim-proxy")
 	m.conn, err = net.FileConn(file)
 	if err != nil {
 		return fmt.Errorf("failed to create net.Conn: %w", err)
