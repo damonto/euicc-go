@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -20,14 +21,19 @@ type Message struct {
 	Type          MessageType
 	Length        uint32
 	TransactionID uint32
+	ReadTimeout   time.Duration // Timeout for reading response
 	Payload       Payload
 }
+
+var mutex sync.Mutex
 
 func (m *Message) WriteTo(w net.Conn) (int, error) {
 	data, err := m.MarshalBinary()
 	if err != nil {
 		return 0, fmt.Errorf("failed to marshal message: %w", err)
 	}
+	mutex.Lock()
+	defer mutex.Unlock()
 	n, err := w.Write(data)
 	if err != nil {
 		return n, fmt.Errorf("failed to write message: %w", err)
@@ -38,7 +44,10 @@ func (m *Message) WriteTo(w net.Conn) (int, error) {
 func (m *Message) ReadFrom(r net.Conn) (int, error) {
 	sourceTransactionID := m.TransactionID
 	sourceType := m.Type
-	deadline := time.Now().Add(30 * time.Second)
+	if m.ReadTimeout == 0 {
+		m.ReadTimeout = 30 * time.Second // Default timeout if not set
+	}
+	deadline := time.Now().Add(m.ReadTimeout)
 	for time.Now().Before(deadline) {
 		buf := make([]byte, 4096)
 		r.SetReadDeadline(time.Now().Add(1 * time.Second))
@@ -47,13 +56,13 @@ func (m *Message) ReadFrom(r net.Conn) (int, error) {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
 				continue // Timeout, try again
 			}
-			return 0, fmt.Errorf("failed to read message: %w", err)
+			return 0, err
 		}
 		if err := m.UnmarshalBinary(buf[:n]); err != nil {
-			if sourceType != m.Type {
+			if sourceType != m.Type&^0x80000000 {
 				continue // Ignore messages from other sources
 			}
-			return 0, fmt.Errorf("failed to unmarshal message: %w", err)
+			return 0, err
 		}
 		if m.TransactionID != sourceTransactionID {
 			continue
@@ -163,7 +172,6 @@ func (r *CommandDoneResponse) UnmarshalBinary(data []byte) error {
 	}
 
 	buf := bytes.NewReader(data)
-
 	binary.Read(buf, binary.LittleEndian, &r.Type)
 	binary.Read(buf, binary.LittleEndian, &r.Length)
 	binary.Read(buf, binary.LittleEndian, &r.TransactionID)

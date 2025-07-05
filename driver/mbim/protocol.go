@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"time"
 	"unicode/utf16"
 )
 
@@ -87,6 +88,124 @@ func (r *OpenDeviceRequest) Message() *Message {
 
 func (r *OpenDeviceRequest) UnmarshalBinary(data []byte) error {
 	return r.Payload.UnmarshalBinary(data)
+}
+
+// endregion
+
+// region Device Slot Mappings
+
+type DeviceSlotMappingsRequest struct {
+	TransactionID uint32
+	MapCount      uint32
+	SlotMappings  []SlotMapping
+	Response      *DeviceSlotMappingsResponse
+}
+
+type SlotMapping struct {
+	Slot uint32
+}
+
+func (r *DeviceSlotMappingsRequest) Message() *Message {
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, r.MapCount)
+
+	if r.MapCount > 0 {
+		dataOffset := 4 + (r.MapCount * 8) // 4 bytes for MapCount + offset table
+		for i := uint32(0); i < r.MapCount; i++ {
+			binary.Write(buf, binary.LittleEndian, dataOffset+i*4) // offset to slot data
+			binary.Write(buf, binary.LittleEndian, uint32(4))      // size of slot data
+		}
+		for _, mapping := range r.SlotMappings {
+			binary.Write(buf, binary.LittleEndian, mapping.Slot)
+		}
+	}
+
+	r.Response = new(DeviceSlotMappingsResponse)
+	commandType := CommandTypeQuery
+	if r.MapCount > 0 {
+		commandType = CommandTypeSet
+	}
+	return &Message{
+		Type:          MessageTypeCommand,
+		TransactionID: r.TransactionID,
+		Payload: &Command{
+			FragmentTotal:   1,
+			FragmentCurrent: 0,
+			Service:         ServiceMsBasicConnectExtensions,
+			CID:             CIDDeviceSlotMappings,
+			CommandType:     uint32(commandType),
+			Data:            buf.Bytes(),
+			Response:        r.Response,
+		},
+	}
+}
+
+type DeviceSlotMappingsResponse struct {
+	MapCount     uint32
+	SlotMappings []SlotMapping
+}
+
+func (r *DeviceSlotMappingsResponse) UnmarshalBinary(data []byte) error {
+	if len(data) < 4 {
+		return errors.New("device slot mappings response data too short")
+	}
+	r.MapCount = binary.LittleEndian.Uint32(data[0:4])
+	r.SlotMappings = make([]SlotMapping, r.MapCount)
+
+	if r.MapCount == 0 {
+		return nil
+	}
+	dataOffset := 4 + r.MapCount*8
+	if len(data) < int(dataOffset) {
+		return errors.New("device slot mappings response buffer too short")
+	}
+	for i := uint32(0); i < r.MapCount; i++ {
+		slotDataOffset := dataOffset + i*4
+		if len(data) < int(slotDataOffset+4) {
+			return errors.New("device slot mappings response slot data too short")
+		}
+		r.SlotMappings[i].Slot = binary.LittleEndian.Uint32(data[slotDataOffset : slotDataOffset+4])
+	}
+	return nil
+}
+
+// endregion
+
+// region Subscriber Ready Status
+
+type SubscriberReadyStatusRequest struct {
+	TransactionID uint32
+	Response      *SubscriberReadyStatusResponse
+}
+
+func (r *SubscriberReadyStatusRequest) Message() *Message {
+	r.Response = new(SubscriberReadyStatusResponse)
+	return &Message{
+		Type:          MessageTypeCommand,
+		TransactionID: r.TransactionID,
+		ReadTimeout:   1 * time.Second,
+		Payload: &Command{
+			FragmentTotal:   1,
+			FragmentCurrent: 0,
+			Service:         ServiceBasicConnect,
+			CID:             CIDSubscriberReadyStatus,
+			CommandType:     CommandTypeQuery,
+			Data:            []byte{},
+			Response:        r.Response,
+		},
+	}
+}
+
+type SubscriberReadyStatusResponse struct {
+	ReadyState uint32
+}
+
+func (r *SubscriberReadyStatusResponse) UnmarshalBinary(data []byte) error {
+	if len(data) < 4 {
+		return errors.New("subscriber ready status response data too short")
+	}
+	r.ReadyState = binary.LittleEndian.Uint32(data[0:4])
+	return nil
 }
 
 // endregion

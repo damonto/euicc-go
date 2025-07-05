@@ -115,12 +115,12 @@ func (r *Request) UnmarshalBinary() ([]byte, error) {
 var mutex sync.Mutex
 
 func (r *Request) WriteTo(w net.Conn) (int, error) {
-	mutex.Lock()
-	defer mutex.Unlock()
 	data, err := r.UnmarshalBinary()
 	if err != nil {
 		return 0, fmt.Errorf("failed to marshal request: %w", err)
 	}
+	mutex.Lock()
+	defer mutex.Unlock()
 	n, err := w.Write(data)
 	if err != nil {
 		return 0, fmt.Errorf("failed to write request: %w", err)
