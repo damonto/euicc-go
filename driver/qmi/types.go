@@ -114,6 +114,7 @@ func (r *Request) UnmarshalBinary() ([]byte, error) {
 
 var mutex sync.Mutex
 
+// WriteTo writes the Request to the provided connection
 func (r *Request) WriteTo(w net.Conn) (int, error) {
 	data, err := r.UnmarshalBinary()
 	if err != nil {

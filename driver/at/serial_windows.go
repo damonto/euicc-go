@@ -134,19 +134,18 @@ func (sp *SerialPort) Write(p []byte) (int, error) {
 
 func (sp *SerialPort) Close() error {
 	if err := windows.EscapeCommFunction(sp.handle, windows.CLRDTR); err != nil {
-		// Log this error but continue with the rest of the closing sequence
-		fmt.Printf("Warning: Failed to clear DTR: %v\n", err)
+		return err
 	}
-
 	// Give the modem a moment to process the DTR change
 	time.Sleep(100 * time.Millisecond)
-
 	// Cancel any pending I/O operations
-	windows.CancelIoEx(sp.handle, nil)
-
+	if err := windows.CancelIoEx(sp.handle, nil); err != nil {
+		return err
+	}
 	// Purge all communication buffers and abort pending I/O
-	windows.PurgeComm(sp.handle, windows.PURGE_RXABORT|windows.PURGE_TXABORT|windows.PURGE_RXCLEAR|windows.PURGE_TXCLEAR)
-
+	if err := windows.PurgeComm(sp.handle, windows.PURGE_RXABORT|windows.PURGE_TXABORT|windows.PURGE_RXCLEAR|windows.PURGE_TXCLEAR); err != nil {
+		return err
+	}
 	// Close the event handles
 	if sp.readEvent != 0 {
 		windows.CloseHandle(sp.readEvent)
@@ -156,7 +155,5 @@ func (sp *SerialPort) Close() error {
 		windows.CloseHandle(sp.writeEvent)
 		sp.writeEvent = 0
 	}
-
-	// Finally, close the serial port handle
 	return windows.CloseHandle(sp.handle)
 }
