@@ -175,6 +175,7 @@ type Response struct {
 	QMUXHeader
 	TransactionID uint16
 	MessageID     MessageID
+	MessageType   MessageType
 	MessageLength uint16
 	TLVs          map[uint8]TLV
 }
@@ -189,34 +190,21 @@ func (r *Response) UnmarshalBinary(data []byte) error {
 	if err := binary.Read(reader, binary.LittleEndian, &r.QMUXHeader); err != nil {
 		return fmt.Errorf("read QMUX header: %w", err)
 	}
-
-	// Read message type (not used yet)
-	var messageType MessageType
-	if err := binary.Read(reader, binary.LittleEndian, &messageType); err != nil {
-		return fmt.Errorf("read message type: %w", err)
-	}
-
+	// Read message type
+	binary.Read(reader, binary.LittleEndian, &r.MessageType)
 	// Read transaction ID
 	switch r.QMUXHeader.ServiceType {
 	case QMIServiceCtl:
 		var txnID uint8
-		if err := binary.Read(reader, binary.LittleEndian, &txnID); err != nil {
-			return fmt.Errorf("read CTL txn ID: %w", err)
-		}
+		binary.Read(reader, binary.LittleEndian, &txnID)
 		r.TransactionID = uint16(txnID)
 	default:
-		if err := binary.Read(reader, binary.LittleEndian, &r.TransactionID); err != nil {
-			return fmt.Errorf("read txn ID: %w", err)
-		}
+		binary.Read(reader, binary.LittleEndian, &r.TransactionID)
 	}
 
 	// Read message ID and length
-	if err := binary.Read(reader, binary.LittleEndian, &r.MessageID); err != nil {
-		return fmt.Errorf("read message ID: %w", err)
-	}
-	if err := binary.Read(reader, binary.LittleEndian, &r.MessageLength); err != nil {
-		return fmt.Errorf("read message length: %w", err)
-	}
+	binary.Read(reader, binary.LittleEndian, &r.MessageID)
+	binary.Read(reader, binary.LittleEndian, &r.MessageLength)
 	r.TLVs = make(map[uint8]TLV)
 	if r.MessageLength > 0 {
 		return r.toTVLs(io.LimitReader(reader, int64(r.MessageLength)))
@@ -235,13 +223,11 @@ func (r *Response) toTVLs(reader io.Reader) error {
 		}
 
 		var n uint16
-		if err := binary.Read(reader, binary.LittleEndian, &n); err != nil {
-			return fmt.Errorf("read TLV length: %w", err)
-		}
+		binary.Read(reader, binary.LittleEndian, &n)
 
 		v := make([]byte, n)
 		if _, err := io.ReadFull(reader, v); err != nil {
-			return fmt.Errorf("read TLV value: %w", err)
+			return err
 		}
 		r.TLVs[t] = TLV{Type: t, Len: n, Value: v}
 	}

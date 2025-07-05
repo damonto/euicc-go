@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/damonto/euicc-go/driver/mbim"
+	"github.com/damonto/euicc-go/driver/qmi"
 	"github.com/damonto/euicc-go/lpa"
 	sgp22 "github.com/damonto/euicc-go/v2"
 )
@@ -37,14 +37,14 @@ func NewDownloadHandler() lpa.DownloadHandler {
 func main() {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
-	ch, err := mbim.New("/dev/cdc-wdm0", 1)
-	if err != nil {
-		panic(err)
-	}
-	// ch, err := qmi.New("/dev/cdc-wdm1", 1)
+	// ch, err := mbim.New("/dev/cdc-wdm0", 1)
 	// if err != nil {
 	// 	panic(err)
 	// }
+	ch, err := qmi.New("/dev/cdc-wdm1", 1)
+	if err != nil {
+		panic(err)
+	}
 	// ch, err := at.New("/dev/ttyUSB7")
 	// if err != nil {
 	// 	panic(err)
@@ -63,11 +63,11 @@ func main() {
 	// 	fmt.Println(n.SequenceNumber, n.ICCID, n.ProfileManagementOperation)
 	// }
 
-	// id, _ := sgp22.NewICCID("8944478600004240215")
+	// id, _ := sgp22.NewICCID("8944476500001224158")
 	// fmt.Println(client.DeleteProfile(id))
 	// fmt.Println(client.EnableProfile(id))
 
-	// pn, err := client.RetrieveNotificationList(sgp22.SequenceNumber(50))
+	// pn, err := client.RetrieveNotificationList(sgp22.SequenceNumber(202))
 	// if err != nil {
 	// 	fmt.Println(err)
 	// 	return

@@ -2,183 +2,175 @@ package mbim
 
 import "fmt"
 
-// MBIMStatusError represents status errors from the MBIM device.
-type MBIMStatusError uint32
+// MBIMStatus represents status errors from the MBIM device.
+type MBIMStatus uint32
 
 const (
-	MBIMStatusErrorNone MBIMStatusError = iota // 0x00000000
-	MBIMStatusErrorBusy
-	MBIMStatusErrorFailure
-	MBIMStatusErrorSimNotInserted
-	MBIMStatusErrorBadSim
-	MBIMStatusErrorPinRequired
-	MBIMStatusErrorPinDisabled
-	MBIMStatusErrorNotRegistered
-	MBIMStatusErrorProvidersNotFound
-	MBIMStatusErrorNoDeviceSupport
-	MBIMStatusErrorProviderNotVisible
-	MBIMStatusErrorDataClassNotAvailable
-	MBIMStatusErrorPacketServiceDetached
-	MBIMStatusErrorMaxActivatedContexts
-	MBIMStatusErrorNotInitialized
-	MBIMStatusErrorVoiceCallInProgress
-	MBIMStatusErrorContextNotActivated
-	MBIMStatusErrorServiceNotActivated
-	MBIMStatusErrorInvalidAccessString
-	MBIMStatusErrorInvalidUserNamePwd
-	MBIMStatusErrorRadioPowerOff
-	MBIMStatusErrorInvalidParameters
-	MBIMStatusErrorReadFailure
-	MBIMStatusErrorWriteFailure
-	MBIMStatusErrorReserved
-	MBIMStatusErrorNoPhonebook
-	MBIMStatusErrorParameterTooLong
-	MBIMStatusErrorStkBusy
-	MBIMStatusErrorOperationNotAllowed
-	MBIMStatusErrorMemoryFailure
-	MBIMStatusErrorInvalidMemoryIndex
-	MBIMStatusErrorMemoryFull
-	MBIMStatusErrorFilterNotSupported
-	MBIMStatusErrorDssInstanceLimit
-	MBIMStatusErrorInvalidDeviceServiceOperation
-	MBIMStatusErrorAuthIncorrectAutn
-	MBIMStatusErrorAuthSyncFailure
-	MBIMStatusErrorAuthAmfNotSet
-	MBIMStatusErrorContextNotSupported
-	MBIMStatusErrorSmsUnknownSmscAddress          MBIMStatusError = 0x00000064 // 100
-	MBIMStatusErrorSmsNetworkTimeout              MBIMStatusError = 0x00000065 // 101
-	MBIMStatusErrorSmsLangNotSupported            MBIMStatusError = 0x00000066 // 102
-	MBIMStatusErrorSmsEncodingNotSupported        MBIMStatusError = 0x00000067 // 103
-	MBIMStatusErrorSmsFormatNotSupported          MBIMStatusError = 0x00000068 // 104
-	MBIMStatusErrorMsNoLogicalChannels            MBIMStatusError = 0x87430001
-	MBIMStatusErrorMsSelectFailed                 MBIMStatusError = 0x87430002
-	MBIMStatusErrorMsInvalidLogicalChannel        MBIMStatusError = 0x87430003
-	MBIMStatusErrorInvalidSignature               MBIMStatusError = 0x91000001
-	MBIMStatusErrorInvalidImei                    MBIMStatusError = 0x91000002
-	MBIMStatusErrorInvalidTimestamp               MBIMStatusError = 0x91000003
-	MBIMStatusErrorNetworkListTooLarge            MBIMStatusError = 0x91000004
-	MBIMStatusErrorSignatureAlgorithmNotSupported MBIMStatusError = 0x91000005
-	MBIMStatusErrorFeatureNotSupported            MBIMStatusError = 0x91000006
-	MBIMStatusErrorDecodeOrParsingError           MBIMStatusError = 0x91000007
+	MBIMStatusNone MBIMStatus = iota // 0x00000000
+	MBIMStatusBusy
+	MBIMStatusFailure
+	MBIMStatusSimNotInserted
+	MBIMStatusBadSim
+	MBIMStatusPinRequired
+	MBIMStatusPinDisabled
+	MBIMStatusNotRegistered
+	MBIMStatusProvidersNotFound
+	MBIMStatusNoDeviceSupport
+	MBIMStatusProviderNotVisible
+	MBIMStatusDataClassNotAvailable
+	MBIMStatusPacketServiceDetached
+	MBIMStatusMaxActivatedContexts
+	MBIMStatusNotInitialized
+	MBIMStatusVoiceCallInProgress
+	MBIMStatusContextNotActivated
+	MBIMStatusServiceNotActivated
+	MBIMStatusInvalidAccessString
+	MBIMStatusInvalidUserNamePwd
+	MBIMStatusRadioPowerOff
+	MBIMStatusInvalidParameters
+	MBIMStatusReadFailure
+	MBIMStatusWriteFailure
+	MBIMStatusReserved
+	MBIMStatusNoPhonebook
+	MBIMStatusParameterTooLong
+	MBIMStatusStkBusy
+	MBIMStatusOperationNotAllowed
+	MBIMStatusMemoryFailure
+	MBIMStatusInvalidMemoryIndex
+	MBIMStatusMemoryFull
+	MBIMStatusFilterNotSupported
+	MBIMStatusDssInstanceLimit
+	MBIMStatusInvalidDeviceServiceOperation
+	MBIMStatusAuthIncorrectAutn
+	MBIMStatusAuthSyncFailure
+	MBIMStatusAuthAmfNotSet
+	MBIMStatusContextNotSupported
+	MBIMStatusSmsUnknownSmscAddress          MBIMStatus = 0x00000064 // 100
+	MBIMStatusSmsNetworkTimeout              MBIMStatus = 0x00000065 // 101
+	MBIMStatusSmsLangNotSupported            MBIMStatus = 0x00000066 // 102
+	MBIMStatusSmsEncodingNotSupported        MBIMStatus = 0x00000067 // 103
+	MBIMStatusSmsFormatNotSupported          MBIMStatus = 0x00000068 // 104
+	MBIMStatusMsNoLogicalChannels            MBIMStatus = 0x87430001
+	MBIMStatusMsSelectFailed                 MBIMStatus = 0x87430002
+	MBIMStatusMsInvalidLogicalChannel        MBIMStatus = 0x87430003
+	MBIMStatusInvalidSignature               MBIMStatus = 0x91000001
+	MBIMStatusInvalidImei                    MBIMStatus = 0x91000002
+	MBIMStatusInvalidTimestamp               MBIMStatus = 0x91000003
+	MBIMStatusNetworkListTooLarge            MBIMStatus = 0x91000004
+	MBIMStatusSignatureAlgorithmNotSupported MBIMStatus = 0x91000005
+	MBIMStatusFeatureNotSupported            MBIMStatus = 0x91000006
+	MBIMStatusDecodeOrParsingError           MBIMStatus = 0x91000007
 )
 
-func (e MBIMStatusError) Error() string {
+func (e MBIMStatus) Error() string {
 	switch e {
-	case MBIMStatusErrorNone:
+	case MBIMStatusNone:
 		return "Success"
-	case MBIMStatusErrorBusy:
+	case MBIMStatusBusy:
 		return "Busy"
-	case MBIMStatusErrorFailure:
+	case MBIMStatusFailure:
 		return "Failure"
-	case MBIMStatusErrorSimNotInserted:
+	case MBIMStatusSimNotInserted:
 		return "Sim Not Inserted"
-	case MBIMStatusErrorBadSim:
+	case MBIMStatusBadSim:
 		return "Bad Sim"
-	case MBIMStatusErrorPinRequired:
+	case MBIMStatusPinRequired:
 		return "Pin Required"
-	case MBIMStatusErrorPinDisabled:
+	case MBIMStatusPinDisabled:
 		return "Pin Disabled"
-	case MBIMStatusErrorNotRegistered:
+	case MBIMStatusNotRegistered:
 		return "Not Registered"
-	case MBIMStatusErrorProvidersNotFound:
+	case MBIMStatusProvidersNotFound:
 		return "Providers Not Found"
-	case MBIMStatusErrorNoDeviceSupport:
+	case MBIMStatusNoDeviceSupport:
 		return "No Device Support"
-	case MBIMStatusErrorProviderNotVisible:
+	case MBIMStatusProviderNotVisible:
 		return "Provider Not Visible"
-	case MBIMStatusErrorDataClassNotAvailable:
+	case MBIMStatusDataClassNotAvailable:
 		return "Data Class Not Available"
-	case MBIMStatusErrorPacketServiceDetached:
+	case MBIMStatusPacketServiceDetached:
 		return "Packet Service Detached"
-	case MBIMStatusErrorMaxActivatedContexts:
+	case MBIMStatusMaxActivatedContexts:
 		return "Max Activated Contexts"
-	case MBIMStatusErrorNotInitialized:
+	case MBIMStatusNotInitialized:
 		return "Not Initialized"
-	case MBIMStatusErrorVoiceCallInProgress:
+	case MBIMStatusVoiceCallInProgress:
 		return "Voice Call In Progress"
-	case MBIMStatusErrorContextNotActivated:
+	case MBIMStatusContextNotActivated:
 		return "Context Not Activated"
-	case MBIMStatusErrorServiceNotActivated:
+	case MBIMStatusServiceNotActivated:
 		return "Service Not Activated"
-	case MBIMStatusErrorInvalidAccessString:
+	case MBIMStatusInvalidAccessString:
 		return "Invalid Access String"
-	case MBIMStatusErrorInvalidUserNamePwd:
+	case MBIMStatusInvalidUserNamePwd:
 		return "Invalid User Name Pwd"
-	case MBIMStatusErrorRadioPowerOff:
+	case MBIMStatusRadioPowerOff:
 		return "Radio Power Off"
-	case MBIMStatusErrorInvalidParameters:
+	case MBIMStatusInvalidParameters:
 		return "Invalid Parameters"
-	case MBIMStatusErrorReadFailure:
+	case MBIMStatusReadFailure:
 		return "Read Failure"
-	case MBIMStatusErrorWriteFailure:
+	case MBIMStatusWriteFailure:
 		return "Write Failure"
-	case MBIMStatusErrorNoPhonebook:
+	case MBIMStatusNoPhonebook:
 		return "No Phonebook"
-	case MBIMStatusErrorParameterTooLong:
+	case MBIMStatusParameterTooLong:
 		return "Parameter Too Long"
-	case MBIMStatusErrorStkBusy:
+	case MBIMStatusStkBusy:
 		return "Stk Busy"
-	case MBIMStatusErrorOperationNotAllowed:
+	case MBIMStatusOperationNotAllowed:
 		return "Operation Not Allowed"
-	case MBIMStatusErrorMemoryFailure:
+	case MBIMStatusMemoryFailure:
 		return "Memory Failure"
-	case MBIMStatusErrorInvalidMemoryIndex:
+	case MBIMStatusInvalidMemoryIndex:
 		return "Invalid Memory Index"
-	case MBIMStatusErrorMemoryFull:
+	case MBIMStatusMemoryFull:
 		return "Memory Full"
-	case MBIMStatusErrorFilterNotSupported:
+	case MBIMStatusFilterNotSupported:
 		return "Filter Not Supported"
-	case MBIMStatusErrorDssInstanceLimit:
+	case MBIMStatusDssInstanceLimit:
 		return "Dss Instance Limit"
-	case MBIMStatusErrorInvalidDeviceServiceOperation:
+	case MBIMStatusInvalidDeviceServiceOperation:
 		return "Invalid Device Service Operation"
-	case MBIMStatusErrorAuthIncorrectAutn:
+	case MBIMStatusAuthIncorrectAutn:
 		return "Auth Incorrect Autn"
-	case MBIMStatusErrorAuthSyncFailure:
+	case MBIMStatusAuthSyncFailure:
 		return "Auth Sync Failure"
-	case MBIMStatusErrorAuthAmfNotSet:
+	case MBIMStatusAuthAmfNotSet:
 		return "Auth Amf Not Set"
-	case MBIMStatusErrorContextNotSupported:
+	case MBIMStatusContextNotSupported:
 		return "Context Not Supported"
-	case MBIMStatusErrorSmsUnknownSmscAddress:
+	case MBIMStatusSmsUnknownSmscAddress:
 		return "Sms Unknown Smsc Address"
-	case MBIMStatusErrorSmsNetworkTimeout:
+	case MBIMStatusSmsNetworkTimeout:
 		return "Sms Network Timeout"
-	case MBIMStatusErrorSmsLangNotSupported:
+	case MBIMStatusSmsLangNotSupported:
 		return "Sms Lang Not Supported"
-	case MBIMStatusErrorSmsEncodingNotSupported:
+	case MBIMStatusSmsEncodingNotSupported:
 		return "Sms Encoding Not Supported"
-	case MBIMStatusErrorSmsFormatNotSupported:
+	case MBIMStatusSmsFormatNotSupported:
 		return "Sms Format Not Supported"
-	case MBIMStatusErrorMsNoLogicalChannels:
+	case MBIMStatusMsNoLogicalChannels:
 		return "Ms No Logical Channels"
-	case MBIMStatusErrorMsSelectFailed:
+	case MBIMStatusMsSelectFailed:
 		return "Ms Select Failed"
-	case MBIMStatusErrorMsInvalidLogicalChannel:
+	case MBIMStatusMsInvalidLogicalChannel:
 		return "Ms Invalid Logical Channel"
-	case MBIMStatusErrorInvalidSignature:
+	case MBIMStatusInvalidSignature:
 		return "Invalid Signature"
-	case MBIMStatusErrorInvalidImei:
+	case MBIMStatusInvalidImei:
 		return "Invalid Imei"
-	case MBIMStatusErrorInvalidTimestamp:
+	case MBIMStatusInvalidTimestamp:
 		return "Invalid Timestamp"
-	case MBIMStatusErrorNetworkListTooLarge:
+	case MBIMStatusNetworkListTooLarge:
 		return "Network List Too Large"
-	case MBIMStatusErrorSignatureAlgorithmNotSupported:
+	case MBIMStatusSignatureAlgorithmNotSupported:
 		return "Signature Algorithm Not Supported"
-	case MBIMStatusErrorFeatureNotSupported:
+	case MBIMStatusFeatureNotSupported:
 		return "Feature Not Supported"
-	case MBIMStatusErrorDecodeOrParsingError:
+	case MBIMStatusDecodeOrParsingError:
 		return "Decode Or Parsing Error"
 	default:
 		return fmt.Sprintf("Unknown MBIM Status Error: %d", e)
 	}
-}
-
-type MBIMError struct {
-	Code MBIMStatusError
-}
-
-func (e MBIMError) Error() string {
-	return fmt.Sprintf("MBIM Error: %s (%d) ", e.Code.Error(), e.Code)
 }

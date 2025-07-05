@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"slices"
 	"time"
 )
 
@@ -80,13 +79,7 @@ func (m *Message) UnmarshalBinary(data []byte) error {
 		return errors.New("message too short for MBIM header")
 	}
 	buf := bytes.NewReader(data)
-	var msgType uint32
-	if err := binary.Read(buf, binary.LittleEndian, &msgType); err != nil {
-		return err
-	}
-	m.Type = MessageType(msgType)
-
-	// Parse Length
+	binary.Read(buf, binary.LittleEndian, &m.Type)
 	binary.Read(buf, binary.LittleEndian, &m.Length)
 	// The Length field includes the 12-byte header, so payload = Length - 12
 	if m.Length < 12 {
@@ -159,7 +152,7 @@ type CommandDoneResponse struct {
 	FragmentCurrent uint32
 	Service         [16]byte
 	CID             uint32
-	Status          MBIMStatusError
+	Status          MBIMStatus
 	Response        encoding.BinaryUnmarshaler
 }
 
@@ -171,10 +164,7 @@ func (r *CommandDoneResponse) UnmarshalBinary(data []byte) error {
 
 	buf := bytes.NewReader(data)
 
-	var messageType uint32
-	binary.Read(buf, binary.LittleEndian, &messageType)
-	r.Type = MessageType(messageType)
-
+	binary.Read(buf, binary.LittleEndian, &r.Type)
 	binary.Read(buf, binary.LittleEndian, &r.Length)
 	binary.Read(buf, binary.LittleEndian, &r.TransactionID)
 	binary.Read(buf, binary.LittleEndian, &r.FragmentTotal)
@@ -182,39 +172,12 @@ func (r *CommandDoneResponse) UnmarshalBinary(data []byte) error {
 	binary.Read(buf, binary.LittleEndian, &r.Service)
 	binary.Read(buf, binary.LittleEndian, &r.CID)
 
-	if isExtendedService(r.Service) {
-		// Extended service: read 16-byte GUID
-		if len(data) < 48 {
-			return errors.New("extended command done message too short")
-		}
-		if r.Status = MBIMStatusError(binary.LittleEndian.Uint32(data[40:44])); r.Status != MBIMStatusErrorNone {
-			return r.Status
-		}
-		valueLen := binary.LittleEndian.Uint32(data[44:48])
-		if int(48+valueLen) > len(data) {
-			return errors.New("extended response buffer too short")
-		}
-		return r.Response.UnmarshalBinary(data[48 : 48+valueLen])
-	} else {
-		// Basic service: 4-byte Service ID
-		if len(data) < 36 {
-			return errors.New("basic command done message too short")
-		}
-		if r.Status = MBIMStatusError(binary.LittleEndian.Uint32(data[28:32])); r.Status != MBIMStatusErrorNone {
-			return r.Status
-		}
-		valueLen := binary.LittleEndian.Uint32(data[32:36])
-		if int(36+valueLen) > len(data) {
-			return errors.New("basic response buffer too short")
-		}
-		return r.Response.UnmarshalBinary(data[36 : 36+valueLen])
+	if r.Status = MBIMStatus(binary.LittleEndian.Uint32(data[28:32])); r.Status != MBIMStatusNone {
+		return r.Status
 	}
-}
-
-func isExtendedService(service [16]byte) bool {
-	known := [][16]byte{
-		ServiceMsUiccLowLevelAccess,
-		ServiceMsBasicConnectExtensions,
+	valueLen := binary.LittleEndian.Uint32(data[32:36])
+	if int(36+valueLen) > len(data) {
+		return errors.New("basic response buffer too short")
 	}
-	return slices.Contains(known, service)
+	return r.Response.UnmarshalBinary(data[36 : 36+valueLen])
 }

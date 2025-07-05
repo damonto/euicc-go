@@ -44,6 +44,7 @@ const (
 const (
 	CIDProxyControlConfiguration = 0x00000001
 	CIDProxyControlVersion       = 0x00000002
+	CIDDeviceSlotMappings        = 0x00000007
 )
 
 // MBIM Command Types
