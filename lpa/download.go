@@ -69,39 +69,59 @@ func (ac *ActivationCode) UnmarshalText(text []byte) error {
 	return nil
 }
 
-type DownloadProgress uint8
+type DownloadStage uint8
 
 const (
-	DownloadProgressAuthenticateClient DownloadProgress = iota
-	DownloadProgressAuthenticateServer
-	DownloadProgressLoadBPP
+	DownloadStageAuthenticateClient DownloadStage = iota
+	DownloadStageAuthenticateServer
+	DownloadStageInstall
 )
 
-type DownloadHandler interface {
-	Progress(process DownloadProgress)
-	Confirm(metadata *sgp22.ProfileInfo) chan bool
-	ConfirmationCode() chan string
+// String returns a string representation of the DownloadStage.
+func (s DownloadStage) String() string {
+	switch s {
+	case DownloadStageAuthenticateClient:
+		return "Authenticating Client"
+	case DownloadStageAuthenticateServer:
+		return "Authenticating Server"
+	case DownloadStageInstall:
+		return "Installing"
+	default:
+		return fmt.Sprintf("Unknown Stage (%d)", s)
+	}
 }
 
-func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, handler DownloadHandler) (*sgp22.LoadBoundProfilePackageResponse, error) {
-	handler.Progress(DownloadProgressAuthenticateClient)
+// DownloadOptions provides user interaction callbacks during profile download.
+type DownloadOptions struct {
+	OnProgress              func(stage DownloadStage)
+	OnConfirm               func(metadata *sgp22.ProfileInfo) bool
+	OnEnterConfirmationCode func() string
+}
+
+func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, opts *DownloadOptions) (*sgp22.LoadBoundProfilePackageResponse, error) {
+	if opts != nil && opts.OnProgress != nil {
+		opts.OnProgress(DownloadStageAuthenticateClient)
+	}
+
 	clientResponse, metadata, ccRequired, err := c.authenticateClient(ac)
 	if err != nil {
 		if clientResponse != nil && clientResponse.FunctionExecutionStatus().ExecutedSuccess() {
-			return nil, c.raiseError(ac, clientResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
+			return nil, c.abort(ac, clientResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
 		}
 		return nil, err
 	}
 
-	if c.isCanceled(ctx) || !<-handler.Confirm(metadata) {
+	if c.isCanceled(ctx) || (opts != nil && opts.OnConfirm != nil && !opts.OnConfirm(metadata)) {
 		_, err := c.cancelSession(ac, clientResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
 		return nil, err
 	}
 
 	if ccRequired && ac.ConfirmationCode == "" {
-		ac.ConfirmationCode = <-handler.ConfirmationCode()
+		if opts != nil && opts.OnEnterConfirmationCode != nil {
+			ac.ConfirmationCode = opts.OnEnterConfirmationCode()
+		}
 		if ac.ConfirmationCode == "" {
-			return nil, c.raiseError(
+			return nil, c.abort(
 				ac,
 				clientResponse.TransactionID,
 				errors.New("confirmation code is required"),
@@ -110,24 +130,28 @@ func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, handle
 		}
 	}
 
-	handler.Progress(DownloadProgressAuthenticateServer)
+	if opts != nil && opts.OnProgress != nil {
+		opts.OnProgress(DownloadStageAuthenticateServer)
+	}
 	if c.isCanceled(ctx) {
 		_, err := c.cancelSession(ac, clientResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
 		return nil, err
 	}
 	serverResponse, err := c.authenticateServer(ac, clientResponse)
 	if err != nil {
-		return nil, c.raiseError(ac, serverResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
+		return nil, c.abort(ac, serverResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
 	}
 
-	handler.Progress(DownloadProgressLoadBPP)
+	if opts != nil && opts.OnProgress != nil {
+		opts.OnProgress(DownloadStageInstall)
+	}
 	if c.isCanceled(ctx) {
 		_, err := c.cancelSession(ac, serverResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
 		return nil, err
 	}
 	result, err := c.install(serverResponse)
 	if err != nil {
-		return result, c.raiseError(ac, serverResponse.TransactionID, err, sgp22.CancelSessionReasonLoadBppExecutionError)
+		return result, c.abort(ac, serverResponse.TransactionID, err, sgp22.CancelSessionReasonLoadBppExecutionError)
 	}
 	return result, nil
 }
@@ -220,10 +244,10 @@ func (c *Client) isCanceled(ctx context.Context) bool {
 	}
 }
 
-func (c *Client) raiseError(ac *ActivationCode, transactionID []byte, err error, cancelReason sgp22.CancelSessionReason) error {
+func (c *Client) abort(ac *ActivationCode, transactionID []byte, err error, cancelReason sgp22.CancelSessionReason) error {
 	_, cancelErr := c.cancelSession(ac, transactionID, cancelReason)
 	if cancelErr != nil {
-		return errors.Join(err, fmt.Errorf("cancel session error: %w", cancelErr))
+		return fmt.Errorf("session canceled after error: %w (cancel failed: %v)", err, cancelErr)
 	}
 	return err
 }

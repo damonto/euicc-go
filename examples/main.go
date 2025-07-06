@@ -4,47 +4,21 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/damonto/euicc-go/driver/mbim"
+	"github.com/damonto/euicc-go/driver/qmi"
 	"github.com/damonto/euicc-go/lpa"
-	sgp22 "github.com/damonto/euicc-go/v2"
 )
-
-type DownloadHandler struct{}
-
-// HandleConfirm implements lpa.Handler.
-func (d *DownloadHandler) Confirm(metadata *sgp22.ProfileInfo) chan bool {
-	fmt.Println(metadata)
-	bool := make(chan bool, 1)
-	bool <- true
-	return bool
-}
-
-// HandleProgress implements lpa.Handler.
-func (d *DownloadHandler) Progress(process lpa.DownloadProgress) {
-	fmt.Println(process)
-}
-
-func (d *DownloadHandler) ConfirmationCode() chan string {
-	code := make(chan string, 1)
-	code <- "0000"
-	return code
-}
-
-func NewDownloadHandler() lpa.DownloadHandler {
-	return &DownloadHandler{}
-}
 
 func main() {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
-	ch, err := mbim.New("/dev/cdc-wdm0", 1)
-	if err != nil {
-		panic(err)
-	}
-	// ch, err := qmi.New("/dev/cdc-wdm1", 1)
+	// ch, err := mbim.New("/dev/cdc-wdm0", 1)
 	// if err != nil {
 	// 	panic(err)
 	// }
+	ch, err := qmi.New("/dev/cdc-wdm1", 1)
+	if err != nil {
+		panic(err)
+	}
 	// ch, err := at.New("/dev/ttyUSB7")
 	// if err != nil {
 	// 	panic(err)
@@ -99,7 +73,16 @@ func main() {
 	// 	SMDP:       &url.URL{Scheme: "https", Host: "smdp.io"},
 	// 	MatchingID: "QR-G-5C-1LS-1W1Z9P7",
 	// 	IMEI:       "356938035643809",
-	// }, NewDownloadHandler())
+	// }, &lpa.DownloadOptions{
+	// 	OnProgress: func(stage lpa.DownloadStage) {
+	// 		fmt.Println(stage)
+	// 	},
+	// 	OnConfirm: func(metadata *sgp22.ProfileInfo) bool {
+	// 		fmt.Printf("Confirm download of profile %s with ICCID %s\n", metadata.ProfileName, metadata.ICCID)
+	// 		return true // Return true to confirm the download
+	// 	},
+	// 	OnEnterConfirmationCode: func() string { return "" },
+	// })
 	// if err != nil {
 	// 	panic(err)
 	// }
