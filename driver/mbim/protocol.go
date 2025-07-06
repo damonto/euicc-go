@@ -17,7 +17,7 @@ type ProxyConfigRequest struct {
 	Response      *ProxyConfigResponse
 }
 
-func (r *ProxyConfigRequest) Message() *Message {
+func (r *ProxyConfigRequest) Request() *Request {
 	utf16s := utf16.Encode([]rune(r.DevicePath))
 	utf16s = append(utf16s, 0) // null terminator
 	pb := new(bytes.Buffer)
@@ -31,18 +31,18 @@ func (r *ProxyConfigRequest) Message() *Message {
 	buf.Write(devicePathUTF16)
 
 	r.Response = new(ProxyConfigResponse)
-	return &Message{
+	return &Request{
 		MessageType:   MessageTypeCommand,
 		TransactionID: r.TransactionID,
-		Payload: &Command{
+		Command: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
 			ServiceID:       ServiceMbimProxyControl,
 			CommandID:       CIDProxyControlConfiguration,
 			CommandType:     CommandTypeSet,
 			Data:            buf.Bytes(),
-			Response:        r.Response,
 		},
+		Response: r.Response,
 	}
 }
 
@@ -57,38 +57,28 @@ func (r *ProxyConfigResponse) UnmarshalBinary(data []byte) error { return nil }
 
 type OpenDeviceRequest struct {
 	TransactionID uint32
-	Payload       *OpenDevicePayload
+	Response      *OpenDeviceResponse
 }
 
-type OpenDevicePayload struct {
-	MaxControlTransfer uint32
+func (r *OpenDeviceRequest) Request() *Request {
+	r.Response = new(OpenDeviceResponse)
+	return &Request{
+		MessageType:   MessageTypeOpen,
+		TransactionID: r.TransactionID,
+		Command:       r,
+		Response:      r.Response,
+	}
 }
 
-func (p *OpenDevicePayload) MarshalBinary() ([]byte, error) {
+func (r *OpenDeviceRequest) MarshalBinary() ([]byte, error) {
 	buf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buf, p.MaxControlTransfer)
+	binary.LittleEndian.PutUint32(buf, 4096)
 	return buf, nil
 }
 
-func (p *OpenDevicePayload) UnmarshalBinary(data []byte) error {
-	p.MaxControlTransfer = binary.LittleEndian.Uint32(data[0:4])
-	return nil
-}
+type OpenDeviceResponse struct{}
 
-func (r *OpenDeviceRequest) Message() *Message {
-	r.Payload = &OpenDevicePayload{
-		MaxControlTransfer: 4096,
-	}
-	return &Message{
-		MessageType:   MessageTypeOpen,
-		TransactionID: r.TransactionID,
-		Payload:       r.Payload,
-	}
-}
-
-func (r *OpenDeviceRequest) UnmarshalBinary(data []byte) error {
-	return r.Payload.UnmarshalBinary(data)
-}
+func (p *OpenDeviceResponse) UnmarshalBinary(data []byte) error { return nil }
 
 // endregion
 
@@ -105,7 +95,7 @@ type SlotMapping struct {
 	Slot uint32
 }
 
-func (r *DeviceSlotMappingsRequest) Message() *Message {
+func (r *DeviceSlotMappingsRequest) Request() *Request {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, r.MapCount)
 
@@ -125,18 +115,18 @@ func (r *DeviceSlotMappingsRequest) Message() *Message {
 	if r.MapCount > 0 {
 		commandType = CommandTypeSet
 	}
-	return &Message{
+	return &Request{
 		MessageType:   MessageTypeCommand,
 		TransactionID: r.TransactionID,
-		Payload: &Command{
+		Command: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
 			ServiceID:       ServiceMsBasicConnectExtensions,
 			CommandID:       CIDDeviceSlotMappings,
 			CommandType:     uint32(commandType),
 			Data:            buf.Bytes(),
-			Response:        r.Response,
 		},
+		Response: r.Response,
 	}
 }
 
@@ -178,21 +168,21 @@ type SubscriberReadyStatusRequest struct {
 	Response      *SubscriberReadyStatusResponse
 }
 
-func (r *SubscriberReadyStatusRequest) Message() *Message {
+func (r *SubscriberReadyStatusRequest) Request() *Request {
 	r.Response = new(SubscriberReadyStatusResponse)
-	return &Message{
+	return &Request{
 		MessageType:   MessageTypeCommand,
 		TransactionID: r.TransactionID,
 		ReadTimeout:   1 * time.Second,
-		Payload: &Command{
+		Command: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
 			ServiceID:       ServiceBasicConnect,
 			CommandID:       CIDSubscriberReadyStatus,
 			CommandType:     CommandTypeQuery,
 			Data:            []byte{},
-			Response:        r.Response,
 		},
+		Response: r.Response,
 	}
 }
 
@@ -220,7 +210,7 @@ type OpenLogicalChannelRequest struct {
 	Response      *OpenLogicalChannelResponse
 }
 
-func (r *OpenLogicalChannelRequest) Message() *Message {
+func (r *OpenLogicalChannelRequest) Request() *Request {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, uint32(len(r.AppId)))
 	binary.Write(buf, binary.LittleEndian, uint32(16))
@@ -228,18 +218,18 @@ func (r *OpenLogicalChannelRequest) Message() *Message {
 	binary.Write(buf, binary.LittleEndian, r.Group)
 	buf.Write(r.AppId)
 	r.Response = new(OpenLogicalChannelResponse)
-	return &Message{
+	return &Request{
 		MessageType:   MessageTypeCommand,
 		TransactionID: r.TransactionID,
-		Payload: &Command{
+		Command: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
 			ServiceID:       ServiceMsUiccLowLevelAccess,
 			CommandID:       CIDUiccOpenChannel,
 			CommandType:     CommandTypeSet,
 			Data:            buf.Bytes(),
-			Response:        r.Response,
 		},
+		Response: r.Response,
 	}
 }
 
@@ -271,23 +261,23 @@ type CloseLogicalChannelRequest struct {
 	Response      *CloseLogicalChannelResponse
 }
 
-func (r *CloseLogicalChannelRequest) Message() *Message {
+func (r *CloseLogicalChannelRequest) Request() *Request {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, uint32(r.Channel))
 	binary.Write(buf, binary.LittleEndian, r.Group)
 	r.Response = new(CloseLogicalChannelResponse)
-	return &Message{
+	return &Request{
 		MessageType:   MessageTypeCommand,
 		TransactionID: r.TransactionID,
-		Payload: &Command{
+		Command: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
 			ServiceID:       ServiceMsUiccLowLevelAccess,
 			CommandID:       CIDUiccCloseChannel,
 			CommandType:     CommandTypeSet,
 			Data:            buf.Bytes(),
-			Response:        r.Response,
 		},
+		Response: r.Response,
 	}
 }
 
@@ -312,7 +302,7 @@ type TransmitAPDURequest struct {
 	Response        *TransmitAPDUResponse
 }
 
-func (r *TransmitAPDURequest) Message() *Message {
+func (r *TransmitAPDURequest) Request() *Request {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, r.Channel)
 	binary.Write(buf, binary.LittleEndian, r.SecureMessaging)
@@ -321,18 +311,18 @@ func (r *TransmitAPDURequest) Message() *Message {
 	binary.Write(buf, binary.LittleEndian, uint32(20))
 	buf.Write(r.APDU)
 	r.Response = new(TransmitAPDUResponse)
-	return &Message{
+	return &Request{
 		MessageType:   MessageTypeCommand,
 		TransactionID: r.TransactionID,
-		Payload: &Command{
+		Command: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
 			ServiceID:       ServiceMsUiccLowLevelAccess,
 			CommandID:       CIDUiccAPDU,
 			CommandType:     CommandTypeSet,
 			Data:            buf.Bytes(),
-			Response:        r.Response,
 		},
+		Response: r.Response,
 	}
 }
 

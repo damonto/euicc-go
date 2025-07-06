@@ -91,7 +91,7 @@ func (m *MBIM) currentActivatedSlot() (uint8, error) {
 		TransactionID: atomic.AddUint32(&m.txnID, 1),
 		MapCount:      0, // Query operation
 	}
-	if err := request.Message().Transmit(m.conn); err != nil {
+	if err := request.Request().Transmit(m.conn); err != nil {
 		return 0, fmt.Errorf("failed to query slot mappings: %w", err)
 	}
 	if len(request.Response.SlotMappings) == 0 {
@@ -109,7 +109,7 @@ func (m *MBIM) activateSlot(slot uint8) error {
 			{Slot: uint32(slot)},
 		},
 	}
-	if err := request.Message().Transmit(m.conn); err != nil {
+	if err := request.Request().Transmit(m.conn); err != nil {
 		return fmt.Errorf("failed to set slot mapping: %w", err)
 	}
 	return nil
@@ -117,11 +117,11 @@ func (m *MBIM) activateSlot(slot uint8) error {
 
 // waitForSlotActivation waits for the slot to become active by checking subscriber ready status
 func (m *MBIM) waitForSlotActivation() error {
-	for range 20 { // Try for up to 20 times (similar to C implementation)
+	for range 30 {
 		request := SubscriberReadyStatusRequest{
 			TransactionID: atomic.AddUint32(&m.txnID, 1),
 		}
-		if err := request.Message().Transmit(m.conn); err != nil {
+		if err := request.Request().Transmit(m.conn); err != nil {
 			continue // Ignore errors, retry
 		}
 		readyState := request.Response.ReadyState
@@ -140,7 +140,7 @@ func (m *MBIM) configureProxy() error {
 		DevicePath:    m.device,
 		Timeout:       30,
 	}
-	return request.Message().Transmit(m.conn)
+	return request.Request().Transmit(m.conn)
 }
 
 // openDevice sends MBIM Open message to establish connection
@@ -148,14 +148,7 @@ func (m *MBIM) openDevice() error {
 	request := OpenDeviceRequest{
 		TransactionID: atomic.AddUint32(&m.txnID, 1),
 	}
-	message := request.Message()
-	if _, err := message.WriteTo(m.conn); err != nil {
-		return err
-	}
-	if _, err := message.ReadFrom(m.conn); err != nil {
-		return err
-	}
-	return request.Message().Transmit(m.conn)
+	return request.Request().Transmit(m.conn)
 }
 
 // OpenLogicalChannel opens a logical channel for the specified Application ID
@@ -166,7 +159,7 @@ func (m *MBIM) OpenLogicalChannel(aid []byte) (byte, error) {
 		SelectP2Arg:   0,
 		Group:         1,
 	}
-	if err := request.Message().Transmit(m.conn); err != nil {
+	if err := request.Request().Transmit(m.conn); err != nil {
 		return 0, fmt.Errorf("failed to open logical channel: %w", err)
 	}
 	m.channel = request.Response.Channel
@@ -182,7 +175,7 @@ func (m *MBIM) Transmit(command []byte) ([]byte, error) {
 		ClassByteType:   0,
 		APDU:            command,
 	}
-	if err := request.Message().Transmit(m.conn); err != nil {
+	if err := request.Request().Transmit(m.conn); err != nil {
 		return nil, fmt.Errorf("failed to transmit APDU: %w", err)
 	}
 	sw := make([]byte, 2)
@@ -198,7 +191,7 @@ func (m *MBIM) CloseLogicalChannel(channel byte) error {
 		Channel:       uint32(channel),
 		Group:         1,
 	}
-	return request.Message().Transmit(m.conn)
+	return request.Request().Transmit(m.conn)
 }
 
 // Disconnect closes the MBIM connection and releases resources

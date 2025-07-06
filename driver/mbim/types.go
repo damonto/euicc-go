@@ -4,31 +4,26 @@ import (
 	"bytes"
 	"encoding"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"net"
 	"sync"
 	"time"
 )
 
-type Payload interface {
-	encoding.BinaryMarshaler
-	encoding.BinaryUnmarshaler
-}
-
-// Message represents a standard MBIM message
-type Message struct {
+// Request represents a standard MBIM request
+type Request struct {
 	MessageType   MessageType
 	MessageLength uint32
 	TransactionID uint32
 	ReadTimeout   time.Duration // Timeout for reading response
-	Payload       Payload
+	Command       encoding.BinaryMarshaler
+	Response      encoding.BinaryUnmarshaler
 }
 
 var mutex sync.Mutex
 
-func (m *Message) WriteTo(w net.Conn) (int, error) {
-	data, err := m.MarshalBinary()
+func (r *Request) WriteTo(w net.Conn) (int, error) {
+	data, err := r.MarshalBinary()
 	if err != nil {
 		return 0, fmt.Errorf("failed to marshal message: %w", err)
 	}
@@ -41,73 +36,60 @@ func (m *Message) WriteTo(w net.Conn) (int, error) {
 	return n, nil
 }
 
-func (m *Message) ReadFrom(r net.Conn) (int, error) {
-	sourceTransactionID := m.TransactionID
-	sourceMessageType := m.MessageType
-	if m.ReadTimeout == 0 {
-		m.ReadTimeout = 30 * time.Second // Default timeout if not set
+func (r *Request) ReadFrom(c net.Conn) (int, error) {
+	if r.ReadTimeout == 0 {
+		r.ReadTimeout = 30 * time.Second // Default timeout if not set
 	}
-	deadline := time.Now().Add(m.ReadTimeout)
+	deadline := time.Now().Add(r.ReadTimeout)
 	for time.Now().Before(deadline) {
 		buf := make([]byte, 4096)
-		r.SetReadDeadline(time.Now().Add(1 * time.Second))
-		n, err := r.Read(buf)
+		c.SetReadDeadline(time.Now().Add(1 * time.Second))
+		n, err := c.Read(buf)
 		if err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
 				continue // Timeout, try again
 			}
 			return 0, err
 		}
-		if err := m.UnmarshalBinary(buf[:n]); err != nil {
-			if sourceMessageType != m.MessageType&^0x80000000 {
+		response := CommandResponse{Response: r.Response}
+		if err := response.UnmarshalBinary(buf[:n]); err != nil {
+			if r.MessageType != response.MessageType&^0x80000000 {
 				continue // Ignore messages from other sources
 			}
 			return 0, err
 		}
-		if m.TransactionID != sourceTransactionID {
+		if r.TransactionID != response.TransactionID {
 			continue
 		}
 		return n, nil
 	}
-	return 0, fmt.Errorf("transaction ID %d not found in response", sourceTransactionID)
+	return 0, fmt.Errorf("transaction ID %d not found in response", r.TransactionID)
 }
 
 // Transmit sends the MBIM message and waits for a response
-func (m *Message) Transmit(conn net.Conn) error {
-	if _, err := m.WriteTo(conn); err != nil {
+func (r *Request) Transmit(conn net.Conn) error {
+	if _, err := r.WriteTo(conn); err != nil {
 		return fmt.Errorf("failed to write message: %w", err)
 	}
-	if _, err := m.ReadFrom(conn); err != nil {
+	if _, err := r.ReadFrom(conn); err != nil {
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 	return nil
 }
 
-// UnmarshalBinary parses a binary MBIM message
-func (m *Message) UnmarshalBinary(data []byte) error {
-	if len(data) < 12 {
-		return errors.New("message too short for MBIM header")
-	}
-	buf := bytes.NewReader(data)
-	binary.Read(buf, binary.LittleEndian, &m.MessageType)
-	binary.Read(buf, binary.LittleEndian, &m.MessageLength)
-	binary.Read(buf, binary.LittleEndian, &m.TransactionID)
-	return m.Payload.UnmarshalBinary(data)
-}
-
 // MarshalBinary creates binary representation of the MBIM message
-func (m *Message) MarshalBinary() ([]byte, error) {
-	payload, err := m.Payload.MarshalBinary()
+func (r *Request) MarshalBinary() ([]byte, error) {
+	command, err := r.Command.MarshalBinary()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
-	m.MessageLength = uint32(12 + len(payload))
+	r.MessageLength = uint32(12 + len(command))
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, m.MessageType)
-	binary.Write(buf, binary.LittleEndian, m.MessageLength)
-	binary.Write(buf, binary.LittleEndian, m.TransactionID)
-	if len(payload) > 0 {
-		buf.Write(payload)
+	binary.Write(buf, binary.LittleEndian, r.MessageType)
+	binary.Write(buf, binary.LittleEndian, r.MessageLength)
+	binary.Write(buf, binary.LittleEndian, r.TransactionID)
+	if len(command) > 0 {
+		buf.Write(command)
 	}
 	return buf.Bytes(), nil
 }
@@ -121,7 +103,6 @@ type Command struct {
 	CommandType     uint32 // 0=Query, 1=Set
 	DataLength      uint32
 	Data            []byte
-	Response        encoding.BinaryUnmarshaler
 }
 
 // MarshalBinary creates binary representation of the MBIM command
@@ -140,16 +121,8 @@ func (c *Command) MarshalBinary() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// UnmarshalBinary parses binary data into MBIM command
-func (c *Command) UnmarshalBinary(data []byte) error {
-	response := CommandDoneResponse{
-		Response: c.Response,
-	}
-	return response.UnmarshalBinary(data)
-}
-
-// CommandDoneResponse represents the response to a command
-type CommandDoneResponse struct {
+// CommandResponse represents the response to a command
+type CommandResponse struct {
 	MessageType     MessageType
 	MessageLength   uint32
 	TransactionID   uint32
@@ -163,19 +136,19 @@ type CommandDoneResponse struct {
 	Response        encoding.BinaryUnmarshaler
 }
 
-// UnmarshalBinary parses binary data into MBIM command done response
-func (r *CommandDoneResponse) UnmarshalBinary(data []byte) error {
-	if len(data) < 36 {
-		return errors.New("command done response data too short")
-	}
+// UnmarshalBinary parses binary data into MBIM command response
+func (r *CommandResponse) UnmarshalBinary(data []byte) error {
 	buf := bytes.NewReader(data)
 	binary.Read(buf, binary.LittleEndian, &r.MessageType)
 	binary.Read(buf, binary.LittleEndian, &r.MessageLength)
 	binary.Read(buf, binary.LittleEndian, &r.TransactionID)
-	binary.Read(buf, binary.LittleEndian, &r.FragmentTotal)
-	binary.Read(buf, binary.LittleEndian, &r.FragmentCurrent)
-	binary.Read(buf, binary.LittleEndian, &r.ServiceID)
-	binary.Read(buf, binary.LittleEndian, &r.CommandID)
+	// If the message length is larger than 16, it contains the fragment and service information (command-done, indicate, etc.)
+	if r.MessageLength > 16 {
+		binary.Read(buf, binary.LittleEndian, &r.FragmentTotal)
+		binary.Read(buf, binary.LittleEndian, &r.FragmentCurrent)
+		binary.Read(buf, binary.LittleEndian, &r.ServiceID)
+		binary.Read(buf, binary.LittleEndian, &r.CommandID)
+	}
 	binary.Read(buf, binary.LittleEndian, &r.Status)
 	if r.Status != MBIMStatusNone {
 		return r.Status

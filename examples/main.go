@@ -51,14 +51,14 @@ func main() {
 	// 	return
 	// }
 
-	// ps, err := client.ListProfile(nil, nil)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
-	// for _, p := range ps {
-	// 	fmt.Println(p.ProfileName, p.ICCID)
-	// }
+	ps, err := client.ListProfile(nil, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	for _, p := range ps {
+		fmt.Println(p.ProfileName, p.ICCID)
+	}
 
 	eid, _ := client.EID()
 	fmt.Println(eid)
