@@ -23,7 +23,7 @@ func main() {
 	// if err != nil {
 	// 	panic(err)
 	// }
-	client, err := lpa.New(&lpa.Option{
+	client, err := lpa.New(&lpa.Options{
 		Channel: ch,
 	})
 	if err != nil {
