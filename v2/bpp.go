@@ -30,7 +30,7 @@ func SegmentedBoundProfilePackage(bpp *bertlv.TLV) (segments [][]byte, err error
 		case n < 16777216:
 			buf.Write([]byte{0x83, byte(n >> 16), byte(n >> 8), byte(n)})
 		default:
-			buf.Write([]byte{0x84, byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)})
+			panic(fmt.Sprintf("TLV too large: %d exceeds 3-byte length limit (3 bytes max)", n))
 		}
 		return buf.Bytes()
 	}

@@ -17,7 +17,7 @@ func marshalLength(n uint32) []byte {
 	case n < 16777216:
 		return []byte{0x83, byte(n >> 16), byte(n >> 8), byte(n)}
 	}
-	return []byte{0x84, byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)}
+	panic(fmt.Sprintf("TLV too large: %d exceeds 3-byte length limit (3 bytes max)", n))
 }
 
 func readLength(r io.Reader) (value uint32, err error) {
@@ -35,10 +35,6 @@ func readLength(r io.Reader) (value uint32, err error) {
 		length = make([]byte, 3)
 		n, err = io.ReadAtLeast(r, length, 3)
 		value = uint32(length[0])<<16 | uint32(length[1])<<8 | uint32(length[2])
-	case 0x84:
-		length = make([]byte, 4)
-		n, err = io.ReadAtLeast(r, length, 4)
-		value = uint32(length[0])<<24 | uint32(length[1])<<16 | uint32(length[2])<<8 | uint32(length[3])
 	default:
 		if length[0] >= 0x80 {
 			err = errors.New("unsupported length encoding")
