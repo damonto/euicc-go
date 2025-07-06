@@ -26,7 +26,7 @@ type Client struct {
 
 // Option is the configuration for the LPA client.
 // It includes the channel for APDU communication, logger, AID, maximum APDU size (MSS), admin protocol version, and timeout.
-type Option struct {
+type Options struct {
 	// Channel is the channel for APDU communication. It is required for APDU communication.
 	Channel apdu.SmartCardChannel
 	// AID is the application identifier for the GSMA ISD-R application. It defaults to GSMA ISD-R Application AID.
@@ -41,76 +41,76 @@ type Option struct {
 	Timeout time.Duration
 }
 
-func (opt *Option) validateAdminProtocolVersion() error {
+func (opts *Options) validateAdminProtocolVersion() error {
 	// If the version starts with "v", remove it
-	if opt.AdminProtocolVersion[0] == 'v' {
-		opt.AdminProtocolVersion = opt.AdminProtocolVersion[1:]
+	if opts.AdminProtocolVersion[0] == 'v' {
+		opts.AdminProtocolVersion = opts.AdminProtocolVersion[1:]
 	}
 	// Currently only v2.x.x is supported
-	if opt.AdminProtocolVersion[0] != '2' {
-		return fmt.Errorf("unsupported admin protocol version: %s", opt.AdminProtocolVersion)
+	if opts.AdminProtocolVersion[0] != '2' {
+		return fmt.Errorf("unsupported admin protocol version: %s", opts.AdminProtocolVersion)
 	}
 	return nil
 }
 
-func (opt *Option) validateMSS() error {
-	if opt.MSS < 0 || opt.MSS > 254 {
-		return fmt.Errorf("invalid maximum APDU size: %d", opt.MSS)
+func (opts *Options) validateMSS() error {
+	if opts.MSS < 0 || opts.MSS > 254 {
+		return fmt.Errorf("invalid maximum APDU size: %d", opts.MSS)
 	}
 	return nil
 }
 
-func (opt *Option) validate() error {
-	if err := opt.validateMSS(); err != nil {
+func (opts *Options) validate() error {
+	if err := opts.validateMSS(); err != nil {
 		return err
 	}
-	if err := opt.validateAdminProtocolVersion(); err != nil {
+	if err := opts.validateAdminProtocolVersion(); err != nil {
 		return err
 	}
-	if opt.Channel == nil {
+	if opts.Channel == nil {
 		return errors.New("channel is required for APDU communication")
 	}
 	return nil
 }
 
-func (opt *Option) setDefaults() {
-	if opt.AID == nil {
-		opt.AID = GSMAISDRApplicationAID
+func (opts *Options) setDefaults() {
+	if opts.AID == nil {
+		opts.AID = GSMAISDRApplicationAID
 	}
-	if opt.MSS == 0 {
-		opt.MSS = 254
+	if opts.MSS == 0 {
+		opts.MSS = 254
 	}
-	if opt.AdminProtocolVersion == "" {
-		opt.AdminProtocolVersion = "2.5.0"
+	if opts.AdminProtocolVersion == "" {
+		opts.AdminProtocolVersion = "2.5.0"
 	}
-	if opt.Timeout == 0 {
-		opt.Timeout = 30 * time.Second
+	if opts.Timeout == 0 {
+		opts.Timeout = 30 * time.Second
 	}
-	if opt.Logger == nil {
-		opt.Logger = slog.Default()
+	if opts.Logger == nil {
+		opts.Logger = slog.Default()
 	}
 }
 
 // Normalize normalizes the options by setting default values and validating them.
-func (opt *Option) Normalize() error {
-	opt.setDefaults()
-	return opt.validate()
+func (opts *Options) Normalize() error {
+	opts.setDefaults()
+	return opts.validate()
 }
 
 // New creates a new LPA client with the given options.
-func New(opt *Option) (*Client, error) {
+func New(opts *Options) (*Client, error) {
 	var c Client
 	var err error
-	if err := opt.Normalize(); err != nil {
+	if err := opts.Normalize(); err != nil {
 		return nil, err
 	}
-	if c.transmitter, err = driver.NewTransmitter(opt.Logger, opt.Channel, opt.AID, opt.MSS); err != nil {
+	if c.transmitter, err = driver.NewTransmitter(opts.Logger, opts.Channel, opts.AID, opts.MSS); err != nil {
 		return nil, err
 	}
 	c.APDU = c.transmitter
 	c.HTTP = &http.Client{
-		Client:        driver.NewHTTPClient(opt.Logger, opt.Timeout),
-		AdminProtocol: fmt.Sprintf("gsma/rsp/v%s", opt.AdminProtocolVersion),
+		Client:        driver.NewHTTPClient(opts.Logger, opts.Timeout),
+		AdminProtocol: fmt.Sprintf("gsma/rsp/v%s", opts.AdminProtocolVersion),
 	}
 	return &c, nil
 }
