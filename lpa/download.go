@@ -98,6 +98,7 @@ type DownloadOptions struct {
 	OnEnterConfirmationCode func() string
 }
 
+// DownloadProfile downloads a profile using the provided activation code and options.
 func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, opts *DownloadOptions) (*sgp22.LoadBoundProfilePackageResponse, error) {
 	if opts != nil && opts.OnProgress != nil {
 		opts.OnProgress(DownloadStageAuthenticateClient)
