@@ -32,13 +32,13 @@ func (r *ProxyConfigRequest) Message() *Message {
 
 	r.Response = new(ProxyConfigResponse)
 	return &Message{
-		Type:          MessageTypeCommand,
+		MessageType:   MessageTypeCommand,
 		TransactionID: r.TransactionID,
 		Payload: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
-			Service:         ServiceMbimProxyControl,
-			CID:             CIDProxyControlConfiguration,
+			ServiceID:       ServiceMbimProxyControl,
+			CommandID:       CIDProxyControlConfiguration,
 			CommandType:     CommandTypeSet,
 			Data:            buf.Bytes(),
 			Response:        r.Response,
@@ -80,7 +80,7 @@ func (r *OpenDeviceRequest) Message() *Message {
 		MaxControlTransfer: 4096,
 	}
 	return &Message{
-		Type:          MessageTypeOpen,
+		MessageType:   MessageTypeOpen,
 		TransactionID: r.TransactionID,
 		Payload:       r.Payload,
 	}
@@ -126,13 +126,13 @@ func (r *DeviceSlotMappingsRequest) Message() *Message {
 		commandType = CommandTypeSet
 	}
 	return &Message{
-		Type:          MessageTypeCommand,
+		MessageType:   MessageTypeCommand,
 		TransactionID: r.TransactionID,
 		Payload: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
-			Service:         ServiceMsBasicConnectExtensions,
-			CID:             CIDDeviceSlotMappings,
+			ServiceID:       ServiceMsBasicConnectExtensions,
+			CommandID:       CIDDeviceSlotMappings,
 			CommandType:     uint32(commandType),
 			Data:            buf.Bytes(),
 			Response:        r.Response,
@@ -181,14 +181,14 @@ type SubscriberReadyStatusRequest struct {
 func (r *SubscriberReadyStatusRequest) Message() *Message {
 	r.Response = new(SubscriberReadyStatusResponse)
 	return &Message{
-		Type:          MessageTypeCommand,
+		MessageType:   MessageTypeCommand,
 		TransactionID: r.TransactionID,
 		ReadTimeout:   1 * time.Second,
 		Payload: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
-			Service:         ServiceBasicConnect,
-			CID:             CIDSubscriberReadyStatus,
+			ServiceID:       ServiceBasicConnect,
+			CommandID:       CIDSubscriberReadyStatus,
 			CommandType:     CommandTypeQuery,
 			Data:            []byte{},
 			Response:        r.Response,
@@ -229,13 +229,13 @@ func (r *OpenLogicalChannelRequest) Message() *Message {
 	buf.Write(r.AppId)
 	r.Response = new(OpenLogicalChannelResponse)
 	return &Message{
-		Type:          MessageTypeCommand,
+		MessageType:   MessageTypeCommand,
 		TransactionID: r.TransactionID,
 		Payload: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
-			Service:         ServiceMsUiccLowLevelAccess,
-			CID:             CIDUiccOpenChannel,
+			ServiceID:       ServiceMsUiccLowLevelAccess,
+			CommandID:       CIDUiccOpenChannel,
 			CommandType:     CommandTypeSet,
 			Data:            buf.Bytes(),
 			Response:        r.Response,
@@ -277,13 +277,13 @@ func (r *CloseLogicalChannelRequest) Message() *Message {
 	binary.Write(buf, binary.LittleEndian, r.Group)
 	r.Response = new(CloseLogicalChannelResponse)
 	return &Message{
-		Type:          MessageTypeCommand,
+		MessageType:   MessageTypeCommand,
 		TransactionID: r.TransactionID,
 		Payload: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
-			Service:         ServiceMsUiccLowLevelAccess,
-			CID:             CIDUiccCloseChannel,
+			ServiceID:       ServiceMsUiccLowLevelAccess,
+			CommandID:       CIDUiccCloseChannel,
 			CommandType:     CommandTypeSet,
 			Data:            buf.Bytes(),
 			Response:        r.Response,
@@ -322,13 +322,13 @@ func (r *TransmitAPDURequest) Message() *Message {
 	buf.Write(r.APDU)
 	r.Response = new(TransmitAPDUResponse)
 	return &Message{
-		Type:          MessageTypeCommand,
+		MessageType:   MessageTypeCommand,
 		TransactionID: r.TransactionID,
 		Payload: &Command{
 			FragmentTotal:   1,
 			FragmentCurrent: 0,
-			Service:         ServiceMsUiccLowLevelAccess,
-			CID:             CIDUiccAPDU,
+			ServiceID:       ServiceMsUiccLowLevelAccess,
+			CommandID:       CIDUiccAPDU,
 			CommandType:     CommandTypeSet,
 			Data:            buf.Bytes(),
 			Response:        r.Response,

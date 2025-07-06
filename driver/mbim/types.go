@@ -18,8 +18,8 @@ type Payload interface {
 
 // Message represents a standard MBIM message
 type Message struct {
-	Type          MessageType
-	Length        uint32
+	MessageType   MessageType
+	MessageLength uint32
 	TransactionID uint32
 	ReadTimeout   time.Duration // Timeout for reading response
 	Payload       Payload
@@ -43,7 +43,7 @@ func (m *Message) WriteTo(w net.Conn) (int, error) {
 
 func (m *Message) ReadFrom(r net.Conn) (int, error) {
 	sourceTransactionID := m.TransactionID
-	sourceType := m.Type
+	sourceMessageType := m.MessageType
 	if m.ReadTimeout == 0 {
 		m.ReadTimeout = 30 * time.Second // Default timeout if not set
 	}
@@ -59,7 +59,7 @@ func (m *Message) ReadFrom(r net.Conn) (int, error) {
 			return 0, err
 		}
 		if err := m.UnmarshalBinary(buf[:n]); err != nil {
-			if sourceType != m.Type&^0x80000000 {
+			if sourceMessageType != m.MessageType&^0x80000000 {
 				continue // Ignore messages from other sources
 			}
 			return 0, err
@@ -72,6 +72,7 @@ func (m *Message) ReadFrom(r net.Conn) (int, error) {
 	return 0, fmt.Errorf("transaction ID %d not found in response", sourceTransactionID)
 }
 
+// Transmit sends the MBIM message and waits for a response
 func (m *Message) Transmit(conn net.Conn) error {
 	if _, err := m.WriteTo(conn); err != nil {
 		return fmt.Errorf("failed to write message: %w", err)
@@ -88,15 +89,10 @@ func (m *Message) UnmarshalBinary(data []byte) error {
 		return errors.New("message too short for MBIM header")
 	}
 	buf := bytes.NewReader(data)
-	binary.Read(buf, binary.LittleEndian, &m.Type)
-	binary.Read(buf, binary.LittleEndian, &m.Length)
-	// The Length field includes the 12-byte header, so payload = Length - 12
-	if m.Length < 12 {
-		return fmt.Errorf("invalid message length: %d (must be at least 12 for header)", m.Length)
-	}
-	// Parse Transaction ID
+	binary.Read(buf, binary.LittleEndian, &m.MessageType)
+	binary.Read(buf, binary.LittleEndian, &m.MessageLength)
 	binary.Read(buf, binary.LittleEndian, &m.TransactionID)
-	return m.Payload.UnmarshalBinary(data[12 : 12+int(m.Length)-12])
+	return m.Payload.UnmarshalBinary(data)
 }
 
 // MarshalBinary creates binary representation of the MBIM message
@@ -105,10 +101,10 @@ func (m *Message) MarshalBinary() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
-	m.Length = uint32(12 + len(payload))
+	m.MessageLength = uint32(12 + len(payload))
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, m.Type)
-	binary.Write(buf, binary.LittleEndian, m.Length)
+	binary.Write(buf, binary.LittleEndian, m.MessageType)
+	binary.Write(buf, binary.LittleEndian, m.MessageLength)
 	binary.Write(buf, binary.LittleEndian, m.TransactionID)
 	if len(payload) > 0 {
 		buf.Write(payload)
@@ -120,8 +116,8 @@ func (m *Message) MarshalBinary() ([]byte, error) {
 type Command struct {
 	FragmentTotal   uint32
 	FragmentCurrent uint32
-	Service         [16]byte
-	CID             uint32
+	ServiceID       [16]byte
+	CommandID       uint32
 	CommandType     uint32 // 0=Query, 1=Set
 	DataLength      uint32
 	Data            []byte
@@ -134,8 +130,8 @@ func (c *Command) MarshalBinary() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, c.FragmentTotal)
 	binary.Write(buf, binary.LittleEndian, c.FragmentCurrent)
-	binary.Write(buf, binary.LittleEndian, c.Service)
-	binary.Write(buf, binary.LittleEndian, c.CID)
+	binary.Write(buf, binary.LittleEndian, c.ServiceID)
+	binary.Write(buf, binary.LittleEndian, c.CommandID)
 	binary.Write(buf, binary.LittleEndian, c.CommandType)
 	binary.Write(buf, binary.LittleEndian, c.DataLength)
 	if len(c.Data) > 0 {
@@ -154,14 +150,16 @@ func (c *Command) UnmarshalBinary(data []byte) error {
 
 // CommandDoneResponse represents the response to a command
 type CommandDoneResponse struct {
-	Type            MessageType
-	Length          uint32
+	MessageType     MessageType
+	MessageLength   uint32
 	TransactionID   uint32
 	FragmentTotal   uint32
 	FragmentCurrent uint32
-	Service         [16]byte
-	CID             uint32
+	ServiceID       [16]byte
+	CommandID       uint32
 	Status          MBIMStatus
+	ResponseLength  uint32
+	ResponseBuffer  []byte
 	Response        encoding.BinaryUnmarshaler
 }
 
@@ -170,22 +168,20 @@ func (r *CommandDoneResponse) UnmarshalBinary(data []byte) error {
 	if len(data) < 36 {
 		return errors.New("command done response data too short")
 	}
-
 	buf := bytes.NewReader(data)
-	binary.Read(buf, binary.LittleEndian, &r.Type)
-	binary.Read(buf, binary.LittleEndian, &r.Length)
+	binary.Read(buf, binary.LittleEndian, &r.MessageType)
+	binary.Read(buf, binary.LittleEndian, &r.MessageLength)
 	binary.Read(buf, binary.LittleEndian, &r.TransactionID)
 	binary.Read(buf, binary.LittleEndian, &r.FragmentTotal)
 	binary.Read(buf, binary.LittleEndian, &r.FragmentCurrent)
-	binary.Read(buf, binary.LittleEndian, &r.Service)
-	binary.Read(buf, binary.LittleEndian, &r.CID)
-
-	if r.Status = MBIMStatus(binary.LittleEndian.Uint32(data[28:32])); r.Status != MBIMStatusNone {
+	binary.Read(buf, binary.LittleEndian, &r.ServiceID)
+	binary.Read(buf, binary.LittleEndian, &r.CommandID)
+	binary.Read(buf, binary.LittleEndian, &r.Status)
+	if r.Status != MBIMStatusNone {
 		return r.Status
 	}
-	valueLen := binary.LittleEndian.Uint32(data[32:36])
-	if int(36+valueLen) > len(data) {
-		return errors.New("basic response buffer too short")
-	}
-	return r.Response.UnmarshalBinary(data[36 : 36+valueLen])
+	binary.Read(buf, binary.LittleEndian, &r.ResponseLength)
+	r.ResponseBuffer = make([]byte, r.ResponseLength)
+	binary.Read(buf, binary.LittleEndian, &r.ResponseBuffer)
+	return r.Response.UnmarshalBinary(r.ResponseBuffer)
 }

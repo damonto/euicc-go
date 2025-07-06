@@ -4,21 +4,21 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/damonto/euicc-go/driver/qmi"
+	"github.com/damonto/euicc-go/driver/mbim"
 	"github.com/damonto/euicc-go/lpa"
 )
 
 func main() {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
-	// ch, err := mbim.New("/dev/cdc-wdm0", 1)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	ch, err := qmi.New("/dev/cdc-wdm1", 1)
+	ch, err := mbim.New("/dev/cdc-wdm0", 1)
 	if err != nil {
 		panic(err)
 	}
+	// ch, err := qmi.New("/dev/cdc-wdm1", 1)
+	// if err != nil {
+	// 	panic(err)
+	// }
 	// ch, err := at.New("/dev/ttyUSB7")
 	// if err != nil {
 	// 	panic(err)
