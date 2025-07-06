@@ -58,7 +58,7 @@ func (r *Request) ReadFrom(c net.Conn) (int, error) {
 			}
 			return 0, err
 		}
-		if r.TransactionID != response.TransactionID {
+		if r.MessageType != response.MessageType&^0x80000000 && r.TransactionID != response.TransactionID {
 			continue
 		}
 		return n, nil
