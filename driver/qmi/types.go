@@ -41,11 +41,7 @@ type QMUXHeader struct {
 	ClientID     uint8
 }
 
-type TransactionID interface {
-	uint8 | uint16
-}
-
-type Header[T TransactionID] struct {
+type Header[T uint8 | uint16] struct {
 	MessageType   MessageType
 	TransactionID T
 	MessageID     MessageID
