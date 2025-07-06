@@ -93,7 +93,7 @@ func (sp *SerialPort) Read(p []byte) (int, error) {
 		return 0, fmt.Errorf("ReadFile failed: %w", err)
 	}
 
-	s, _ := windows.WaitForSingleObject(sp.readEvent, 3000) // increase timeout
+	s, _ := windows.WaitForSingleObject(sp.readEvent, 5000) // increase timeout
 	switch s {
 	case uint32(windows.WAIT_OBJECT_0):
 		err = windows.GetOverlappedResult(sp.handle, &overlapped, &bytesRead, false)
@@ -117,7 +117,7 @@ func (sp *SerialPort) Write(p []byte) (int, error) {
 		return 0, fmt.Errorf("WriteFile failed: %w", err)
 	}
 
-	s, _ := windows.WaitForSingleObject(sp.writeEvent, 3000)
+	s, _ := windows.WaitForSingleObject(sp.writeEvent, 5000)
 	switch s {
 	case uint32(windows.WAIT_OBJECT_0):
 		err = windows.GetOverlappedResult(sp.handle, &overlapped, &bytesWritten, false)
