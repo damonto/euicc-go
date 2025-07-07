@@ -5,6 +5,7 @@ import (
 	"encoding"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -42,26 +43,34 @@ func (r *Request) ReadFrom(c net.Conn) (int, error) {
 	}
 	deadline := time.Now().Add(r.ReadTimeout)
 	for time.Now().Before(deadline) {
-		buf := make([]byte, 4096)
 		c.SetReadDeadline(time.Now().Add(1 * time.Second))
-		n, err := c.Read(buf)
-		if err != nil {
+
+		header := make([]byte, 12)
+		if _, err := io.ReadAtLeast(c, header, 12); err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
-				continue // Timeout, try again
+				continue
 			}
+			return 0, fmt.Errorf("failed to read header: %w", err)
+		}
+
+		length := binary.LittleEndian.Uint32(header[4:8])
+		buf := make([]byte, length)
+		copy(buf[:12], header)
+		if _, err := io.ReadFull(c, buf[12:]); err != nil {
 			return 0, err
 		}
-		response := CommandResponse{Response: r.Response}
-		if err := response.UnmarshalBinary(buf[:n]); err != nil {
-			if r.MessageType != response.MessageType&^0x80000000 {
-				continue // Ignore messages from other sources
-			}
-			return 0, err
-		}
-		if r.MessageType != response.MessageType&^0x80000000 && r.TransactionID != response.TransactionID {
+
+		messageType := binary.LittleEndian.Uint32(header[0:4])
+		transactionID := binary.LittleEndian.Uint32(header[8:12])
+		if messageType&^0x80000000 != uint32(r.MessageType) || transactionID != r.TransactionID {
 			continue
 		}
-		return n, nil
+
+		response := CommandResponse{Response: r.Response}
+		if err := response.UnmarshalBinary(buf); err != nil {
+			return 0, err
+		}
+		return len(buf), nil
 	}
 	return 0, fmt.Errorf("transaction ID %d not found in response", r.TransactionID)
 }

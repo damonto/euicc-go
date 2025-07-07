@@ -129,21 +129,29 @@ func (r *Request) WriteTo(w net.Conn) (int, error) {
 func (r *Request) ReadFrom(c net.Conn) (int, error) {
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		buf := make([]byte, 4096)
 		c.SetReadDeadline(time.Now().Add(1 * time.Second))
-		if _, err := c.Read(buf); err != nil {
+
+		header := make([]byte, 3)
+		if _, err := io.ReadAtLeast(c, header, 3); err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
 				continue // Timeout, try again
 			}
 			return 0, fmt.Errorf("failed to read from connection: %w", err)
 		}
-		n := int(binary.LittleEndian.Uint16(buf[1:3])) + 1
+
+		length := int(binary.LittleEndian.Uint16(header[1:3])) + 1
+		buf := make([]byte, length)
+		copy(buf[:3], header)
+		if _, err := io.ReadFull(c, buf[3:]); err != nil {
+			return 0, err
+		}
+
 		var response Response
-		if err := response.UnmarshalBinary(buf[:n]); err != nil {
+		if err := response.UnmarshalBinary(buf[:length]); err != nil {
 			return 0, fmt.Errorf("failed to unmarshal message: %w", err)
 		}
 		if r.ClientID != response.ClientID && response.TransactionID != r.TransactionID {
-			continue // Not the expected transaction ID, keep waiting
+			continue
 		}
 		if err := response.Error(); err != nil {
 			return 0, err
@@ -151,7 +159,7 @@ func (r *Request) ReadFrom(c net.Conn) (int, error) {
 		if err := r.Response.UnmarshalResponse(response.TLVs); err != nil {
 			return 0, fmt.Errorf("failed to unmarshal response TLVs: %w", err)
 		}
-		return n, nil
+		return length, nil
 	}
 	return 0, fmt.Errorf("timed out waiting for response for transaction ID %d", r.TransactionID)
 }
