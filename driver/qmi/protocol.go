@@ -30,7 +30,7 @@ func (r *InternalOpenResponse) UnmarshalResponse(TLVs map[uint8]TLV) error { ret
 
 // endregion
 
-// region Allocate/Release Client ID Requests
+// region Allocate Client ID Requests
 
 type AllocateClientIDRequest struct {
 	TransactionID uint16
