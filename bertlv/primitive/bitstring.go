@@ -30,7 +30,7 @@ func UnmarshalBitString(bits *[]bool) encoding.BinaryUnmarshaler {
 		data = data[1:]
 		flags := make([]bool, bitLength)
 		var x byte
-		for i := 0; i < bitLength; i++ {
+		for i := range bitLength {
 			x = 7 - byte(i%8)
 			flags[i] = data[i/8]>>x&0b1 == 0b1
 		}
