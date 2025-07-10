@@ -108,16 +108,12 @@ func (r *Request) UnmarshalBinary() ([]byte, error) {
 	return requestBuf.Bytes(), nil
 }
 
-var mutex sync.Mutex
-
 // WriteTo writes the Request to the provided connection
 func (r *Request) WriteTo(w net.Conn) (int, error) {
 	data, err := r.UnmarshalBinary()
 	if err != nil {
 		return 0, fmt.Errorf("failed to marshal request: %w", err)
 	}
-	mutex.Lock()
-	defer mutex.Unlock()
 	n, err := w.Write(data)
 	if err != nil {
 		return 0, fmt.Errorf("failed to write request: %w", err)
@@ -164,8 +160,12 @@ func (r *Request) ReadFrom(c net.Conn) (int, error) {
 	return 0, fmt.Errorf("timed out waiting for response for transaction ID %d", r.TransactionID)
 }
 
+var mutex sync.Mutex
+
 // Transmit sends the request and waits for the response
 func (r *Request) Transmit(c net.Conn) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	if _, err := r.WriteTo(c); err != nil {
 		return fmt.Errorf("failed to write request: %w", err)
 	}

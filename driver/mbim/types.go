@@ -21,15 +21,11 @@ type Request struct {
 	Response      encoding.BinaryUnmarshaler
 }
 
-var mutex sync.Mutex
-
 func (r *Request) WriteTo(w net.Conn) (int, error) {
 	data, err := r.MarshalBinary()
 	if err != nil {
 		return 0, fmt.Errorf("failed to marshal message: %w", err)
 	}
-	mutex.Lock()
-	defer mutex.Unlock()
 	n, err := w.Write(data)
 	if err != nil {
 		return n, fmt.Errorf("failed to write message: %w", err)
@@ -75,8 +71,12 @@ func (r *Request) ReadFrom(c net.Conn) (int, error) {
 	return 0, fmt.Errorf("transaction ID %d not found in response", r.TransactionID)
 }
 
+var mutex sync.Mutex
+
 // Transmit sends the MBIM message and waits for a response
 func (r *Request) Transmit(conn net.Conn) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	if _, err := r.WriteTo(conn); err != nil {
 		return fmt.Errorf("failed to write message: %w", err)
 	}
