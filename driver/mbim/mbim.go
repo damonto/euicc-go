@@ -152,10 +152,10 @@ func (m *MBIM) openDevice() error {
 }
 
 // OpenLogicalChannel opens a logical channel for the specified Application ID
-func (m *MBIM) OpenLogicalChannel(aid []byte) (byte, error) {
+func (m *MBIM) OpenLogicalChannel(AID []byte) (byte, error) {
 	request := OpenLogicalChannelRequest{
 		TransactionID: atomic.AddUint32(&m.txnID, 1),
-		AppId:         aid,
+		AppId:         AID,
 		SelectP2Arg:   0,
 		Group:         1,
 	}

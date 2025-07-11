@@ -78,7 +78,7 @@ func (r *Request) UnmarshalBinary() ([]byte, error) {
 	}
 	value := toBuffer(r.TLVs)
 	headerBuf := new(bytes.Buffer)
-	if r.ServiceType == QMIServiceCtl {
+	if r.ServiceType == QMIServiceControl {
 		binary.Write(headerBuf, binary.LittleEndian, Header[uint8]{
 			MessageType:   QMIMessageTypeRequest,
 			TransactionID: uint8(r.TransactionID),
@@ -199,7 +199,7 @@ func (r *Response) UnmarshalBinary(data []byte) error {
 	binary.Read(reader, binary.LittleEndian, &r.MessageType)
 	// Read transaction ID
 	switch r.QMUXHeader.ServiceType {
-	case QMIServiceCtl:
+	case QMIServiceControl:
 		var txnID uint8
 		binary.Read(reader, binary.LittleEndian, &txnID)
 		r.TransactionID = uint16(txnID)
@@ -229,7 +229,6 @@ func (r *Response) toTVLs(reader io.Reader) error {
 
 		var n uint16
 		binary.Read(reader, binary.LittleEndian, &n)
-
 		v := make([]byte, n)
 		if _, err := io.ReadFull(reader, v); err != nil {
 			return err

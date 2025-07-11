@@ -108,13 +108,13 @@ func (q *QMI) releaseClientID() error {
 }
 
 // OpenLogicalChannel opens a logical channel with the specified AID
-func (q *QMI) OpenLogicalChannel(aid []byte) (byte, error) {
+func (q *QMI) OpenLogicalChannel(AID []byte) (byte, error) {
 	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
 	request := OpenLogicalChannelRequest{
 		ClientID:      q.cid,
 		TransactionID: txnID,
 		Slot:          q.slot,
-		AID:           aid,
+		AID:           AID,
 	}
 	if err := request.Request().Transmit(q.conn); err != nil {
 		return 0, fmt.Errorf("failed to send open logical channel request: %w", err)

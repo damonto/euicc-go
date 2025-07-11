@@ -6,8 +6,8 @@ import "fmt"
 type ServiceType uint8
 
 const (
-	QMIServiceCtl ServiceType = 0x00 // Control service
-	QMIServiceUIM ServiceType = 0x0B // User Identity Module service
+	QMIServiceControl ServiceType = 0x00 // Control service
+	QMIServiceUIM     ServiceType = 0x0B // UIM service
 )
 
 // MessageType represents QMI message types

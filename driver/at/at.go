@@ -81,7 +81,7 @@ func (a *AT) Connect() error {
 	return err
 }
 
-func (a *AT) OpenLogicalChannel(aid []byte) (byte, error) {
+func (a *AT) OpenLogicalChannel(AID []byte) (byte, error) {
 	channel, err := a.Transmit([]byte{0x00, 0x70, 0x00, 0x00, 0x01})
 	if err != nil {
 		return 0, err
@@ -90,7 +90,7 @@ func (a *AT) OpenLogicalChannel(aid []byte) (byte, error) {
 		return 0, fmt.Errorf("failed to open logical channel: %X", channel)
 	}
 	a.channel = channel[0]
-	sw, err := a.Transmit(append([]byte{a.channel, 0xA4, 0x04, 0x00, byte(len(aid))}, aid...))
+	sw, err := a.Transmit(append([]byte{a.channel, 0xA4, 0x04, 0x00, byte(len(AID))}, AID...))
 	if err != nil {
 		return 0, err
 	}

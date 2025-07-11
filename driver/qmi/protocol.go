@@ -15,7 +15,7 @@ func (r *InternalOpenRequest) Request() *Request {
 	request := Request{
 		TransactionID: r.TransactionID,
 		MessageID:     QMICtlInternalProxyOpen,
-		ServiceType:   QMIServiceCtl,
+		ServiceType:   QMIServiceControl,
 		TLVs: []TLV{
 			{Type: 0x01, Len: uint16(len(r.DevicePath)), Value: r.DevicePath},
 		},
@@ -42,7 +42,7 @@ func (r *AllocateClientIDRequest) Request() *Request {
 	request := Request{
 		TransactionID: r.TransactionID,
 		MessageID:     QMICtlCmdAllocateClientID,
-		ServiceType:   QMIServiceCtl,
+		ServiceType:   QMIServiceControl,
 		TLVs: []TLV{
 			{Type: 0x01, Len: 1, Value: []byte{byte(QMIServiceUIM)}},
 		},
@@ -78,7 +78,7 @@ func (r *ReleaseClientIDRequest) Request() *Request {
 	request := Request{
 		TransactionID: r.TransactionID,
 		MessageID:     QMICtlCmdReleaseClientID,
-		ServiceType:   QMIServiceCtl,
+		ServiceType:   QMIServiceControl,
 		TLVs: []TLV{
 			{Type: 0x01, Len: 2, Value: []byte{byte(QMIServiceUIM), r.ClientID}},
 		},
