@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -42,9 +41,7 @@ func Open(port string) (io.ReadWriteCloser, error) {
 	dcb.StopBits = windows.ONESTOPBIT
 	dcb.Flags = dcb.Flags | 0x00000001 // fBinary = 1
 	dcb.Flags &^= 0x00000002           // fParity = 0
-	// dcb.Flags |= 0x00000010         // fDtrControl = DTR_CONTROL_ENABLE (bit 4)
-	// Use DTR_CONTROL_HANDSHAKE or disable it if you control it manually
-	dcb.Flags &^= (1 << 4) | (1 << 5) // Clear DTR and RTS control bits before setting
+	dcb.Flags &^= (1 << 4) | (1 << 5)  // Clear DTR and RTS control bits before setting
 
 	if err := windows.SetCommState(handle, &dcb); err != nil {
 		windows.CloseHandle(handle)
@@ -56,7 +53,6 @@ func Open(port string) (io.ReadWriteCloser, error) {
 		windows.CloseHandle(handle)
 		return nil, fmt.Errorf("SetDTR failed: %w", err)
 	}
-
 	// Set timeouts
 	timeouts := windows.CommTimeouts{
 		ReadIntervalTimeout:         50,
@@ -136,8 +132,6 @@ func (sp *SerialPort) Close() error {
 	if err := windows.EscapeCommFunction(sp.handle, windows.CLRDTR); err != nil {
 		return err
 	}
-	// Give the modem a moment to process the DTR change
-	time.Sleep(100 * time.Millisecond)
 	// Cancel any pending I/O operations
 	if err := windows.CancelIoEx(sp.handle, nil); err != nil {
 		return err
