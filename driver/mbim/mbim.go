@@ -12,6 +12,7 @@ import (
 	"github.com/damonto/euicc-go/apdu"
 )
 
+// MBIM implements the apdu.SmartCardChannel interface using MBIM protocol
 type MBIM struct {
 	device  string
 	slot    uint8
