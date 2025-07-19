@@ -3,6 +3,7 @@ package sgp22
 import (
 	"errors"
 	"net/url"
+	"strings"
 
 	"github.com/damonto/euicc-go/bertlv"
 )
@@ -50,6 +51,8 @@ type HTTPResponse interface {
 
 func InvokeHTTP[I HTTPRequest[O], O HTTPResponse](client HTTPClient, address *url.URL, request I) (O, error) {
 	response := request.RemoteResponse()
+	// workaround: Orange PL notification address contains space in the host.
+	address.Host = strings.ReplaceAll(address.Host, " ", "")
 	if err := client.SendRequest(request.URL(address), request, response); err != nil {
 		return response, err
 	}
