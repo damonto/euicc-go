@@ -65,9 +65,8 @@ func (q *QMI) Connect() error {
 
 // openProxyConnection sends a request to the qmi-proxy to open a connection
 func (q *QMI) openProxyConnection() error {
-	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
 	request := &InternalOpenRequest{
-		TransactionID: txnID,
+		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
 		DevicePath:    []byte(q.device),
 	}
 	return request.Request().Transmit(q.conn)
@@ -75,9 +74,8 @@ func (q *QMI) openProxyConnection() error {
 
 // allocateClientID sends a request to allocate a client ID for UIM service
 func (q *QMI) allocateClientID() error {
-	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
 	request := AllocateClientIDRequest{
-		TransactionID: txnID,
+		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
 	}
 	if err := request.Request().Transmit(q.conn); err != nil {
 		return fmt.Errorf("failed to send allocate client ID request: %w", err)
@@ -96,10 +94,9 @@ func (q *QMI) Disconnect() error {
 
 // releaseClientID sends a request to release the allocated client ID
 func (q *QMI) releaseClientID() error {
-	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
 	request := ReleaseClientIDRequest{
 		ClientID:      q.cid,
-		TransactionID: txnID,
+		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
 	}
 	if err := request.Request().Transmit(q.conn); err != nil {
 		return fmt.Errorf("failed to send release client ID request: %w", err)
@@ -109,10 +106,9 @@ func (q *QMI) releaseClientID() error {
 
 // OpenLogicalChannel opens a logical channel with the specified AID
 func (q *QMI) OpenLogicalChannel(AID []byte) (byte, error) {
-	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
 	request := OpenLogicalChannelRequest{
 		ClientID:      q.cid,
-		TransactionID: txnID,
+		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
 		Slot:          q.slot,
 		AID:           AID,
 	}
@@ -125,10 +121,9 @@ func (q *QMI) OpenLogicalChannel(AID []byte) (byte, error) {
 
 // CloseLogicalChannel closes the specified logical channel
 func (q *QMI) CloseLogicalChannel(channel byte) error {
-	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
 	request := CloseLogicalChannelRequest{
 		ClientID:      q.cid,
-		TransactionID: txnID,
+		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
 		Channel:       channel,
 		Slot:          q.slot,
 	}
@@ -137,10 +132,9 @@ func (q *QMI) CloseLogicalChannel(channel byte) error {
 
 // Transmit sends an APDU command (basic channel implementation)
 func (q *QMI) Transmit(command []byte) ([]byte, error) {
-	txnID := uint16(atomic.AddUint32(&q.txnID, 1))
 	request := TransmitAPDURequest{
 		ClientID:      q.cid,
-		TransactionID: txnID,
+		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
 		Slot:          q.slot,
 		Channel:       q.channel,
 		Command:       command,
