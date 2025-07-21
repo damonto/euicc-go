@@ -1,7 +1,5 @@
 package qmi
 
-import "fmt"
-
 // ServiceType represents QMI service types
 type ServiceType uint8
 
@@ -47,15 +45,3 @@ const (
 	QMIResultSuccess QMIResult = 0x0000 // Success
 	QMIResultFailure QMIResult = 0x0001 // Failure
 )
-
-// String returns a human-readable description of the QMI result
-func (r QMIResult) String() string {
-	switch r {
-	case QMIResultSuccess:
-		return "Success"
-	case QMIResultFailure:
-		return "Failure"
-	default:
-		return fmt.Sprintf("Unknown result %d", uint16(r))
-	}
-}

@@ -21,15 +21,10 @@ func (t *TLV) Error() error {
 	if len(t.Value) < 4 {
 		return fmt.Errorf("result TLV too short, expected 4 bytes, got %d", len(t.Value))
 	}
-	result := binary.LittleEndian.Uint16(t.Value[0:2])
-	if result == uint16(QMIResultSuccess) {
-		return nil // No error, success case
+	if binary.LittleEndian.Uint16(t.Value[0:2]) == uint16(QMIResultSuccess) {
+		return nil
 	}
-	errorCode := binary.LittleEndian.Uint16(t.Value[2:4])
-	return QMIError{
-		Result:    QMIResult(result),
-		ErrorCode: QMIProtocolError(errorCode),
-	}
+	return QMIError(binary.LittleEndian.Uint16(t.Value[2:4]))
 }
 
 // QMUXHeader represents the header of a QMUX PDU
