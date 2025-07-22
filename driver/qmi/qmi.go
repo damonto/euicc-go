@@ -38,12 +38,10 @@ func (q *QMI) connectToProxy() error {
 	if err != nil {
 		return fmt.Errorf("failed to create socket: %w", err)
 	}
-
 	if err := syscall.Connect(fd, &syscall.SockaddrUnix{Name: "\x00qmi-proxy"}); err != nil {
 		syscall.Close(fd)
 		return fmt.Errorf("failed to connect to qmi-proxy: %w", err)
 	}
-
 	file := os.NewFile(uintptr(fd), "euicc-go-qmi-proxy")
 	q.conn, err = net.FileConn(file)
 	if err != nil {
