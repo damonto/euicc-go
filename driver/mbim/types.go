@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -71,12 +70,8 @@ func (r *Request) ReadFrom(c net.Conn) (int, error) {
 	return 0, fmt.Errorf("transaction ID %d not found in response", r.TransactionID)
 }
 
-var mutex sync.Mutex
-
 // Transmit sends the MBIM message and waits for a response
 func (r *Request) Transmit(conn net.Conn) error {
-	mutex.Lock()
-	defer mutex.Unlock()
 	if _, err := r.WriteTo(conn); err != nil {
 		return fmt.Errorf("failed to write message: %w", err)
 	}

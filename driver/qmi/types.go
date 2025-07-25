@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -155,12 +154,8 @@ func (r *Request) ReadFrom(c net.Conn) (int, error) {
 	return 0, fmt.Errorf("timed out waiting for response for transaction ID %d", r.TransactionID)
 }
 
-var mutex sync.Mutex
-
 // Transmit sends the request and waits for the response
 func (r *Request) Transmit(c net.Conn) error {
-	mutex.Lock()
-	defer mutex.Unlock()
 	if _, err := r.WriteTo(c); err != nil {
 		return fmt.Errorf("failed to write request: %w", err)
 	}
