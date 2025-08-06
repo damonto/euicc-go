@@ -65,6 +65,7 @@ func (q *QMI) Connect() error {
 	return nil
 }
 
+// ensureSlotActivated checks if the desired slot is activated and activates it if necessary
 func (q *QMI) ensureSlotActivated() error {
 	slot, err := q.currentActivatedSlot()
 	if err != nil {
@@ -100,7 +101,7 @@ func (q *QMI) waitForSlotActivation() error {
 
 // currentActivatedSlot returns the currently active logical slot
 func (q *QMI) currentActivatedSlot() (uint8, error) {
-	request := &GetSlotStatusRequest{
+	request := GetSlotStatusRequest{
 		ClientID:      q.cid,
 		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
 	}
