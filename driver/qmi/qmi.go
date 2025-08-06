@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/damonto/euicc-go/apdu"
 )
@@ -58,12 +59,71 @@ func (q *QMI) Connect() error {
 	if err := q.allocateClientID(); err != nil {
 		return fmt.Errorf("failed to allocate client ID: %w", err)
 	}
+	if err := q.ensureSlotActivated(); err != nil {
+		return fmt.Errorf("failed to ensure slot is activated: %w", err)
+	}
 	return nil
+}
+
+func (q *QMI) ensureSlotActivated() error {
+	slot, err := q.currentActivatedSlot()
+	if err != nil {
+		return fmt.Errorf("failed to get active slot: %w", err)
+	}
+	if slot == q.slot {
+		return nil
+	}
+	if err := q.switchSlot(); err != nil {
+		return fmt.Errorf("failed to switch slot: %w", err)
+	}
+	if err := q.waitForSlotActivation(); err != nil {
+		return fmt.Errorf("failed to wait for slot activation: %w", err)
+	}
+	return nil
+}
+
+// waitForSlotActivation waits for the specified slot to be activated
+func (q *QMI) waitForSlotActivation() error {
+	for range 30 {
+		slot, err := q.currentActivatedSlot()
+		if err != nil {
+			continue
+		}
+		if slot == q.slot {
+			// Wait for a short period to ensure the slot is fully activated.
+			time.Sleep(1 * time.Second)
+			return nil
+		}
+	}
+	return fmt.Errorf("failed to activate slot %d", q.slot)
+}
+
+// currentActivatedSlot returns the currently active logical slot
+func (q *QMI) currentActivatedSlot() (uint8, error) {
+	request := &GetSlotStatusRequest{
+		ClientID:      q.cid,
+		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
+	}
+	if err := request.Request().Transmit(q.conn); err != nil {
+		return 0, fmt.Errorf("failed to send get slot status request: %w", err)
+	}
+	return request.Response.ActivatedSlot, nil
+}
+
+// switchSlot switches to the specified logical and physical slot
+func (q *QMI) switchSlot() error {
+	request := SwitchSlotRequest{
+		ClientID:      q.cid,
+		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
+		LogicalSlot:   1,
+		PhysicalSlot:  uint32(q.slot),
+	}
+	return request.Request().Transmit(q.conn)
 }
 
 // openProxyConnection sends a request to the qmi-proxy to open a connection
 func (q *QMI) openProxyConnection() error {
-	request := &InternalOpenRequest{
+	request := InternalOpenRequest{
 		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
 		DevicePath:    []byte(q.device),
 	}

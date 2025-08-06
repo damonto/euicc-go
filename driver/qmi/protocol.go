@@ -1,6 +1,12 @@
 package qmi
 
-import "fmt"
+import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"time"
+)
 
 // region Internal Open Request
 
@@ -101,6 +107,101 @@ func (r *ReleaseClientIDResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
 
 // endregion
 
+// region Switch Slot Request
+
+type SwitchSlotRequest struct {
+	ClientID      uint8
+	TransactionID uint16
+	LogicalSlot   uint8
+	PhysicalSlot  uint32
+	Response      *SwitchSlotResponse
+}
+
+func (r *SwitchSlotRequest) Request() *Request {
+	r.Response = new(SwitchSlotResponse)
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, r.PhysicalSlot)
+	request := Request{
+		ClientID:      r.ClientID,
+		TransactionID: r.TransactionID,
+		MessageID:     QMIUIMSwitchSlot,
+		ServiceType:   QMIServiceUIM,
+		TLVs: []TLV{
+			{Type: 0x01, Len: 1, Value: []byte{r.LogicalSlot}},
+			{Type: 0x02, Len: 4, Value: buf.Bytes()},
+		},
+		Response: r.Response,
+	}
+	return &request
+}
+
+type SwitchSlotResponse struct{}
+
+func (r *SwitchSlotResponse) UnmarshalResponse(TLVs map[uint8]TLV) error { return nil }
+
+// endregion
+
+// region Get Slot Status Request
+
+type GetSlotStatusRequest struct {
+	ClientID      uint8
+	TransactionID uint16
+	Response      *GetSlotStatusResponse
+}
+
+func (r *GetSlotStatusRequest) Request() *Request {
+	r.Response = new(GetSlotStatusResponse)
+	request := Request{
+		ClientID:      r.ClientID,
+		TransactionID: r.TransactionID,
+		MessageID:     QMIUIMGetSlotStatus,
+		ServiceType:   QMIServiceUIM,
+		ReadTimeout:   1 * time.Second,
+		Response:      r.Response,
+	}
+	return &request
+}
+
+type Slot struct {
+	CardStatus  QmiUimPhysicalCardState
+	SlotStatus  QmiUimSlotState
+	LogicalSlot uint8
+	ICCID       [10]byte
+}
+
+type GetSlotStatusResponse struct {
+	Slots         []Slot
+	ActivatedSlot uint8
+}
+
+func (r *GetSlotStatusResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
+	if value, ok := TLVs[0x10]; ok {
+		var slotCount uint8
+		buf := bytes.NewBuffer(value.Value)
+		binary.Read(buf, binary.LittleEndian, &slotCount)
+		r.Slots = make([]Slot, 0, slotCount)
+		for i := range slotCount {
+			var slot Slot
+			binary.Read(buf, binary.LittleEndian, &slot.CardStatus)
+			binary.Read(buf, binary.LittleEndian, &slot.SlotStatus)
+			binary.Read(buf, binary.LittleEndian, &slot.LogicalSlot)
+			var iccidLen uint8
+			binary.Read(buf, binary.LittleEndian, &iccidLen)
+			if iccidLen > 0 {
+				binary.Read(buf, binary.LittleEndian, &slot.ICCID)
+			}
+			if slot.SlotStatus == QMIUimSlotStateActive {
+				r.ActivatedSlot = uint8(i + 1)
+			}
+			r.Slots = append(r.Slots, slot)
+		}
+		return nil
+	}
+	return errors.New("could not find slot status in response")
+}
+
+// endregion
+
 // region Open Logical Channel Request
 
 type OpenLogicalChannelRequest struct {
@@ -137,7 +238,7 @@ func (r *OpenLogicalChannelResponse) UnmarshalResponse(TLVs map[uint8]TLV) error
 		r.Channel = value.Value[0]
 		return nil
 	}
-	return fmt.Errorf("could not find logical channel in response")
+	return errors.New("could not find logical channel in response")
 }
 
 // endregion
@@ -178,13 +279,13 @@ func (r *CloseLogicalChannelResponse) UnmarshalResponse(TLVs map[uint8]TLV) erro
 	if value, ok := TLVs[0x01]; ok && len(value.Value) >= 1 {
 		r.Slot = value.Value[0]
 	} else {
-		return fmt.Errorf("could not find slot in response")
+		return errors.New("could not find slot in response")
 	}
 	if value, ok := TLVs[0x11]; ok && len(value.Value) >= 1 {
 		r.Channel = value.Value[0]
 		return nil
 	}
-	return fmt.Errorf("could not find channel in response")
+	return errors.New("could not find channel in response")
 }
 
 // endregion
@@ -231,7 +332,7 @@ func (r *TransmitAPDUResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("could not find APDU response in message")
+	return errors.New("could not find APDU response in message")
 }
 
 // endregion

@@ -50,6 +50,7 @@ type Request struct {
 	ClientID      uint8
 	TransactionID uint16
 	ServiceType   ServiceType
+	ReadTimeout   time.Duration
 	MessageID     MessageID
 	TLVs          []TLV
 	Response      ResponseUnmarshaler
@@ -67,9 +68,6 @@ func toBuffer(TLVs []TLV) *bytes.Buffer {
 
 // UnmarshalBinary converts the Request into a binary representation suitable for transmission
 func (r *Request) UnmarshalBinary() ([]byte, error) {
-	if len(r.TLVs) == 0 {
-		return nil, errors.New("no TLVs to marshal")
-	}
 	value := toBuffer(r.TLVs)
 	headerBuf := new(bytes.Buffer)
 	if r.ServiceType == QMIServiceControl {
@@ -117,7 +115,10 @@ func (r *Request) WriteTo(w net.Conn) (int, error) {
 
 // ReadFrom reads a response from the connection and unmarshals it into the Request's Response field
 func (r *Request) ReadFrom(c net.Conn) (int, error) {
-	deadline := time.Now().Add(30 * time.Second)
+	if r.ReadTimeout == 0 {
+		r.ReadTimeout = 30 * time.Second
+	}
+	deadline := time.Now().Add(r.ReadTimeout)
 	for time.Now().Before(deadline) {
 		c.SetReadDeadline(time.Now().Add(1 * time.Second))
 

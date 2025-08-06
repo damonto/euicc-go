@@ -15,7 +15,7 @@ type Request struct {
 	MessageType   MessageType
 	MessageLength uint32
 	TransactionID uint32
-	ReadTimeout   time.Duration // Timeout for reading response
+	ReadTimeout   time.Duration
 	Command       encoding.BinaryMarshaler
 	Response      encoding.BinaryUnmarshaler
 }
@@ -34,7 +34,7 @@ func (r *Request) WriteTo(w net.Conn) (int, error) {
 
 func (r *Request) ReadFrom(c net.Conn) (int, error) {
 	if r.ReadTimeout == 0 {
-		r.ReadTimeout = 30 * time.Second // Default timeout if not set
+		r.ReadTimeout = 30 * time.Second
 	}
 	deadline := time.Now().Add(r.ReadTimeout)
 	for time.Now().Before(deadline) {

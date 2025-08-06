@@ -30,6 +30,8 @@ const (
 	QMIUIMSendAPDU            MessageID = 0x003B
 	QMIUIMOpenLogicalChannel  MessageID = 0x0042
 	QMIUIMCloseLogicalChannel MessageID = 0x003F
+	QMIUIMSwitchSlot          MessageID = 0x0046
+	QMIUIMGetSlotStatus       MessageID = 0x0047
 )
 
 // QMUX header constants
@@ -44,4 +46,21 @@ type QMIResult uint16
 const (
 	QMIResultSuccess QMIResult = 0x0000 // Success
 	QMIResultFailure QMIResult = 0x0001 // Failure
+)
+
+// UIM Physical Card State
+type QmiUimPhysicalCardState uint32
+
+const (
+	QMIUimPhysicalCardStateUnknown QmiUimPhysicalCardState = 0x00
+	QMIUimPhysicalCardStateAbsent  QmiUimPhysicalCardState = 0x01
+	QMIUimPhysicalCardStatePresent QmiUimPhysicalCardState = 0x02
+)
+
+// UIM Slot State
+type QmiUimSlotState uint32
+
+const (
+	QMIUimSlotStateInactive QmiUimSlotState = 0x00
+	QMIUimSlotStateActive   QmiUimSlotState = 0x01
 )
