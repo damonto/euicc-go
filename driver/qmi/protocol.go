@@ -163,8 +163,8 @@ func (r *GetSlotStatusRequest) Request() *Request {
 }
 
 type Slot struct {
-	CardStatus  QmiUimPhysicalCardState
-	SlotStatus  QmiUimSlotState
+	CardStatus  UIMPhysicalCardState
+	SlotStatus  UIMSlotState
 	LogicalSlot uint8
 	ICCID       [10]byte
 }
@@ -190,7 +190,7 @@ func (r *GetSlotStatusResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
 			if iccidLen > 0 {
 				binary.Read(buf, binary.LittleEndian, &slot.ICCID)
 			}
-			if slot.SlotStatus == QMIUimSlotStateActive {
+			if slot.SlotStatus == UIMSlotStateActive {
 				r.ActivatedSlot = uint8(i + 1)
 			}
 			r.Slots = append(r.Slots, slot)

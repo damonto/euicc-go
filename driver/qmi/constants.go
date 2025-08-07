@@ -49,18 +49,18 @@ const (
 )
 
 // UIM Physical Card State
-type QmiUimPhysicalCardState uint32
+type UIMPhysicalCardState uint32
 
 const (
-	QMIUimPhysicalCardStateUnknown QmiUimPhysicalCardState = 0x00
-	QMIUimPhysicalCardStateAbsent  QmiUimPhysicalCardState = 0x01
-	QMIUimPhysicalCardStatePresent QmiUimPhysicalCardState = 0x02
+	UIMPhysicalCardStateUnknown UIMPhysicalCardState = 0x00
+	UIMPhysicalCardStateAbsent  UIMPhysicalCardState = 0x01
+	UIMPhysicalCardStatePresent UIMPhysicalCardState = 0x02
 )
 
 // UIM Slot State
-type QmiUimSlotState uint32
+type UIMSlotState uint32
 
 const (
-	QMIUimSlotStateInactive QmiUimSlotState = 0x00
-	QMIUimSlotStateActive   QmiUimSlotState = 0x01
+	UIMSlotStateInactive UIMSlotState = 0x00
+	UIMSlotStateActive   UIMSlotState = 0x01
 )
