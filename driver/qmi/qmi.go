@@ -95,6 +95,7 @@ func (q *QMI) waitForSlotActivation() error {
 			time.Sleep(1 * time.Second)
 			return nil
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 	return fmt.Errorf("failed to activate slot %d", q.slot)
 }
