@@ -18,7 +18,7 @@ type InternalOpenRequest struct {
 
 func (r *InternalOpenRequest) Request() *Request {
 	r.Response = new(InternalOpenResponse)
-	request := Request{
+	return &Request{
 		TransactionID: r.TransactionID,
 		MessageID:     QMICtlInternalProxyOpen,
 		ServiceType:   QMIServiceControl,
@@ -27,7 +27,6 @@ func (r *InternalOpenRequest) Request() *Request {
 		},
 		Response: r.Response,
 	}
-	return &request
 }
 
 type InternalOpenResponse struct{}
@@ -45,7 +44,7 @@ type AllocateClientIDRequest struct {
 
 func (r *AllocateClientIDRequest) Request() *Request {
 	r.Response = new(AllocateClientIDResponse)
-	request := Request{
+	return &Request{
 		TransactionID: r.TransactionID,
 		MessageID:     QMICtlCmdAllocateClientID,
 		ServiceType:   QMIServiceControl,
@@ -54,7 +53,6 @@ func (r *AllocateClientIDRequest) Request() *Request {
 		},
 		Response: r.Response,
 	}
-	return &request
 }
 
 type AllocateClientIDResponse struct {
@@ -81,7 +79,7 @@ type ReleaseClientIDRequest struct {
 
 func (r *ReleaseClientIDRequest) Request() *Request {
 	r.Response = new(ReleaseClientIDResponse)
-	request := Request{
+	return &Request{
 		TransactionID: r.TransactionID,
 		MessageID:     QMICtlCmdReleaseClientID,
 		ServiceType:   QMIServiceControl,
@@ -90,7 +88,6 @@ func (r *ReleaseClientIDRequest) Request() *Request {
 		},
 		Response: r.Response,
 	}
-	return &request
 }
 
 type ReleaseClientIDResponse struct {
@@ -121,7 +118,7 @@ func (r *SwitchSlotRequest) Request() *Request {
 	r.Response = new(SwitchSlotResponse)
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, r.PhysicalSlot)
-	request := Request{
+	return &Request{
 		ClientID:      r.ClientID,
 		TransactionID: r.TransactionID,
 		MessageID:     QMIUIMSwitchSlot,
@@ -132,7 +129,6 @@ func (r *SwitchSlotRequest) Request() *Request {
 		},
 		Response: r.Response,
 	}
-	return &request
 }
 
 type SwitchSlotResponse struct{}
@@ -151,7 +147,7 @@ type GetSlotStatusRequest struct {
 
 func (r *GetSlotStatusRequest) Request() *Request {
 	r.Response = new(GetSlotStatusResponse)
-	request := Request{
+	return &Request{
 		ClientID:      r.ClientID,
 		TransactionID: r.TransactionID,
 		MessageID:     QMIUIMGetSlotStatus,
@@ -159,7 +155,6 @@ func (r *GetSlotStatusRequest) Request() *Request {
 		ReadTimeout:   1 * time.Second,
 		Response:      r.Response,
 	}
-	return &request
 }
 
 type Slot struct {
@@ -215,7 +210,7 @@ type OpenLogicalChannelRequest struct {
 func (r *OpenLogicalChannelRequest) Request() *Request {
 	value := append([]byte{byte(len(r.AID))}, r.AID...)
 	r.Response = new(OpenLogicalChannelResponse)
-	request := Request{
+	return &Request{
 		ClientID:      r.ClientID,
 		TransactionID: r.TransactionID,
 		MessageID:     QMIUIMOpenLogicalChannel,
@@ -226,7 +221,6 @@ func (r *OpenLogicalChannelRequest) Request() *Request {
 		},
 		Response: r.Response,
 	}
-	return &request
 }
 
 type OpenLogicalChannelResponse struct {
@@ -255,7 +249,7 @@ type CloseLogicalChannelRequest struct {
 
 func (r *CloseLogicalChannelRequest) Request() *Request {
 	r.Response = new(CloseLogicalChannelResponse)
-	request := Request{
+	return &Request{
 		ClientID:      r.ClientID,
 		TransactionID: r.TransactionID,
 		MessageID:     QMIUIMCloseLogicalChannel,
@@ -267,7 +261,6 @@ func (r *CloseLogicalChannelRequest) Request() *Request {
 		},
 		Response: r.Response,
 	}
-	return &request
 }
 
 type CloseLogicalChannelResponse struct {
@@ -305,7 +298,7 @@ func (r *TransmitAPDURequest) Request() *Request {
 	length := len(r.Command)
 	value := append([]byte{byte(length), byte(length >> 8)}, r.Command...)
 	r.Response = new(TransmitAPDUResponse)
-	request := Request{
+	return &Request{
 		ClientID:      r.ClientID,
 		TransactionID: r.TransactionID,
 		MessageID:     QMIUIMSendAPDU,
@@ -317,7 +310,6 @@ func (r *TransmitAPDURequest) Request() *Request {
 		},
 		Response: r.Response,
 	}
-	return &request
 }
 
 type TransmitAPDUResponse struct {
