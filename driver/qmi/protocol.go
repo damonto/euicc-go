@@ -158,8 +158,8 @@ func (r *GetSlotStatusRequest) Request() *Request {
 }
 
 type Slot struct {
-	CardStatus  UIMPhysicalCardState
-	SlotStatus  UIMSlotState
+	CardState   UIMPhysicalCardState
+	SlotState   UIMSlotState
 	LogicalSlot uint8
 	ICCID       [10]byte
 }
@@ -177,15 +177,15 @@ func (r *GetSlotStatusResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
 		r.Slots = make([]Slot, 0, slotCount)
 		for i := range slotCount {
 			var slot Slot
-			binary.Read(buf, binary.LittleEndian, &slot.CardStatus)
-			binary.Read(buf, binary.LittleEndian, &slot.SlotStatus)
+			binary.Read(buf, binary.LittleEndian, &slot.CardState)
+			binary.Read(buf, binary.LittleEndian, &slot.SlotState)
 			binary.Read(buf, binary.LittleEndian, &slot.LogicalSlot)
 			var iccidLen uint8
 			binary.Read(buf, binary.LittleEndian, &iccidLen)
 			if iccidLen > 0 {
 				binary.Read(buf, binary.LittleEndian, &slot.ICCID)
 			}
-			if slot.SlotStatus == UIMSlotStateActive {
+			if slot.SlotState == UIMSlotStateActive {
 				r.ActivatedSlot = uint8(i + 1)
 			}
 			r.Slots = append(r.Slots, slot)
@@ -193,6 +193,90 @@ func (r *GetSlotStatusResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
 		return nil
 	}
 	return errors.New("could not find slot status in response")
+}
+
+// endregion
+
+// region Get Card Status Request
+
+type GetCardStatusRequest struct {
+	ClientID      uint8
+	TransactionID uint16
+	Response      *GetCardStatusResponse
+}
+
+func (r *GetCardStatusRequest) Request() *Request {
+	r.Response = new(GetCardStatusResponse)
+	return &Request{
+		ClientID:      r.ClientID,
+		TransactionID: r.TransactionID,
+		MessageID:     QMIUIMGetCardStatus,
+		ServiceType:   QMIServiceUIM,
+		Response:      r.Response,
+	}
+}
+
+type GetCardStatusResponse struct {
+	IndexGWPrimary   uint16
+	Index1XPrimary   uint16
+	IndexGWSecondary uint16
+	Index1XSecondary uint16
+	Cards            []Card
+}
+
+type Card struct {
+	State        UIMCardState
+	Applications []Application
+}
+
+type Application struct {
+	Type  UIMCardApplicationType
+	State UIMCardApplicationState
+}
+
+func (r *GetCardStatusResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
+	if value, ok := TLVs[0x10]; ok {
+		buf := bytes.NewBuffer(value.Value)
+		binary.Read(buf, binary.LittleEndian, &r.IndexGWPrimary)
+		binary.Read(buf, binary.LittleEndian, &r.Index1XPrimary)
+		binary.Read(buf, binary.LittleEndian, &r.IndexGWSecondary)
+		binary.Read(buf, binary.LittleEndian, &r.Index1XSecondary)
+
+		var cardLen uint8
+		binary.Read(buf, binary.LittleEndian, &cardLen)
+		r.Cards = make([]Card, 0, cardLen)
+		for range cardLen {
+			var card Card
+			binary.Read(buf, binary.LittleEndian, &card.State)
+			buf.Next(4)
+			var appLen uint8
+			binary.Read(buf, binary.LittleEndian, &appLen)
+			card.Applications = make([]Application, 0, appLen)
+			for range appLen {
+				var app Application
+				binary.Read(buf, binary.LittleEndian, &app.Type)
+				binary.Read(buf, binary.LittleEndian, &app.State)
+				card.Applications = append(card.Applications, app)
+				buf.Next(28)
+			}
+			r.Cards = append(r.Cards, card)
+		}
+		return nil
+	}
+	return errors.New("could not find card status in response")
+}
+
+func (r *GetCardStatusResponse) IsReady() bool {
+	for _, card := range r.Cards {
+		if card.State == UIMCardStatusPresent {
+			for _, app := range card.Applications {
+				if app.Type == UIMCardApplicationTypeUSIM && app.State == UIMCardApplicationStateReady {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // endregion

@@ -62,6 +62,9 @@ func (q *QMI) Connect() error {
 	if err := q.ensureSlotActivated(); err != nil {
 		return fmt.Errorf("failed to ensure slot is activated: %w", err)
 	}
+	// In QMI mode, we need to keep the SIM slot set to 1, because once the
+	// configured slot becomes active, it will be assigned as slot 1.
+	q.slot = 1
 	return nil
 }
 
@@ -91,13 +94,31 @@ func (q *QMI) waitForSlotActivation() error {
 			continue
 		}
 		if slot == q.slot {
-			// Wait for a short period to ensure the slot is fully activated.
-			time.Sleep(1 * time.Second)
-			return nil
+			for range 30 {
+				ready, err := q.isReady()
+				if err != nil {
+					return err
+				}
+				if ready {
+					return nil
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 	return fmt.Errorf("failed to activate slot %d", q.slot)
+}
+
+func (q *QMI) isReady() (bool, error) {
+	request := GetCardStatusRequest{
+		ClientID:      q.cid,
+		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
+	}
+	if err := request.Request().Transmit(q.conn); err != nil {
+		return false, fmt.Errorf("failed to send get card status request: %w", err)
+	}
+	return request.Response.IsReady(), nil
 }
 
 // currentActivatedSlot returns the currently active logical slot
