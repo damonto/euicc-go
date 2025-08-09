@@ -88,7 +88,7 @@ func (q *QMI) ensureSlotActivated() error {
 
 // waitForSlotActivation waits for the specified slot to be activated
 func (q *QMI) waitForSlotActivation() error {
-	for range 30 {
+	for range 10 {
 		ready, err := q.isReady()
 		if err != nil {
 			return err
@@ -96,7 +96,7 @@ func (q *QMI) waitForSlotActivation() error {
 		if ready {
 			return nil
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 	return fmt.Errorf("failed to activate slot %d", q.slot)
 }

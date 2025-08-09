@@ -118,7 +118,7 @@ func (m *MBIM) activateSlot(slot uint8) error {
 
 // waitForSlotActivation waits for the slot to become active by checking subscriber ready status
 func (m *MBIM) waitForSlotActivation() error {
-	for range 30 {
+	for range 10 {
 		request := SubscriberReadyStatusRequest{
 			TransactionID: atomic.AddUint32(&m.txnID, 1),
 		}
@@ -129,7 +129,7 @@ func (m *MBIM) waitForSlotActivation() error {
 		if readyState == MBIMSubscriberReadyStateInitialized || readyState == MBIMSubscriberReadyStateNoEsimProfile {
 			return nil
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 	return fmt.Errorf("sim did not become available after slot %d activation", m.slot)
 }
