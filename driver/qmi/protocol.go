@@ -350,23 +350,9 @@ func (r *CloseLogicalChannelRequest) Request() *Request {
 	}
 }
 
-type CloseLogicalChannelResponse struct {
-	Slot    byte
-	Channel byte
-}
+type CloseLogicalChannelResponse struct{}
 
-func (r *CloseLogicalChannelResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
-	if value, ok := TLVs[0x01]; ok && len(value.Value) >= 1 {
-		r.Slot = value.Value[0]
-	} else {
-		return errors.New("could not find slot in response")
-	}
-	if value, ok := TLVs[0x11]; ok && len(value.Value) >= 1 {
-		r.Channel = value.Value[0]
-		return nil
-	}
-	return errors.New("could not find channel in response")
-}
+func (r *CloseLogicalChannelResponse) UnmarshalResponse(TLVs map[uint8]TLV) error { return nil }
 
 // endregion
 
