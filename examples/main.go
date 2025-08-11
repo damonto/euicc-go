@@ -106,7 +106,7 @@ func testListNotifications(client *lpa.Client) {
 		panic(err)
 	}
 	for _, notification := range notifications {
-		fmt.Printf("Sequence: %d, ICCID: %s, Operation: %s\n",
+		fmt.Printf("Sequence: %d, ICCID: %s, Operation: %d\n",
 			notification.SequenceNumber, notification.ICCID, notification.ProfileManagementOperation)
 	}
 }
