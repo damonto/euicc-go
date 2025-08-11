@@ -248,7 +248,9 @@ func (r *GetCardStatusResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
 		for range cardLen {
 			var card Card
 			binary.Read(buf, binary.LittleEndian, &card.State)
+
 			buf.Next(4)
+
 			var appLen uint8
 			binary.Read(buf, binary.LittleEndian, &appLen)
 			card.Applications = make([]Application, 0, appLen)
@@ -257,6 +259,7 @@ func (r *GetCardStatusResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
 				binary.Read(buf, binary.LittleEndian, &app.Type)
 				binary.Read(buf, binary.LittleEndian, &app.State)
 				card.Applications = append(card.Applications, app)
+
 				buf.Next(28)
 			}
 			r.Cards = append(r.Cards, card)

@@ -29,7 +29,7 @@ func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 		slot:   slot,
 	}
 	if err := q.connectToProxy(); err != nil {
-		return nil, fmt.Errorf("failed to connect to qmi-proxy: %w", err)
+		return nil, err
 	}
 	return q, nil
 }
@@ -44,8 +44,7 @@ func (q *QMI) connectToProxy() error {
 		syscall.Close(fd)
 		return fmt.Errorf("failed to connect to qmi-proxy: %w", err)
 	}
-	file := os.NewFile(uintptr(fd), "euicc-go-qmi-proxy")
-	q.conn, err = net.FileConn(file)
+	q.conn, err = net.FileConn(os.NewFile(uintptr(fd), "euicc-go-qmi-proxy"))
 	if err != nil {
 		return fmt.Errorf("failed to create net.Conn: %w", err)
 	}

@@ -104,11 +104,11 @@ func (r *Request) UnmarshalBinary() ([]byte, error) {
 func (r *Request) WriteTo(w net.Conn) (int, error) {
 	data, err := r.UnmarshalBinary()
 	if err != nil {
-		return 0, fmt.Errorf("failed to marshal request: %w", err)
+		return 0, err
 	}
 	n, err := w.Write(data)
 	if err != nil {
-		return 0, fmt.Errorf("failed to write request: %w", err)
+		return 0, err
 	}
 	return n, nil
 }
