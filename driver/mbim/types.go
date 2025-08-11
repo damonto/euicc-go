@@ -23,11 +23,11 @@ type Request struct {
 func (r *Request) WriteTo(w net.Conn) (int, error) {
 	data, err := r.MarshalBinary()
 	if err != nil {
-		return 0, fmt.Errorf("failed to marshal message: %w", err)
+		return 0, err
 	}
 	n, err := w.Write(data)
 	if err != nil {
-		return n, fmt.Errorf("failed to write message: %w", err)
+		return n, err
 	}
 	return n, nil
 }
@@ -45,7 +45,7 @@ func (r *Request) ReadFrom(c net.Conn) (int, error) {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
 				continue
 			}
-			return 0, fmt.Errorf("failed to read header: %w", err)
+			return 0, err
 		}
 
 		length := binary.LittleEndian.Uint32(header[4:8])
@@ -73,10 +73,10 @@ func (r *Request) ReadFrom(c net.Conn) (int, error) {
 // Transmit sends the MBIM message and waits for a response
 func (r *Request) Transmit(conn net.Conn) error {
 	if _, err := r.WriteTo(conn); err != nil {
-		return fmt.Errorf("failed to write message: %w", err)
+		return err
 	}
 	if _, err := r.ReadFrom(conn); err != nil {
-		return fmt.Errorf("failed to read response: %w", err)
+		return err
 	}
 	return nil
 }
@@ -85,7 +85,7 @@ func (r *Request) Transmit(conn net.Conn) error {
 func (r *Request) MarshalBinary() ([]byte, error) {
 	command, err := r.Command.MarshalBinary()
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+		return nil, err
 	}
 	r.MessageLength = uint32(12 + len(command))
 	buf := new(bytes.Buffer)

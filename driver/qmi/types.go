@@ -127,7 +127,7 @@ func (r *Request) ReadFrom(c net.Conn) (int, error) {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
 				continue // Timeout, try again
 			}
-			return 0, fmt.Errorf("failed to read from connection: %w", err)
+			return 0, err
 		}
 
 		length := int(binary.LittleEndian.Uint16(header[1:3])) + 1
@@ -139,7 +139,7 @@ func (r *Request) ReadFrom(c net.Conn) (int, error) {
 
 		var response Response
 		if err := response.UnmarshalBinary(buf[:length]); err != nil {
-			return 0, fmt.Errorf("failed to unmarshal message: %w", err)
+			return 0, err
 		}
 		if r.ClientID != response.ClientID && response.TransactionID != r.TransactionID {
 			continue
@@ -148,7 +148,7 @@ func (r *Request) ReadFrom(c net.Conn) (int, error) {
 			return 0, err
 		}
 		if err := r.Response.UnmarshalResponse(response.TLVs); err != nil {
-			return 0, fmt.Errorf("failed to unmarshal response TLVs: %w", err)
+			return 0, err
 		}
 		return length, nil
 	}
@@ -158,10 +158,10 @@ func (r *Request) ReadFrom(c net.Conn) (int, error) {
 // Transmit sends the request and waits for the response
 func (r *Request) Transmit(c net.Conn) error {
 	if _, err := r.WriteTo(c); err != nil {
-		return fmt.Errorf("failed to write request: %w", err)
+		return err
 	}
 	if _, err := r.ReadFrom(c); err != nil {
-		return fmt.Errorf("failed to read response: %w", err)
+		return err
 	}
 	return nil
 }

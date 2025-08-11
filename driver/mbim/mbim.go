@@ -3,6 +3,7 @@ package mbim
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"sync/atomic"
@@ -141,7 +142,11 @@ func (m *MBIM) configureProxy() error {
 		DevicePath:    m.device,
 		Timeout:       30,
 	}
-	return request.Request().Transmit(m.conn)
+	err := request.Request().Transmit(m.conn)
+	if err == io.EOF {
+		return fmt.Errorf("device %s is not connected", m.device)
+	}
+	return err
 }
 
 // openDevice sends MBIM Open message to establish connection

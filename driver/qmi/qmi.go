@@ -2,6 +2,7 @@ package qmi
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"sync/atomic"
@@ -141,7 +142,11 @@ func (q *QMI) openProxyConnection() error {
 		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
 		DevicePath:    []byte(q.device),
 	}
-	return request.Request().Transmit(q.conn)
+	err := request.Request().Transmit(q.conn)
+	if err == io.EOF {
+		return fmt.Errorf("device %s is not connected", q.device)
+	}
+	return err
 }
 
 // allocateClientID sends a request to allocate a client ID for UIM service
