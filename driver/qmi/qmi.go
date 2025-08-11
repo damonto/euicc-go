@@ -73,44 +73,35 @@ func (q *QMI) Connect() error {
 func (q *QMI) ensureSlotActivated() error {
 	slot, err := q.currentActivatedSlot()
 	if err != nil {
-		return fmt.Errorf("failed to get active slot: %w", err)
+		return err
 	}
 	if slot == q.slot {
 		return nil
 	}
 	if err := q.switchSlot(); err != nil {
-		return fmt.Errorf("failed to switch slot: %w", err)
+		return err
 	}
-	if err := q.waitForSlotActivation(); err != nil {
-		return fmt.Errorf("failed to wait for slot activation: %w", err)
-	}
-	return nil
+	return q.waitForSlotActivation()
 }
 
 // waitForSlotActivation waits for the specified slot to be activated
 func (q *QMI) waitForSlotActivation() error {
+	var err error
 	for range 10 {
-		ready, err := q.isReady()
-		if err != nil {
-			return err
+		request := GetCardStatusRequest{
+			ClientID:      q.cid,
+			TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
 		}
-		if ready {
+		err = request.Request().Transmit(q.conn)
+		if err != nil {
+			continue
+		}
+		if request.Response.IsReady() {
 			return nil
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	return fmt.Errorf("failed to activate slot %d", q.slot)
-}
-
-func (q *QMI) isReady() (bool, error) {
-	request := GetCardStatusRequest{
-		ClientID:      q.cid,
-		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
-	}
-	if err := request.Request().Transmit(q.conn); err != nil {
-		return false, fmt.Errorf("failed to send get card status request: %w", err)
-	}
-	return request.Response.IsReady(), nil
+	return fmt.Errorf("sim did not become available after slot %d activation err: %w", q.slot, err)
 }
 
 // currentActivatedSlot returns the currently active logical slot
@@ -120,7 +111,7 @@ func (q *QMI) currentActivatedSlot() (uint8, error) {
 		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
 	}
 	if err := request.Request().Transmit(q.conn); err != nil {
-		return 0, fmt.Errorf("failed to send get slot status request: %w", err)
+		return 0, err
 	}
 	return request.Response.ActivatedSlot, nil
 }
@@ -154,8 +145,12 @@ func (q *QMI) allocateClientID() error {
 	request := AllocateClientIDRequest{
 		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
 	}
-	if err := request.Request().Transmit(q.conn); err != nil {
-		return fmt.Errorf("failed to send allocate client ID request: %w", err)
+	err := request.Request().Transmit(q.conn)
+	if err == io.EOF {
+		return fmt.Errorf("device %s doesn't support QMI protocol", q.device)
+	}
+	if err != nil {
+		return err
 	}
 	q.cid = request.Response.ClientID
 	return nil
@@ -164,7 +159,7 @@ func (q *QMI) allocateClientID() error {
 // Disconnect releases the client ID and closes the connection
 func (q *QMI) Disconnect() error {
 	if err := q.releaseClientID(); err != nil {
-		return fmt.Errorf("failed to release client ID: %w", err)
+		return err
 	}
 	return q.conn.Close()
 }
@@ -176,7 +171,7 @@ func (q *QMI) releaseClientID() error {
 		TransactionID: uint16(atomic.AddUint32(&q.txnID, 1)),
 	}
 	if err := request.Request().Transmit(q.conn); err != nil {
-		return fmt.Errorf("failed to send release client ID request: %w", err)
+		return err
 	}
 	return nil
 }
@@ -190,7 +185,7 @@ func (q *QMI) OpenLogicalChannel(AID []byte) (byte, error) {
 		AID:           AID,
 	}
 	if err := request.Request().Transmit(q.conn); err != nil {
-		return 0, fmt.Errorf("failed to send open logical channel request: %w", err)
+		return 0, err
 	}
 	q.channel = request.Response.Channel
 	return q.channel, nil
@@ -217,7 +212,7 @@ func (q *QMI) Transmit(command []byte) ([]byte, error) {
 		Command:       command,
 	}
 	if err := request.Request().Transmit(q.conn); err != nil {
-		return nil, fmt.Errorf("failed to send transmit APDU request: %w", err)
+		return nil, err
 	}
 	return request.Response.Response, nil
 }

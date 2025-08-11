@@ -73,18 +73,15 @@ func (m *MBIM) Connect() error {
 func (m *MBIM) ensureSlotActivated() error {
 	slot, err := m.currentActivatedSlot()
 	if err != nil {
-		return fmt.Errorf("failed to get current active slot: %w", err)
+		return err
 	}
 	if slot == m.slot {
 		return nil
 	}
 	if err := m.activateSlot(m.slot); err != nil {
-		return fmt.Errorf("failed to activate slot %d: %w", m.slot, err)
+		return err
 	}
-	if err := m.waitForSlotActivation(); err != nil {
-		return fmt.Errorf("failed to wait for slot activation: %w", err)
-	}
-	return nil
+	return m.waitForSlotActivation()
 }
 
 // currentActivatedSlot queries the current active slot mapping
@@ -94,7 +91,7 @@ func (m *MBIM) currentActivatedSlot() (uint8, error) {
 		MapCount:      0, // Query operation
 	}
 	if err := request.Request().Transmit(m.conn); err != nil {
-		return 0, fmt.Errorf("failed to query slot mappings: %w", err)
+		return 0, err
 	}
 	if len(request.Response.SlotMappings) == 0 {
 		return 0, fmt.Errorf("no slot mappings found")
@@ -112,18 +109,20 @@ func (m *MBIM) activateSlot(slot uint8) error {
 		},
 	}
 	if err := request.Request().Transmit(m.conn); err != nil {
-		return fmt.Errorf("failed to set slot mapping: %w", err)
+		return err
 	}
 	return nil
 }
 
 // waitForSlotActivation waits for the slot to become active by checking subscriber ready status
 func (m *MBIM) waitForSlotActivation() error {
+	var err error
 	for range 10 {
 		request := SubscriberReadyStatusRequest{
 			TransactionID: atomic.AddUint32(&m.txnID, 1),
 		}
-		if err := request.Request().Transmit(m.conn); err != nil {
+		err = request.Request().Transmit(m.conn)
+		if err != nil {
 			continue // Ignore errors, retry
 		}
 		readyState := request.Response.ReadyState
@@ -132,7 +131,7 @@ func (m *MBIM) waitForSlotActivation() error {
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	return fmt.Errorf("sim did not become available after slot %d activation", m.slot)
+	return fmt.Errorf("sim did not become available after slot %d activation err: %w", m.slot, err)
 }
 
 // configureProxy sends proxy configuration request with device path using the libmbim proxy protocol
@@ -166,7 +165,7 @@ func (m *MBIM) OpenLogicalChannel(AID []byte) (byte, error) {
 		Group:         1,
 	}
 	if err := request.Request().Transmit(m.conn); err != nil {
-		return 0, fmt.Errorf("failed to open logical channel: %w", err)
+		return 0, err
 	}
 	m.channel = request.Response.Channel
 	return byte(m.channel), nil
@@ -182,7 +181,7 @@ func (m *MBIM) Transmit(command []byte) ([]byte, error) {
 		APDU:            command,
 	}
 	if err := request.Request().Transmit(m.conn); err != nil {
-		return nil, fmt.Errorf("failed to transmit APDU: %w", err)
+		return nil, err
 	}
 	sw := make([]byte, 2)
 	binary.LittleEndian.PutUint16(sw, uint16(request.Response.Status&0xFFFF))
