@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/damonto/euicc-go/http/rootci"
@@ -33,6 +34,8 @@ func (l *LoggingRoundTripper) RoundTrip(request *http.Request) (*http.Response, 
 	if err != nil {
 		return nil, err
 	}
+	// workaround: Orange PL notification address contains space in the host.
+	request.URL.Host = strings.ReplaceAll(request.URL.Host, " ", "")
 	request.Body = io.NopCloser(bytes.NewBuffer(body))
 	l.logger.Debug("[HTTP] sending request to", "url", request.URL.String(), "body", string(body))
 	response, err := l.transport.RoundTrip(request)
