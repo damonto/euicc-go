@@ -1,6 +1,7 @@
 package qmi
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -72,6 +73,10 @@ func (q *QMI) Connect() error {
 func (q *QMI) ensureSlotActivated() error {
 	slot, err := q.currentActivatedSlot()
 	if err != nil {
+		// Some older devices do not support the GetSlotStatusRequest QMI command
+		if errors.Is(err, QMIErrorNotSupported) {
+			return nil
+		}
 		return err
 	}
 	if slot == q.slot {
