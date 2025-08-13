@@ -95,7 +95,7 @@ func (q *QMI) waitForSlotActivation() error {
 		if err != nil {
 			continue
 		}
-		if request.Response.IsReady() {
+		if request.Response.Ready() {
 			return nil
 		}
 		time.Sleep(500 * time.Millisecond)

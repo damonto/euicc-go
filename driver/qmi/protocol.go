@@ -269,7 +269,7 @@ func (r *GetCardStatusResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
 	return errors.New("could not find card status in response")
 }
 
-func (r *GetCardStatusResponse) IsReady() bool {
+func (r *GetCardStatusResponse) Ready() bool {
 	for _, card := range r.Cards {
 		if card.State == UIMCardStatusPresent {
 			for _, app := range card.Applications {
