@@ -62,7 +62,7 @@ func (t *Transmitter) Write(command []byte) (n int, err error) {
 func (t *Transmitter) transmit(request *Request) (response Response, err error) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	request.CLA = (request.CLA & 0xF0) | (t.logicalChannel & 0x0F)
+	t.setChannelToCLA(request, t.logicalChannel)
 	if response, err = t.channel.Transmit(request.APDU()); err != nil {
 		return
 	}
@@ -70,6 +70,14 @@ func (t *Transmitter) transmit(request *Request) (response Response, err error) 
 		err = fmt.Errorf("returned an unexpected response with status %04X", response.SW())
 	}
 	return
+}
+
+func (t *Transmitter) setChannelToCLA(request *Request, channel byte) {
+	if channel < 4 {
+		request.CLA = (request.CLA & 0x9C) | channel
+	} else if channel < 20 {
+		request.CLA = (request.CLA & 0xB0) | 0x40 | (channel - 4)
+	}
 }
 
 func (t *Transmitter) readCommandResponse(w io.Writer, le byte) error {
