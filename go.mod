@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/ElMostafaIdrassi/goscard v1.0.0
-	github.com/stretchr/testify v1.11.0
+	github.com/stretchr/testify v1.11.1
 	golang.org/x/sys v0.35.0
 )
 
