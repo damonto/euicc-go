@@ -50,7 +50,7 @@ func (a *AT) run(command string) (string, error) {
 
 func (a *AT) Transmit(command []byte) ([]byte, error) {
 	cmd := fmt.Sprintf("%X", command)
-	cmd = fmt.Sprintf("AT+CSIM=%d,\"%s\"", len(cmd), cmd)
+	cmd = fmt.Sprintf("AT+CSIM=%d,%q", len(cmd), cmd)
 	r, err := a.run(cmd)
 	if err != nil {
 		return nil, err
