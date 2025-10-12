@@ -1,4 +1,4 @@
-package qmi
+package core
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ func (r *InternalOpenRequest) Request() *Request {
 		TransactionID: r.TransactionID,
 		MessageID:     QMICtlInternalProxyOpen,
 		ServiceType:   QMIServiceControl,
-		TLVs: []TLV{
+		Value: TLVs{
 			{Type: 0x01, Len: uint16(len(r.DevicePath)), Value: r.DevicePath},
 		},
 		Response: r.Response,
@@ -31,7 +31,7 @@ func (r *InternalOpenRequest) Request() *Request {
 
 type InternalOpenResponse struct{}
 
-func (r *InternalOpenResponse) UnmarshalResponse(TLVs map[uint8]TLV) error { return nil }
+func (r *InternalOpenResponse) UnmarshalResponse(TLVs *TLVs) error { return nil }
 
 // endregion
 
@@ -48,7 +48,7 @@ func (r *AllocateClientIDRequest) Request() *Request {
 		TransactionID: r.TransactionID,
 		MessageID:     QMICtlCmdAllocateClientID,
 		ServiceType:   QMIServiceControl,
-		TLVs: []TLV{
+		Value: TLVs{
 			{Type: 0x01, Len: 1, Value: []byte{byte(QMIServiceUIM)}},
 		},
 		Response: r.Response,
@@ -59,8 +59,8 @@ type AllocateClientIDResponse struct {
 	ClientID uint8
 }
 
-func (r *AllocateClientIDResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
-	if value, ok := TLVs[0x01]; ok && len(value.Value) >= 2 {
+func (r *AllocateClientIDResponse) UnmarshalResponse(TLVs *TLVs) error {
+	if value, ok := TLVs.Find(0x01); ok && len(value.Value) >= 2 {
 		r.ClientID = value.Value[1]
 		return nil
 	}
@@ -83,7 +83,7 @@ func (r *ReleaseClientIDRequest) Request() *Request {
 		TransactionID: r.TransactionID,
 		MessageID:     QMICtlCmdReleaseClientID,
 		ServiceType:   QMIServiceControl,
-		TLVs: []TLV{
+		Value: TLVs{
 			{Type: 0x01, Len: 2, Value: []byte{byte(QMIServiceUIM), r.ClientID}},
 		},
 		Response: r.Response,
@@ -94,8 +94,8 @@ type ReleaseClientIDResponse struct {
 	ClientID uint8
 }
 
-func (r *ReleaseClientIDResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
-	if value, ok := TLVs[0x01]; ok && len(value.Value) >= 2 {
+func (r *ReleaseClientIDResponse) UnmarshalResponse(TLVs *TLVs) error {
+	if value, ok := TLVs.Find(0x01); ok && len(value.Value) >= 2 {
 		r.ClientID = value.Value[1]
 		return nil
 	}
@@ -123,7 +123,7 @@ func (r *SwitchSlotRequest) Request() *Request {
 		TransactionID: r.TransactionID,
 		MessageID:     QMIUIMSwitchSlot,
 		ServiceType:   QMIServiceUIM,
-		TLVs: []TLV{
+		Value: TLVs{
 			{Type: 0x01, Len: 1, Value: []byte{r.LogicalSlot}},
 			{Type: 0x02, Len: 4, Value: buf.Bytes()},
 		},
@@ -133,7 +133,7 @@ func (r *SwitchSlotRequest) Request() *Request {
 
 type SwitchSlotResponse struct{}
 
-func (r *SwitchSlotResponse) UnmarshalResponse(TLVs map[uint8]TLV) error { return nil }
+func (r *SwitchSlotResponse) UnmarshalResponse(TLVs *TLVs) error { return nil }
 
 // endregion
 
@@ -169,30 +169,31 @@ type GetSlotStatusResponse struct {
 	ActivatedSlot uint8
 }
 
-func (r *GetSlotStatusResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
-	if value, ok := TLVs[0x10]; ok {
-		var slotCount uint8
-		buf := bytes.NewBuffer(value.Value)
-		binary.Read(buf, binary.LittleEndian, &slotCount)
-		r.Slots = make([]Slot, 0, slotCount)
-		for i := range slotCount {
-			var slot Slot
-			binary.Read(buf, binary.LittleEndian, &slot.CardState)
-			binary.Read(buf, binary.LittleEndian, &slot.SlotState)
-			binary.Read(buf, binary.LittleEndian, &slot.LogicalSlot)
-			var iccidLen uint8
-			binary.Read(buf, binary.LittleEndian, &iccidLen)
-			if iccidLen > 0 {
-				binary.Read(buf, binary.LittleEndian, &slot.ICCID)
-			}
-			if slot.SlotState == UIMSlotStateActive {
-				r.ActivatedSlot = uint8(i + 1)
-			}
-			r.Slots = append(r.Slots, slot)
-		}
-		return nil
+func (r *GetSlotStatusResponse) UnmarshalResponse(TLVs *TLVs) error {
+	value, ok := TLVs.Find(0x10)
+	if !ok {
+		return errors.New("could not find slot status in response")
 	}
-	return errors.New("could not find slot status in response")
+	var slotCount uint8
+	buf := bytes.NewBuffer(value.Value)
+	binary.Read(buf, binary.LittleEndian, &slotCount)
+	r.Slots = make([]Slot, 0, slotCount)
+	for i := range slotCount {
+		var slot Slot
+		binary.Read(buf, binary.LittleEndian, &slot.CardState)
+		binary.Read(buf, binary.LittleEndian, &slot.SlotState)
+		binary.Read(buf, binary.LittleEndian, &slot.LogicalSlot)
+		var iccidLen uint8
+		binary.Read(buf, binary.LittleEndian, &iccidLen)
+		if iccidLen > 0 {
+			binary.Read(buf, binary.LittleEndian, &slot.ICCID)
+		}
+		if slot.SlotState == UIMSlotStateActive {
+			r.ActivatedSlot = uint8(i + 1)
+		}
+		r.Slots = append(r.Slots, slot)
+	}
+	return nil
 }
 
 // endregion
@@ -234,39 +235,41 @@ type Application struct {
 	State UIMCardApplicationState
 }
 
-func (r *GetCardStatusResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
-	if value, ok := TLVs[0x10]; ok {
-		buf := bytes.NewBuffer(value.Value)
-		binary.Read(buf, binary.LittleEndian, &r.IndexGWPrimary)
-		binary.Read(buf, binary.LittleEndian, &r.Index1XPrimary)
-		binary.Read(buf, binary.LittleEndian, &r.IndexGWSecondary)
-		binary.Read(buf, binary.LittleEndian, &r.Index1XSecondary)
-
-		var cardLen uint8
-		binary.Read(buf, binary.LittleEndian, &cardLen)
-		r.Cards = make([]Card, 0, cardLen)
-		for range cardLen {
-			var card Card
-			binary.Read(buf, binary.LittleEndian, &card.State)
-
-			buf.Next(4)
-
-			var appLen uint8
-			binary.Read(buf, binary.LittleEndian, &appLen)
-			card.Applications = make([]Application, 0, appLen)
-			for range appLen {
-				var app Application
-				binary.Read(buf, binary.LittleEndian, &app.Type)
-				binary.Read(buf, binary.LittleEndian, &app.State)
-				card.Applications = append(card.Applications, app)
-
-				buf.Next(28)
-			}
-			r.Cards = append(r.Cards, card)
-		}
-		return nil
+func (r *GetCardStatusResponse) UnmarshalResponse(TLVs *TLVs) error {
+	value, ok := TLVs.Find(0x10)
+	if !ok {
+		return errors.New("could not find card status in response")
 	}
-	return errors.New("could not find card status in response")
+
+	buf := bytes.NewBuffer(value.Value)
+	binary.Read(buf, binary.LittleEndian, &r.IndexGWPrimary)
+	binary.Read(buf, binary.LittleEndian, &r.Index1XPrimary)
+	binary.Read(buf, binary.LittleEndian, &r.IndexGWSecondary)
+	binary.Read(buf, binary.LittleEndian, &r.Index1XSecondary)
+
+	var cardLen uint8
+	binary.Read(buf, binary.LittleEndian, &cardLen)
+	r.Cards = make([]Card, 0, cardLen)
+	for range cardLen {
+		var card Card
+		binary.Read(buf, binary.LittleEndian, &card.State)
+
+		buf.Next(4)
+
+		var appLen uint8
+		binary.Read(buf, binary.LittleEndian, &appLen)
+		card.Applications = make([]Application, 0, appLen)
+		for range appLen {
+			var app Application
+			binary.Read(buf, binary.LittleEndian, &app.Type)
+			binary.Read(buf, binary.LittleEndian, &app.State)
+			card.Applications = append(card.Applications, app)
+
+			buf.Next(28)
+		}
+		r.Cards = append(r.Cards, card)
+	}
+	return nil
 }
 
 func (r *GetCardStatusResponse) Ready() bool {
@@ -302,7 +305,7 @@ func (r *OpenLogicalChannelRequest) Request() *Request {
 		TransactionID: r.TransactionID,
 		MessageID:     QMIUIMOpenLogicalChannel,
 		ServiceType:   QMIServiceUIM,
-		TLVs: []TLV{
+		Value: TLVs{
 			{Type: 0x10, Len: uint16(len(value)), Value: value},
 			{Type: 0x01, Len: 1, Value: []byte{r.Slot}},
 		},
@@ -314,8 +317,8 @@ type OpenLogicalChannelResponse struct {
 	Channel byte
 }
 
-func (r *OpenLogicalChannelResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
-	if value, ok := TLVs[0x10]; ok && len(value.Value) >= 1 {
+func (r *OpenLogicalChannelResponse) UnmarshalResponse(TLVs *TLVs) error {
+	if value, ok := TLVs.Find(0x10); ok && len(value.Value) >= 1 {
 		r.Channel = value.Value[0]
 		return nil
 	}
@@ -341,7 +344,7 @@ func (r *CloseLogicalChannelRequest) Request() *Request {
 		TransactionID: r.TransactionID,
 		MessageID:     QMIUIMCloseLogicalChannel,
 		ServiceType:   QMIServiceUIM,
-		TLVs: []TLV{
+		Value: TLVs{
 			{Type: 0x01, Len: 1, Value: []byte{r.Slot}},
 			{Type: 0x11, Len: 1, Value: []byte{r.Channel}},
 			{Type: 0x13, Len: 1, Value: []byte{0x01}},
@@ -352,7 +355,7 @@ func (r *CloseLogicalChannelRequest) Request() *Request {
 
 type CloseLogicalChannelResponse struct{}
 
-func (r *CloseLogicalChannelResponse) UnmarshalResponse(TLVs map[uint8]TLV) error { return nil }
+func (r *CloseLogicalChannelResponse) UnmarshalResponse(TLVs *TLVs) error { return nil }
 
 // endregion
 
@@ -376,7 +379,7 @@ func (r *TransmitAPDURequest) Request() *Request {
 		TransactionID: r.TransactionID,
 		MessageID:     QMIUIMSendAPDU,
 		ServiceType:   QMIServiceUIM,
-		TLVs: []TLV{
+		Value: TLVs{
 			{Type: 0x10, Len: 1, Value: []byte{r.Channel}},
 			{Type: 0x02, Len: uint16(len(value)), Value: value},
 			{Type: 0x01, Len: 1, Value: []byte{r.Slot}},
@@ -389,8 +392,8 @@ type TransmitAPDUResponse struct {
 	Response []byte
 }
 
-func (r *TransmitAPDUResponse) UnmarshalResponse(TLVs map[uint8]TLV) error {
-	if value, ok := TLVs[0x10]; ok && len(value.Value) >= 2 {
+func (r *TransmitAPDUResponse) UnmarshalResponse(TLVs *TLVs) error {
+	if value, ok := TLVs.Find(0x10); ok && len(value.Value) >= 2 {
 		n := int(value.Value[0]) | (int(value.Value[1]) << 8)
 		if len(value.Value) >= 2+n {
 			r.Response = value.Value[2 : 2+n]

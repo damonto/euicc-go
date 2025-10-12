@@ -1,4 +1,4 @@
-package qmi
+package core
 
 // ServiceType represents QMI service types
 type ServiceType uint8

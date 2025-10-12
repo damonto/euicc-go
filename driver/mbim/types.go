@@ -20,19 +20,19 @@ type Request struct {
 	Response      encoding.BinaryUnmarshaler
 }
 
-func (r *Request) WriteTo(w net.Conn) (int, error) {
+func (r *Request) WriteTo(w net.Conn) (int64, error) {
 	data, err := r.MarshalBinary()
 	if err != nil {
 		return 0, err
 	}
 	n, err := w.Write(data)
 	if err != nil {
-		return n, err
+		return int64(n), err
 	}
-	return n, nil
+	return int64(n), nil
 }
 
-func (r *Request) ReadFrom(c net.Conn) (int, error) {
+func (r *Request) ReadFrom(c net.Conn) (int64, error) {
 	if r.ReadTimeout == 0 {
 		r.ReadTimeout = 30 * time.Second
 	}
@@ -65,7 +65,7 @@ func (r *Request) ReadFrom(c net.Conn) (int, error) {
 		if err := response.UnmarshalBinary(buf); err != nil {
 			return 0, err
 		}
-		return len(buf), nil
+		return int64(len(buf)), nil
 	}
 	return 0, fmt.Errorf("transaction ID %d not found in response", r.TransactionID)
 }
