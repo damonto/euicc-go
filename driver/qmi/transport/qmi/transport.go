@@ -11,6 +11,21 @@ import (
 	"github.com/damonto/euicc-go/driver/qmi/core"
 )
 
+type QMUXHeader struct {
+	IfType       uint8
+	Length       uint16
+	ControlFlags uint8
+	ServiceType  core.ServiceType
+	ClientID     uint8
+}
+
+type Header[T uint8 | uint16] struct {
+	MessageType   core.MessageType
+	TransactionID T
+	MessageID     core.MessageID
+	MessageLength uint16
+}
+
 type Transport struct {
 	conn net.Conn
 }
@@ -26,14 +41,14 @@ func (t *Transport) toBytes(r *core.Request) ([]byte, error) {
 	}
 	headerBuf := new(bytes.Buffer)
 	if r.ServiceType == core.QMIServiceControl {
-		binary.Write(headerBuf, binary.LittleEndian, core.Header[uint8]{
+		binary.Write(headerBuf, binary.LittleEndian, Header[uint8]{
 			MessageType:   core.QMIMessageTypeRequest,
 			TransactionID: uint8(r.TransactionID),
 			MessageID:     r.MessageID,
 			MessageLength: uint16(value.Len()),
 		})
 	} else {
-		binary.Write(headerBuf, binary.LittleEndian, core.Header[uint16]{
+		binary.Write(headerBuf, binary.LittleEndian, Header[uint16]{
 			MessageType:   core.QMIMessageTypeRequest,
 			TransactionID: r.TransactionID,
 			MessageID:     r.MessageID,
@@ -44,7 +59,7 @@ func (t *Transport) toBytes(r *core.Request) ([]byte, error) {
 
 	sduBytes := headerBuf.Bytes()
 	requestBuf := new(bytes.Buffer)
-	binary.Write(requestBuf, binary.LittleEndian, core.QMUXHeader{
+	binary.Write(requestBuf, binary.LittleEndian, QMUXHeader{
 		IfType:       core.QMUXHeaderIfType,
 		Length:       uint16(len(sduBytes) + 5),
 		ControlFlags: core.QMUXHeaderControlFlagRequest,

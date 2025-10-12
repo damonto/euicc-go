@@ -8,6 +8,24 @@ import (
 	"time"
 )
 
+type Request struct {
+	ClientID      uint8
+	TransactionID uint16
+	ServiceType   ServiceType
+	ReadTimeout   time.Duration
+	MessageID     MessageID
+	Value         TLVs
+	Response      ResponseUnmarshaler
+}
+
+type ResponseUnmarshaler interface {
+	UnmarshalResponse(TLVs *TLVs) error
+}
+
+type Transport interface {
+	Transmit(request *Request) error
+}
+
 // region Internal Open Request
 
 type InternalOpenRequest struct {
@@ -157,16 +175,16 @@ func (r *GetSlotStatusRequest) Request() *Request {
 	}
 }
 
+type GetSlotStatusResponse struct {
+	Slots         []Slot
+	ActivatedSlot uint8
+}
+
 type Slot struct {
 	CardState   UIMPhysicalCardState
 	SlotState   UIMSlotState
 	LogicalSlot uint8
 	ICCID       [10]byte
-}
-
-type GetSlotStatusResponse struct {
-	Slots         []Slot
-	ActivatedSlot uint8
 }
 
 func (r *GetSlotStatusResponse) UnmarshalResponse(TLVs *TLVs) error {
