@@ -36,7 +36,3 @@ type Request struct {
 type Transport interface {
 	Transmit(request *Request) error
 }
-
-func Transmit(transport Transport, request *Request) error {
-	return transport.Transmit(request)
-}

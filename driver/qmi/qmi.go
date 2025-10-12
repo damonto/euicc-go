@@ -59,7 +59,7 @@ func newQMIConn() (net.Conn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create net.Conn: %w", err)
 	}
-	return conn, err
+	return conn, nil
 }
 
 // openProxyConnection sends a request to the qmi-proxy to open a connection
@@ -68,7 +68,7 @@ func (q *QMI) openProxyConnection() error {
 		TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
 		DevicePath:    []byte(q.device),
 	}
-	err := core.Transmit(q.Transport, request.Request())
+	err := q.Transport.Transmit(request.Request())
 	if err == io.EOF {
 		return fmt.Errorf("device %s is not connected", q.device)
 	}
@@ -80,7 +80,7 @@ func (q *QMI) allocateClientID() error {
 	request := core.AllocateClientIDRequest{
 		TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
 	}
-	err := core.Transmit(q.Transport, request.Request())
+	err := q.Transport.Transmit(request.Request())
 	if err == io.EOF {
 		return fmt.Errorf("device %s doesn't support QMI protocol", q.device)
 	}
@@ -97,11 +97,7 @@ func (q *QMI) releaseClientID() error {
 		ClientID:      q.ClientID,
 		TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
 	}
-	err := core.Transmit(q.Transport, request.Request())
-	if err != nil {
-		return err
-	}
-	return nil
+	return q.Transport.Transmit(request.Request())
 }
 
 // Disconnect releases the client ID and closes the connection

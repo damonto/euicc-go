@@ -54,7 +54,7 @@ func (q *QMIClient) waitForSlotActivation() error {
 			ClientID:      q.ClientID,
 			TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
 		}
-		err = Transmit(q.Transport, request.Request())
+		err = q.Transport.Transmit(request.Request())
 		if err != nil {
 			continue
 		}
@@ -72,7 +72,7 @@ func (q *QMIClient) currentActivatedSlot() (uint8, error) {
 		ClientID:      q.ClientID,
 		TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
 	}
-	if err := Transmit(q.Transport, request.Request()); err != nil {
+	if err := q.Transport.Transmit(request.Request()); err != nil {
 		return 0, err
 	}
 	return request.Response.ActivatedSlot, nil
@@ -86,7 +86,7 @@ func (q *QMIClient) switchSlot() error {
 		LogicalSlot:   1,
 		PhysicalSlot:  uint32(q.Slot),
 	}
-	return Transmit(q.Transport, request.Request())
+	return q.Transport.Transmit(request.Request())
 }
 
 // OpenLogicalChannel opens a logical channel with the specified AID
@@ -97,7 +97,7 @@ func (q *QMIClient) OpenLogicalChannel(AID []byte) (byte, error) {
 		Slot:          q.Slot,
 		AID:           AID,
 	}
-	if err := Transmit(q.Transport, request.Request()); err != nil {
+	if err := q.Transport.Transmit(request.Request()); err != nil {
 		return 0, err
 	}
 	q.channel = request.Response.Channel
@@ -112,7 +112,7 @@ func (q *QMIClient) CloseLogicalChannel(channel byte) error {
 		Channel:       channel,
 		Slot:          q.Slot,
 	}
-	return Transmit(q.Transport, request.Request())
+	return q.Transport.Transmit(request.Request())
 }
 
 // Transmit sends an APDU command (basic channel implementation)
@@ -124,7 +124,7 @@ func (q *QMIClient) Transmit(command []byte) ([]byte, error) {
 		Channel:       q.channel,
 		Command:       command,
 	}
-	if err := Transmit(q.Transport, request.Request()); err != nil {
+	if err := q.Transport.Transmit(request.Request()); err != nil {
 		return nil, err
 	}
 	return request.Response.Response, nil
