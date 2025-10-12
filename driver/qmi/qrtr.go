@@ -225,8 +225,8 @@ func (c *QRTRConn) Close() error {
 func (c *QRTRConn) LocalAddr() net.Addr {
 	return &SockAddr{
 		Family: QRTRAddressFamily,
-		Node:   QRTRNodeBroadcast,
-		Port:   QRTRPortControl,
+		Node:   c.Service.Node,
+		Port:   c.Service.Port,
 	}
 }
 
