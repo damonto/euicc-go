@@ -11,7 +11,6 @@ import (
 
 // Response represents a complete parsed QMI message
 type Response struct {
-	ClientID      uint8
 	TransactionID uint16
 	MessageID     core.MessageID
 	MessageType   core.MessageType
