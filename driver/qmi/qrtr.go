@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"syscall"
 	"time"
 	"unsafe"
 
@@ -16,10 +15,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const (
-	// Socket family for QRTR
-	QRTRAddressFamily = 42 // AF_QIPCRTR
+var _ net.Conn = (*QRTRConn)(nil)
 
+const (
 	// QRTR node and port constants
 	QRTRNodeBroadcast = 0xffffffff
 	QRTRPortControl   = 0xfffffffe
@@ -53,7 +51,7 @@ func (s SockAddr) Network() string {
 }
 
 func (s SockAddr) String() string {
-	return fmt.Sprintf("qrtr://%d:%d/%d", QRTRAddressFamily, s.Node, s.Port)
+	return fmt.Sprintf("qrtr://%d:%d/%d", unix.AF_QIPCRTR, s.Node, s.Port)
 }
 
 // ControlPacket represents a QRTR control packet
@@ -111,7 +109,7 @@ func (c *QRTR) findUIMService() (*Service, error) {
 		c.conn.SetReadDeadline(time.Now().Add(1 * time.Second))
 		n, _, err := c.conn.RecvFrom(buf)
 		if err != nil {
-			if errors.Is(err, syscall.EAGAIN) || errors.Is(err, syscall.EWOULDBLOCK) {
+			if errors.Is(err, unix.EAGAIN) || errors.Is(err, unix.EWOULDBLOCK) {
 				continue
 			}
 			return nil, err
@@ -141,7 +139,7 @@ func (c *QRTR) sendLookupRequest() error {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, pkt)
 	_, err := c.conn.SendTo(&SockAddr{
-		Family: QRTRAddressFamily,
+		Family: unix.AF_QIPCRTR,
 		Node:   QRTRNodeBroadcast,
 		Port:   QRTRPortControl,
 	}, buf.Bytes())
@@ -154,7 +152,7 @@ type QRTRConn struct {
 }
 
 func newQRTRConn() (*QRTRConn, error) {
-	fd, err := unix.Socket(QRTRAddressFamily, unix.SOCK_DGRAM, 0)
+	fd, err := unix.Socket(unix.AF_QIPCRTR, unix.SOCK_DGRAM, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create QRTR socket: %w", err)
 	}
@@ -165,7 +163,7 @@ func (c *QRTRConn) SendTo(dest *SockAddr, data []byte) (int, error) {
 	if len(data) == 0 {
 		return 0, errors.New("data is empty")
 	}
-	n, _, errno := syscall.Syscall6(syscall.SYS_SENDTO,
+	n, _, errno := unix.Syscall6(unix.SYS_SENDTO,
 		uintptr(c.fd),
 		uintptr(unsafe.Pointer(&data[0])),
 		uintptr(len(data)),
@@ -181,7 +179,7 @@ func (c *QRTRConn) SendTo(dest *SockAddr, data []byte) (int, error) {
 func (c *QRTRConn) RecvFrom(buf []byte) (int, *SockAddr, error) {
 	var addr SockAddr
 	addrLen := uintptr(unsafe.Sizeof(addr))
-	n, _, errno := syscall.Syscall6(syscall.SYS_RECVFROM,
+	n, _, errno := unix.Syscall6(unix.SYS_RECVFROM,
 		uintptr(c.fd),
 		uintptr(unsafe.Pointer(&buf[0])),
 		uintptr(len(buf)),
@@ -212,7 +210,7 @@ func (c *QRTRConn) Read(b []byte) (int, error) {
 
 func (c *QRTRConn) Write(b []byte) (int, error) {
 	return c.SendTo(&SockAddr{
-		Family: QRTRAddressFamily,
+		Family: unix.AF_QIPCRTR,
 		Node:   c.Service.Node,
 		Port:   c.Service.Port,
 	}, b)
@@ -224,7 +222,7 @@ func (c *QRTRConn) Close() error {
 
 func (c *QRTRConn) LocalAddr() net.Addr {
 	return &SockAddr{
-		Family: QRTRAddressFamily,
+		Family: unix.AF_QIPCRTR,
 		Node:   c.Service.Node,
 		Port:   c.Service.Port,
 	}
@@ -232,7 +230,7 @@ func (c *QRTRConn) LocalAddr() net.Addr {
 
 func (c *QRTRConn) RemoteAddr() net.Addr {
 	return &SockAddr{
-		Family: QRTRAddressFamily,
+		Family: unix.AF_QIPCRTR,
 		Node:   c.Service.Node,
 		Port:   c.Service.Port,
 	}
@@ -246,27 +244,22 @@ func (c *QRTRConn) SetDeadline(t time.Time) error {
 }
 
 func (c *QRTRConn) SetReadDeadline(t time.Time) error {
-	tv := syscall.NsecToTimeval(c.toTimeDuration(t).Nanoseconds())
-	return syscall.SetsockoptTimeval(c.fd, syscall.SOL_SOCKET, syscall.SO_RCVTIMEO, &tv)
+	tv := unix.NsecToTimeval(c.toTimeDuration(t).Nanoseconds())
+	return unix.SetsockoptTimeval(c.fd, unix.SOL_SOCKET, unix.SO_RCVTIMEO, &tv)
 }
 
 func (c *QRTRConn) SetWriteDeadline(t time.Time) error {
-	tv := syscall.NsecToTimeval(c.toTimeDuration(t).Nanoseconds())
-	return syscall.SetsockoptTimeval(c.fd, syscall.SOL_SOCKET, syscall.SO_SNDTIMEO, &tv)
+	tv := unix.NsecToTimeval(c.toTimeDuration(t).Nanoseconds())
+	return unix.SetsockoptTimeval(c.fd, unix.SOL_SOCKET, unix.SO_SNDTIMEO, &tv)
 }
 
 func (c *QRTRConn) toTimeDuration(t time.Time) time.Duration {
-	now := time.Now()
 	if t.IsZero() {
-		return 0 * time.Second
+		return 0
 	}
-	if t.After(now) {
-		return t.Sub(now)
+	d := time.Until(t)
+	if d <= 0 {
+		return time.Microsecond
 	}
-	return 1 * time.Microsecond
-}
-
-// Disconnect closes the QRTR connection
-func (q *QRTRConn) Disconnect() error {
-	return unix.Close(q.fd)
+	return d
 }
