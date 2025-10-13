@@ -19,6 +19,7 @@ func main() {
 	// 	panic(err)
 	// }
 	ch, err := qmi.New("/dev/cdc-wdm0", 1)
+	// ch, err := qmi.NewQRTR(1)
 	if err != nil {
 		panic(err)
 	}
