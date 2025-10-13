@@ -45,7 +45,7 @@ func readLength(r io.Reader) (value uint32, err error) {
 		err = fmt.Errorf("expected %d bytes, got %d", len(length), n)
 	}
 	if err != nil {
-		err = fmt.Errorf("failed to read length: %w", err)
+		err = fmt.Errorf("read length: %w", err)
 	}
 	return
 }

@@ -2,6 +2,7 @@ package mbim
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -41,15 +42,15 @@ func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 func (m *MBIM) connectToProxy() error {
 	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
 	if err != nil {
-		return fmt.Errorf("failed to create socket: %w", err)
+		return fmt.Errorf("create socket: %w", err)
 	}
 	if err := syscall.Connect(fd, &syscall.SockaddrUnix{Name: "\x00mbim-proxy"}); err != nil {
 		syscall.Close(fd)
-		return fmt.Errorf("failed to connect to mbim-proxy: %w", err)
+		return fmt.Errorf("connect to mbim-proxy: %w", err)
 	}
 	m.conn, err = net.FileConn(os.NewFile(uintptr(fd), "euicc-go-mbim-proxy"))
 	if err != nil {
-		return fmt.Errorf("failed to create net.Conn: %w", err)
+		return fmt.Errorf("create net.Conn: %w", err)
 	}
 	return nil
 }
@@ -57,13 +58,13 @@ func (m *MBIM) connectToProxy() error {
 // Connect establishes MBIM session and opens device
 func (m *MBIM) Connect() error {
 	if err := m.configureProxy(); err != nil {
-		return fmt.Errorf("failed to configure proxy: %w", err)
+		return fmt.Errorf("configure proxy: %w", err)
 	}
 	if err := m.openDevice(); err != nil {
-		return fmt.Errorf("failed to open device: %w", err)
+		return fmt.Errorf("open device: %w", err)
 	}
 	if err := m.ensureSlotActivated(); err != nil {
-		return fmt.Errorf("failed to ensure slot is activated: %w", err)
+		return fmt.Errorf("ensure slot is activated: %w", err)
 	}
 	return nil
 }
@@ -93,7 +94,7 @@ func (m *MBIM) currentActivatedSlot() (uint8, error) {
 		return 0, err
 	}
 	if len(request.Response.SlotMappings) == 0 {
-		return 0, fmt.Errorf("no slot mappings found")
+		return 0, errors.New("no slot mappings found")
 	}
 	return uint8(request.Response.SlotMappings[0].Slot), nil
 }

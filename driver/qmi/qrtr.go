@@ -154,7 +154,7 @@ type QRTRConn struct {
 func newQRTRConn() (*QRTRConn, error) {
 	fd, err := unix.Socket(unix.AF_QIPCRTR, unix.SOCK_DGRAM, 0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create QRTR socket: %w", err)
+		return nil, fmt.Errorf("create QRTR socket: %w", err)
 	}
 	return &QRTRConn{fd: fd}, nil
 }
@@ -171,7 +171,7 @@ func (c *QRTRConn) SendTo(dest *SockAddr, data []byte) (int, error) {
 		uintptr(unsafe.Pointer(dest)),
 		uintptr(unsafe.Sizeof(*dest)))
 	if errno != 0 {
-		return 0, fmt.Errorf("failed to send data: %w", errno)
+		return 0, fmt.Errorf("send data: %w", errno)
 	}
 	return int(n), nil
 }
@@ -187,7 +187,7 @@ func (c *QRTRConn) RecvFrom(buf []byte) (int, *SockAddr, error) {
 		uintptr(unsafe.Pointer(&addr)),
 		uintptr(unsafe.Pointer(&addrLen)))
 	if errno != 0 {
-		return 0, nil, fmt.Errorf("failed to receive data: %w", errno)
+		return 0, nil, fmt.Errorf("receive data: %w", errno)
 	}
 	return int(n), &addr, nil
 }

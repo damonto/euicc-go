@@ -49,15 +49,15 @@ func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 func newQMIConn() (net.Conn, error) {
 	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create socket: %w", err)
+		return nil, fmt.Errorf("create socket: %w", err)
 	}
 	if err := syscall.Connect(fd, &syscall.SockaddrUnix{Name: "\x00qmi-proxy"}); err != nil {
 		syscall.Close(fd)
-		return nil, fmt.Errorf("failed to connect to qmi-proxy: %w", err)
+		return nil, fmt.Errorf("connect to qmi-proxy: %w", err)
 	}
 	conn, err := net.FileConn(os.NewFile(uintptr(fd), "euicc-go-qmi-proxy"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create net.Conn: %w", err)
+		return nil, fmt.Errorf("create net.Conn: %w", err)
 	}
 	return conn, nil
 }
