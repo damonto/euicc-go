@@ -18,12 +18,11 @@ func New(conn net.Conn) core.Transport {
 	return &Transport{conn: conn}
 }
 
-func (t *Transport) toBytes(r *core.Request) ([]byte, error) {
-	value := bytes.NewBuffer(nil)
+func (t *Transport) bytes(r *core.Request) ([]byte, error) {
+	value := new(bytes.Buffer)
 	if _, err := r.Value.WriteTo(value); err != nil {
 		return nil, err
 	}
-
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, core.QMIMessageTypeRequest)
 	binary.Write(buf, binary.LittleEndian, r.TransactionID)
@@ -67,7 +66,7 @@ func (t *Transport) Read(c net.Conn, r *core.Request) (int, error) {
 }
 
 func (t *Transport) Transmit(request *core.Request) error {
-	bs, err := t.toBytes(request)
+	bs, err := t.bytes(request)
 	if err != nil {
 		return err
 	}

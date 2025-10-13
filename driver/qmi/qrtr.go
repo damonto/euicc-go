@@ -107,7 +107,7 @@ func (c *QRTR) findUIMService() (*Service, error) {
 	for time.Now().Before(timeout) {
 		buf := make([]byte, 4096)
 		c.conn.SetReadDeadline(time.Now().Add(1 * time.Second))
-		n, _, err := c.conn.RecvFrom(buf)
+		n, _, err := c.conn.Recvfrom(buf)
 		if err != nil {
 			if errors.Is(err, unix.EAGAIN) || errors.Is(err, unix.EWOULDBLOCK) {
 				continue
@@ -138,7 +138,7 @@ func (c *QRTR) sendLookupRequest() error {
 	}
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, pkt)
-	_, err := c.conn.SendTo(&SockAddr{
+	_, err := c.conn.Sendto(&SockAddr{
 		Family: unix.AF_QIPCRTR,
 		Node:   QRTRNodeBroadcast,
 		Port:   QRTRPortControl,
@@ -159,7 +159,7 @@ func newQRTRConn() (*QRTRConn, error) {
 	return &QRTRConn{fd: fd}, nil
 }
 
-func (c *QRTRConn) SendTo(dest *SockAddr, data []byte) (int, error) {
+func (c *QRTRConn) Sendto(dest *SockAddr, data []byte) (int, error) {
 	if len(data) == 0 {
 		return 0, errors.New("data is empty")
 	}
@@ -176,7 +176,7 @@ func (c *QRTRConn) SendTo(dest *SockAddr, data []byte) (int, error) {
 	return int(n), nil
 }
 
-func (c *QRTRConn) RecvFrom(buf []byte) (int, *SockAddr, error) {
+func (c *QRTRConn) Recvfrom(buf []byte) (int, *SockAddr, error) {
 	var addr SockAddr
 	addrLen := uintptr(unsafe.Sizeof(addr))
 	n, _, errno := unix.Syscall6(unix.SYS_RECVFROM,
@@ -194,7 +194,7 @@ func (c *QRTRConn) RecvFrom(buf []byte) (int, *SockAddr, error) {
 
 func (c *QRTRConn) Read(b []byte) (int, error) {
 	for {
-		n, from, err := c.RecvFrom(b)
+		n, from, err := c.Recvfrom(b)
 		if err != nil {
 			return 0, err
 		}
@@ -209,7 +209,7 @@ func (c *QRTRConn) Read(b []byte) (int, error) {
 }
 
 func (c *QRTRConn) Write(b []byte) (int, error) {
-	return c.SendTo(&SockAddr{
+	return c.Sendto(&SockAddr{
 		Family: unix.AF_QIPCRTR,
 		Node:   c.Service.Node,
 		Port:   c.Service.Port,
