@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"time"
 
 	"github.com/damonto/euicc-go/apdu"
@@ -39,6 +40,8 @@ type Options struct {
 	Logger *slog.Logger
 	// Timeout is the timeout for the HTTP client. It defaults to 30 seconds.
 	Timeout time.Duration
+	// Proxy for the HTTP client. It defaults to "" (unused).
+	InternalProxy string
 }
 
 func (opts *Options) validateAdminProtocolVersion() error {
@@ -108,10 +111,20 @@ func New(opts *Options) (*Client, error) {
 		return nil, err
 	}
 	c.APDU = c.transmitter
-	c.HTTP = &http.Client{
-		Client:        driver.NewHTTPClient(opts.Logger, opts.Timeout),
-		AdminProtocol: fmt.Sprintf("gsma/rsp/v%s", opts.AdminProtocolVersion),
+
+	proxyURL, err := url.Parse(opts.InternalProxy)
+	if err != nil {
+		c.HTTP = &http.Client{
+			Client:        driver.NewHTTPClient(opts.Logger, opts.Timeout, nil),
+			AdminProtocol: fmt.Sprintf("gsma/rsp/v%s", opts.AdminProtocolVersion),
+		}
+	} else {
+		c.HTTP = &http.Client{
+			Client:        driver.NewHTTPClient(opts.Logger, opts.Timeout, proxyURL),
+			AdminProtocol: fmt.Sprintf("gsma/rsp/v%s", opts.AdminProtocolVersion),
+		}
 	}
+
 	return &c, nil
 }
 

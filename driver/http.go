@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -18,14 +19,26 @@ type LoggingRoundTripper struct {
 	logger    *slog.Logger
 }
 
-func NewLoggingRoundTripper(rootci *x509.CertPool, logger *slog.Logger) *LoggingRoundTripper {
-	return &LoggingRoundTripper{
-		logger: logger,
-		transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs: rootci,
+func NewLoggingRoundTripper(rootci *x509.CertPool, logger *slog.Logger, proxyURL *url.URL) *LoggingRoundTripper {
+	if proxyURL != nil {
+		return &LoggingRoundTripper{
+			logger: logger,
+			transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					RootCAs: rootci,
+				},
+				Proxy: http.ProxyURL(proxyURL),
 			},
-		},
+		}
+	} else {
+		return &LoggingRoundTripper{
+			logger: logger,
+			transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					RootCAs: rootci,
+				},
+			},
+		}
 	}
 }
 
@@ -51,12 +64,13 @@ func (l *LoggingRoundTripper) RoundTrip(request *http.Request) (*http.Response, 
 	return response, nil
 }
 
-func NewHTTPClient(logger *slog.Logger, timeout time.Duration) *http.Client {
+func NewHTTPClient(logger *slog.Logger, timeout time.Duration, proxyURL *url.URL) *http.Client {
 	return &http.Client{
 		Timeout: timeout,
 		Transport: NewLoggingRoundTripper(
 			rootci.TrustedRootCIs(),
 			logger,
+			proxyURL,
 		),
 	}
 }

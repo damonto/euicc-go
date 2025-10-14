@@ -43,6 +43,7 @@ func main() {
 
 	client, err := lpa.New(&lpa.Options{
 		Channel: ch,
+		//InternalProxy: "http://proxy.lan:8080",
 	})
 	if err != nil {
 		fmt.Printf("Failed to create LPA client: %v\n", err)
