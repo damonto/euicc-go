@@ -58,7 +58,8 @@ func main() {
 
 	// testDiscovery(client)
 
-        //testDeleteProfile(client)
+        testDisableProfile(client)
+        testDeleteProfile(client)
         testSendAllNotifications(client)
 }
 
@@ -127,7 +128,8 @@ func testEnableProfile(client *lpa.Client) {
 }
 
 func testDisableProfile(client *lpa.Client) {
-	id, _ := sgp22.NewICCID("8944476500001224158")
+	//id, _ := sgp22.NewICCID("8944476500001224158")
+	id, _ := sgp22.NewICCID("8944476500006628536")
 	if err := client.DisableProfile(id, true); err != nil {
 		fmt.Printf("Failed to disable profile: %v\n", err)
 	} else {
