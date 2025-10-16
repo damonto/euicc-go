@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+        "bytes"
 
 	"github.com/damonto/euicc-go/driver/qmi"
 	"github.com/damonto/euicc-go/lpa"
@@ -18,8 +19,8 @@ func main() {
 	// if err != nil {
 	// 	panic(err)
 	// }
-	ch, err := qmi.New("/dev/cdc-wdm0", 1)
-	// ch, err := qmi.NewQRTR(1)
+	// ch, err := qmi.New("/dev/cdc-wdm0", 1)
+	ch, err := qmi.NewQRTR(2)
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +44,7 @@ func main() {
 
 	client, err := lpa.New(&lpa.Options{
 		Channel: ch,
-		//InternalProxy: "http://proxy.lan:8080",
+		InternalProxy: "http://192.168.11.199:8888",
 	})
 	if err != nil {
 		fmt.Printf("Failed to create LPA client: %v\n", err)
@@ -56,6 +57,9 @@ func main() {
 	testListProfiles(client)
 
 	// testDiscovery(client)
+
+        //testDeleteProfile(client)
+        testSendAllNotifications(client)
 }
 
 func testEID(client *lpa.Client) {
@@ -166,4 +170,33 @@ func testDiscovery(client *lpa.Client) {
 			fmt.Printf("Discovered profile: %s, URL: %s\n", entry.EventID, entry.Address)
 		}
 	}
+}
+
+func testDeleteProfile(client *lpa.Client) {
+        if err := client.DeleteProfile("8944476500006628536"); err != nil {
+                fmt.Printf("Failed to delete profile: %v\n", err)
+        } else {
+                fmt.Println("Profile deleted successfully")
+        }
+}
+
+func testSendAllNotifications(client *lpa.Client) {
+        notifications, err := client.ListNotification()
+        if err != nil {
+                panic(err)
+        }
+
+        // id, _ := sgp22.NewICCID("8944476500001224158")
+        id, _ := sgp22.NewICCID("8944476500006628536")
+
+        for _, notification := range notifications {
+
+            if bytes.Equal(notification.ICCID, id) {
+
+                fmt.Printf("Sequence: %d, ICCID: %s, Operation: %d\n",
+                        notification.SequenceNumber, notification.ICCID, notification.ProfileManagementOperation)
+
+                testSendNotification(client, notification.SequenceNumber)
+            }
+        }
 }
