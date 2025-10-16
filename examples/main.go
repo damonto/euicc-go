@@ -58,9 +58,10 @@ func main() {
 
 	// testDiscovery(client)
 
-        testDisableProfile(client)
-        testDeleteProfile(client)
-        testSendAllNotifications(client)
+        //testDisableProfile(client)
+        //testDeleteProfile(client)
+        //testSendAllNotifications(client)
+        //testDownload(client)
 }
 
 func testEID(client *lpa.Client) {
@@ -175,7 +176,8 @@ func testDiscovery(client *lpa.Client) {
 }
 
 func testDeleteProfile(client *lpa.Client) {
-        if err := client.DeleteProfile("8944476500006628536"); err != nil {
+        id, _ := sgp22.NewICCID("8944476500006628536")
+        if err := client.DeleteProfile(id); err != nil {
                 fmt.Printf("Failed to delete profile: %v\n", err)
         } else {
                 fmt.Println("Profile deleted successfully")
