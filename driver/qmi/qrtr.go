@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"time"
 	"unsafe"
 
@@ -95,10 +96,6 @@ func NewQRTR(slot uint8) (apdu.SmartCardChannel, error) {
 	return q, nil
 }
 
-func (c *QRTR) Disconnect() error {
-	return c.conn.Close()
-}
-
 func (c *QRTR) findService(serviceType core.ServiceType) (*Service, error) {
 	if err := c.sendControlPacket(serviceType); err != nil {
 		return nil, err
@@ -140,6 +137,10 @@ func (c *QRTR) sendControlPacket(serviceType core.ServiceType) error {
 		Port:   QRTRPortControl,
 	}, buf.Bytes())
 	return err
+}
+
+func (c *QRTR) Disconnect() error {
+	return c.conn.Close()
 }
 
 type QRTRConn struct {
@@ -207,7 +208,7 @@ func (c *QRTRConn) Recv(b []byte) (int, *SockAddr, error) {
 		}
 		return n, from, nil
 	}
-	return 0, nil, errors.New("read timeout")
+	return 0, nil, os.ErrDeadlineExceeded
 }
 
 func (c *QRTRConn) Read(b []byte) (int, error) {
