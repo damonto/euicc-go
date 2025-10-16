@@ -112,18 +112,25 @@ func New(opts *Options) (*Client, error) {
 	}
 	c.APDU = c.transmitter
 
-	proxyURL, err := url.Parse(opts.InternalProxy)
-	if err != nil {
-		c.HTTP = &http.Client{
-			Client:        driver.NewHTTPClient(opts.Logger, opts.Timeout, nil),
-			AdminProtocol: fmt.Sprintf("gsma/rsp/v%s", opts.AdminProtocolVersion),
-		}
-	} else {
-		c.HTTP = &http.Client{
-			Client:        driver.NewHTTPClient(opts.Logger, opts.Timeout, proxyURL),
-			AdminProtocol: fmt.Sprintf("gsma/rsp/v%s", opts.AdminProtocolVersion),
-		}
-	}
+        if opts.InternalProxy == "" {
+            c.HTTP = &http.Client{
+                Client:        driver.NewHTTPClient(opts.Logger, opts.Timeout, nil),
+                AdminProtocol: fmt.Sprintf("gsma/rsp/v%s", opts.AdminProtocolVersion),
+            }
+        } else {
+	    proxyURL, err := url.Parse(opts.InternalProxy)
+            if err != nil {
+                c.HTTP = &http.Client{
+                    Client:        driver.NewHTTPClient(opts.Logger, opts.Timeout, nil),
+                    AdminProtocol: fmt.Sprintf("gsma/rsp/v%s", opts.AdminProtocolVersion),
+                }
+            } else {
+	        c.HTTP = &http.Client{
+		    Client:        driver.NewHTTPClient(opts.Logger, opts.Timeout, proxyURL),
+		    AdminProtocol: fmt.Sprintf("gsma/rsp/v%s", opts.AdminProtocolVersion),
+                }
+            }
+        }
 
 	return &c, nil
 }
