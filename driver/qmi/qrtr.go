@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"time"
 	"unsafe"
 
@@ -87,7 +88,7 @@ func NewQRTR(slot uint8) (apdu.SmartCardChannel, error) {
 			Slot:      slot,
 		},
 	}
-	q.conn.Service, err = q.findUIMService()
+	q.conn.Service, err = q.findService(core.QMIServiceUIM)
 	if err != nil {
 		conn.Close()
 		return nil, err
@@ -95,23 +96,15 @@ func NewQRTR(slot uint8) (apdu.SmartCardChannel, error) {
 	return q, nil
 }
 
-func (c *QRTR) Disconnect() error {
-	return c.conn.Close()
-}
-
-func (c *QRTR) findUIMService() (*Service, error) {
-	if err := c.sendLookupRequest(); err != nil {
+func (c *QRTR) findService(serviceType core.ServiceType) (*Service, error) {
+	if err := c.sendControlPacket(serviceType); err != nil {
 		return nil, err
 	}
 	timeout := time.Now().Add(5 * time.Second)
 	for time.Now().Before(timeout) {
-		buf := make([]byte, 4096)
-		c.conn.SetReadDeadline(time.Now().Add(1 * time.Second))
-		n, _, err := c.conn.Recvfrom(buf)
+		buf := make([]byte, 1024)
+		n, _, err := c.conn.Recv(buf)
 		if err != nil {
-			if errors.Is(err, unix.EAGAIN) || errors.Is(err, unix.EWOULDBLOCK) {
-				continue
-			}
 			return nil, err
 		}
 		if QRTRPacketType(binary.LittleEndian.Uint32(buf[:4])) != QRTRPacketTypeNewServer {
@@ -119,18 +112,18 @@ func (c *QRTR) findUIMService() (*Service, error) {
 		}
 		var service Service
 		binary.Read(bytes.NewReader(buf[4:n]), binary.LittleEndian, &service)
-		if core.ServiceType(service.Service) == core.QMIServiceUIM {
+		if core.ServiceType(service.Service) == serviceType {
 			return &service, nil
 		}
 	}
-	return nil, errors.New("UIM service not found")
+	return nil, fmt.Errorf("service %d not found", serviceType)
 }
 
-func (c *QRTR) sendLookupRequest() error {
+func (c *QRTR) sendControlPacket(serviceType core.ServiceType) error {
 	pkt := &ControlPacket{
 		Command: QRTRPacketTypeNewLookup,
 		Service: Service{
-			Service:  uint32(core.QMIServiceUIM),
+			Service:  uint32(serviceType),
 			Instance: 0,
 			Node:     0,
 			Port:     0,
@@ -146,9 +139,14 @@ func (c *QRTR) sendLookupRequest() error {
 	return err
 }
 
+func (c *QRTR) Disconnect() error {
+	return c.conn.Close()
+}
+
 type QRTRConn struct {
-	fd      int
-	Service *Service
+	fd           int
+	Service      *Service
+	readDeadline time.Duration
 }
 
 func newQRTRConn() (*QRTRConn, error) {
@@ -156,7 +154,7 @@ func newQRTRConn() (*QRTRConn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create QRTR socket: %w", err)
 	}
-	return &QRTRConn{fd: fd}, nil
+	return &QRTRConn{fd: fd, readDeadline: 30 * time.Second}, nil
 }
 
 func (c *QRTRConn) Sendto(dest *SockAddr, data []byte) (int, error) {
@@ -192,9 +190,30 @@ func (c *QRTRConn) Recvfrom(buf []byte) (int, *SockAddr, error) {
 	return int(n), &addr, nil
 }
 
+func (c *QRTRConn) Recv(b []byte) (int, *SockAddr, error) {
+	tv := unix.NsecToTimeval((1 * time.Second).Nanoseconds())
+	if err := unix.SetsockoptTimeval(c.fd, unix.SOL_SOCKET, unix.SO_RCVTIMEO, &tv); err != nil {
+		return 0, nil, err
+	}
+
+	timeout := time.Now().Add(c.readDeadline)
+	for time.Now().Before(timeout) {
+		n, from, err := c.Recvfrom(b)
+		if err != nil {
+			if errors.Is(err, unix.EAGAIN) || errors.Is(err, unix.EWOULDBLOCK) {
+				time.Sleep(10 * time.Millisecond)
+				continue
+			}
+			return 0, nil, err
+		}
+		return n, from, nil
+	}
+	return 0, nil, os.ErrDeadlineExceeded
+}
+
 func (c *QRTRConn) Read(b []byte) (int, error) {
 	for {
-		n, from, err := c.Recvfrom(b)
+		n, from, err := c.Recv(b)
 		if err != nil {
 			return 0, err
 		}
@@ -244,8 +263,8 @@ func (c *QRTRConn) SetDeadline(t time.Time) error {
 }
 
 func (c *QRTRConn) SetReadDeadline(t time.Time) error {
-	tv := unix.NsecToTimeval(c.toTimeDuration(t).Nanoseconds())
-	return unix.SetsockoptTimeval(c.fd, unix.SOL_SOCKET, unix.SO_RCVTIMEO, &tv)
+	c.readDeadline = c.toTimeDuration(t)
+	return nil
 }
 
 func (c *QRTRConn) SetWriteDeadline(t time.Time) error {

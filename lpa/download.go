@@ -69,6 +69,16 @@ func (ac *ActivationCode) UnmarshalText(text []byte) error {
 	return nil
 }
 
+func (ac *ActivationCode) validate() error {
+	if ac.SMDP == nil || ac.SMDP.Host == "" {
+		return errors.New("SM-DP+ is required")
+	}
+	if ac.IMEI == "" {
+		return errors.New("IMEI is required")
+	}
+	return nil
+}
+
 type DownloadStage uint8
 
 const (
@@ -100,6 +110,10 @@ type DownloadOptions struct {
 
 // DownloadProfile downloads a profile using the provided activation code and options.
 func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, opts *DownloadOptions) (*sgp22.LoadBoundProfilePackageResponse, error) {
+	if err := ac.validate(); err != nil {
+		return nil, err
+	}
+
 	if opts != nil && opts.OnProgress != nil {
 		opts.OnProgress(DownloadStageAuthenticateClient)
 	}

@@ -39,14 +39,9 @@ func (t *Transport) Read(c net.Conn, r *core.Request) (int, error) {
 	}
 	deadline := time.Now().Add(r.ReadTimeout)
 	for time.Now().Before(deadline) {
-		c.SetReadDeadline(time.Now().Add(1 * time.Second))
-
 		buf := make([]byte, 512)
 		n, err := c.Read(buf)
 		if err != nil {
-			if ne, ok := err.(net.Error); ok && ne.Timeout() {
-				continue
-			}
 			return 0, err
 		}
 
