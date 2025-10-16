@@ -144,9 +144,9 @@ func (c *QRTR) Disconnect() error {
 }
 
 type QRTRConn struct {
-	fd           int
-	Service      *Service
-	readDeadline time.Duration
+	fd          int
+	Service     *Service
+	readTimeout time.Duration
 }
 
 func newQRTRConn() (*QRTRConn, error) {
@@ -154,7 +154,7 @@ func newQRTRConn() (*QRTRConn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create QRTR socket: %w", err)
 	}
-	return &QRTRConn{fd: fd, readDeadline: 30 * time.Second}, nil
+	return &QRTRConn{fd: fd, readTimeout: 30 * time.Second}, nil
 }
 
 func (c *QRTRConn) Sendto(dest *SockAddr, data []byte) (int, error) {
@@ -196,7 +196,7 @@ func (c *QRTRConn) Recv(b []byte) (int, *SockAddr, error) {
 		return 0, nil, err
 	}
 
-	timeout := time.Now().Add(c.readDeadline)
+	timeout := time.Now().Add(c.readTimeout)
 	for time.Now().Before(timeout) {
 		n, from, err := c.Recvfrom(b)
 		if err != nil {
@@ -263,7 +263,7 @@ func (c *QRTRConn) SetDeadline(t time.Time) error {
 }
 
 func (c *QRTRConn) SetReadDeadline(t time.Time) error {
-	c.readDeadline = c.toTimeDuration(t)
+	c.readTimeout = c.toTimeDuration(t)
 	return nil
 }
 
