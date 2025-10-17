@@ -69,6 +69,12 @@ type Service struct {
 	Port     uint32
 }
 
+type QRTRConn struct {
+	fd          int
+	Service     *Service
+	readTimeout time.Duration
+}
+
 // QRTR implements the apdu.SmartCardChannel interface using QRTR protocol
 type QRTR struct {
 	conn *QRTRConn
@@ -141,12 +147,6 @@ func (c *QRTR) sendControlPacket(serviceType core.ServiceType) error {
 
 func (c *QRTR) Disconnect() error {
 	return c.conn.Close()
-}
-
-type QRTRConn struct {
-	fd          int
-	Service     *Service
-	readTimeout time.Duration
 }
 
 func newQRTRConn() (*QRTRConn, error) {
