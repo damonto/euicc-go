@@ -10,8 +10,8 @@ import (
 )
 
 type Client struct {
-	Client        *http.Client
-	AdminProtocol string
+	Client               *http.Client
+	AdminProtocolVersion string
 }
 
 func (c *Client) NewRequest(u *url.URL, request any) (*http.Request, error) {
@@ -47,6 +47,6 @@ func (c *Client) Header() http.Header {
 	return http.Header{
 		"Content-Type":     {"application/json"},
 		"User-Agent":       {"gsma-rsp-lpad"},
-		"X-Admin-Protocol": {c.AdminProtocol},
+		"X-Admin-Protocol": {fmt.Sprintf("gsma/rsp/v%s", c.AdminProtocolVersion)},
 	}
 }

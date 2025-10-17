@@ -109,8 +109,8 @@ func New(opts *Options) (*Client, error) {
 	}
 	c.APDU = c.transmitter
 	c.HTTP = &http.Client{
-		Client:        driver.NewHTTPClient(opts.Logger, opts.Timeout),
-		AdminProtocol: fmt.Sprintf("gsma/rsp/v%s", opts.AdminProtocolVersion),
+		Client:               driver.NewHTTPClient(opts.Logger, opts.Timeout),
+		AdminProtocolVersion: opts.AdminProtocolVersion,
 	}
 	return &c, nil
 }
