@@ -69,6 +69,7 @@ type Service struct {
 	Port     uint32
 }
 
+// QRTRConn represents a QRTR connection
 type QRTRConn struct {
 	fd          int
 	Service     *Service
