@@ -34,10 +34,13 @@ func (l *LoggingRoundTripper) RoundTrip(request *http.Request) (*http.Response, 
 	if err != nil {
 		return nil, err
 	}
+	request.Body.Close()
+
 	// workaround: Orange PL notification address contains space in the host.
 	request.URL.Host = strings.ReplaceAll(request.URL.Host, " ", "")
 	request.Body = io.NopCloser(bytes.NewBuffer(body))
 	l.logger.Debug("[HTTP] sending request to", "url", request.URL.String(), "body", string(body))
+
 	response, err := l.transport.RoundTrip(request)
 	if err != nil {
 		return nil, err
@@ -46,6 +49,7 @@ func (l *LoggingRoundTripper) RoundTrip(request *http.Request) (*http.Response, 
 	if err != nil {
 		return nil, err
 	}
+	response.Body.Close()
 	response.Body = io.NopCloser(bytes.NewBuffer(rb))
 	l.logger.Debug("[HTTP] received response from", "url", request.URL.String(), "body", string(rb))
 	return response, nil
