@@ -55,7 +55,7 @@ func NewHTTPClient(logger *slog.Logger, timeout time.Duration) *http.Client {
 	return &http.Client{
 		Timeout: timeout,
 		Transport: NewLoggingRoundTripper(
-			rootci.TrustedRootCIs(),
+			rootci.TrustedRootCAs(),
 			logger,
 		),
 	}
