@@ -243,7 +243,7 @@ func (c *Client) confirmationCodeRequired(tlv *bertlv.TLV) bool {
 }
 
 func (c *Client) profileMetadata(tlv *bertlv.TLV) (*sgp22.ProfileInfo, error) {
-	var profileInfo = new(sgp22.ProfileInfo)
+	profileInfo := new(sgp22.ProfileInfo)
 	if err := profileInfo.UnmarshalBERTLV(tlv); err != nil {
 		return nil, err
 	}
