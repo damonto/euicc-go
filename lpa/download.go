@@ -154,7 +154,7 @@ func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, opts *
 	}
 	serverResponse, err := c.authenticateServer(ac, clientResponse)
 	if err != nil {
-		return nil, c.abort(ac, serverResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
+		return nil, c.abort(ac, clientResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
 	}
 
 	if opts != nil && opts.OnProgress != nil {
@@ -262,7 +262,7 @@ func (c *Client) isCanceled(ctx context.Context) bool {
 func (c *Client) abort(ac *ActivationCode, transactionID []byte, err error, cancelReason sgp22.CancelSessionReason) error {
 	_, cancelErr := c.cancelSession(ac, transactionID, cancelReason)
 	if cancelErr != nil {
-		return fmt.Errorf("session canceled after error: %w (cancel failed: %v)", err, cancelErr)
+		return fmt.Errorf("%w (cancel session error: %v)", err, cancelErr)
 	}
 	return err
 }
