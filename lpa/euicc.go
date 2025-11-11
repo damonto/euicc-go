@@ -24,7 +24,7 @@ type Client struct {
 	transmitter driver.Transmitter
 }
 
-// Option is the configuration for the LPA client.
+// Options is the configuration for the LPA client.
 // It includes the channel for APDU communication, logger, AID, maximum APDU size (MSS), admin protocol version, and timeout.
 type Options struct {
 	// Channel is the channel for APDU communication. It is required for APDU communication.
