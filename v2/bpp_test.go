@@ -42,26 +42,27 @@ func TestSegmentedBoundProfilePackage(t *testing.T) {
 	}
 }
 
-func LoadBoundProfilePackage(name string) (bpp *bertlv.TLV, err error) {
+func LoadBoundProfilePackage(name string) (*bertlv.TLV, error) {
 	fp, err := os.Open(filepath.Join("fixtures", name))
 	if err != nil {
-		return
+		return nil, err
 	}
-	bpp = new(bertlv.TLV)
+	bpp := new(bertlv.TLV)
 	_, err = bpp.ReadFrom(base64.NewDecoder(base64.StdEncoding, fp))
-	return
+	return bpp, err
 }
 
-func LoadSegmentedBoundProfilePackage(name string) (sbpp [][]byte, err error) {
+func LoadSegmentedBoundProfilePackage(name string) ([][]byte, error) {
 	fp, err := os.Open(filepath.Join("fixtures", name))
 	if err != nil {
-		return
+		return nil, err
 	}
 	scanner := bufio.NewScanner(fp)
 	scanner.Split(bufio.ScanLines)
 	var block []byte
 	var line int
 	var text string
+	var sbpp [][]byte
 	for scanner.Scan() {
 		line++
 		text = scanner.Text()
@@ -73,5 +74,5 @@ func LoadSegmentedBoundProfilePackage(name string) (sbpp [][]byte, err error) {
 		}
 		sbpp = append(sbpp, block)
 	}
-	return
+	return sbpp, nil
 }

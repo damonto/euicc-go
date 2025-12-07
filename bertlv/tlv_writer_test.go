@@ -2,9 +2,10 @@ package bertlv
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestTLV_Len(t *testing.T) {
@@ -122,8 +123,9 @@ type limitWriter struct {
 	Limited int
 }
 
-func (w *limitWriter) Write(p []byte) (n int, err error) {
-	w.n += len(p)
+func (w *limitWriter) Write(p []byte) (int, error) {
+	n := len(p)
+	w.n += n
 	if w.n > w.Limited {
 		return 0, io.ErrClosedPipe
 	}

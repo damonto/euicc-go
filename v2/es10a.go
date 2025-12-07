@@ -63,15 +63,15 @@ func (r *SetDefaultDPAddressRequest) CardResponse() *SetDefaultDPAddressResponse
 	return new(SetDefaultDPAddressResponse)
 }
 
-func (r *SetDefaultDPAddressRequest) MarshalBERTLV() (request *bertlv.TLV, err error) {
+func (r *SetDefaultDPAddressRequest) MarshalBERTLV() (*bertlv.TLV, error) {
 	if !utf8.Valid([]byte(r.DefaultDPAddress)) {
 		return nil, errors.New("DefaultDPAddress is not a valid UTF-8 string")
 	}
-	request = bertlv.NewChildren(
+	request := bertlv.NewChildren(
 		bertlv.ContextSpecific.Constructed(63),
 		bertlv.NewValue(bertlv.ContextSpecific.Primitive(0), []byte(r.DefaultDPAddress)),
 	)
-	return
+	return request, nil
 }
 
 type SetDefaultDPAddressResponse struct {

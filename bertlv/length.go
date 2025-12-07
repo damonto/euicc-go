@@ -20,8 +20,10 @@ func marshalLength(n uint32) []byte {
 	panic(fmt.Sprintf("TLV too large: %d exceeds 3-byte length limit (3 bytes max)", n))
 }
 
-func readLength(r io.Reader) (value uint32, err error) {
+func readLength(r io.Reader) (uint32, error) {
 	var n int
+	var err error
+	var value uint32
 	length := make([]byte, 1)
 	switch n, err = io.ReadAtLeast(r, length, 1); length[0] {
 	case 0x81:
@@ -47,7 +49,7 @@ func readLength(r io.Reader) (value uint32, err error) {
 	if err != nil {
 		err = fmt.Errorf("read length: %w", err)
 	}
-	return
+	return value, err
 }
 
 func contentLength(tlv *TLV) int {

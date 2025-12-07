@@ -34,10 +34,12 @@ func (t *Transmitter) Read(p []byte) (n int, err error) {
 	return t.response.Read(p)
 }
 
-func (t *Transmitter) Write(command []byte) (n int, err error) {
+func (t *Transmitter) Write(command []byte) (int, error) {
+	var n int
 	t.response = new(bytes.Buffer)
 	request := Request{CLA: 0x80, INS: 0xE2}
 	var response Response
+	var err error
 	chunks := byte(len(command) / t.MSS)
 	for request.Data = range slices.Chunk(command, t.MSS) {
 		if request.P1 = 0x11; request.P2 == chunks {
@@ -56,20 +58,22 @@ func (t *Transmitter) Write(command []byte) (n int, err error) {
 			break
 		}
 	}
-	return
+	return n, err
 }
 
-func (t *Transmitter) transmit(request *Request) (response Response, err error) {
+func (t *Transmitter) transmit(request *Request) (Response, error) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	t.setChannelToCLA(request, t.logicalChannel)
-	if response, err = t.channel.Transmit(request.APDU()); err != nil {
-		return
+	b, err := t.channel.Transmit(request.APDU())
+	if err != nil {
+		return nil, err
 	}
+	response := Response(b)
 	if !response.OK() && !response.HasMore() {
 		err = fmt.Errorf("returned an unexpected response with status %04X", response.SW())
 	}
-	return
+	return response, err
 }
 
 func (t *Transmitter) setChannelToCLA(request *Request, channel byte) {

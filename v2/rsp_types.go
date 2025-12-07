@@ -7,16 +7,16 @@ import (
 
 type HexString []byte
 
-func (h *HexString) MarshalText() (text []byte, err error) {
-	text = make([]byte, hex.EncodedLen(len(*h)))
+func (h *HexString) MarshalText() ([]byte, error) {
+	text := make([]byte, hex.EncodedLen(len(*h)))
 	hex.Encode(text, *h)
 	text = bytes.ToUpper(text)
-	return
+	return text, nil
 }
 
-func (h *HexString) UnmarshalText(text []byte) (err error) {
+func (h *HexString) UnmarshalText(text []byte) error {
 	dst := make([]byte, hex.DecodedLen(len(text)))
 	n, err := hex.Decode(dst, text)
 	*h = dst[:n]
-	return
+	return err
 }

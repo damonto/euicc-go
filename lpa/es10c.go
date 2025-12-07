@@ -85,7 +85,7 @@ func (c *Client) DeleteProfile(identifier any) error {
 	return c.setProfile(sgp22.DeleteProfile, identifier, false)
 }
 
-func (c *Client) setProfile(operation sgp22.ProfileOperation, identifier any, refresh bool) (err error) {
+func (c *Client) setProfile(operation sgp22.ProfileOperation, identifier any, refresh bool) error {
 	var request sgp22.ProfileOperationRequest
 	request.Operation = operation
 	switch v := identifier.(type) {
@@ -97,8 +97,8 @@ func (c *Client) setProfile(operation sgp22.ProfileOperation, identifier any, re
 		return errors.New("invalid profile identifier")
 	}
 	request.Refresh = refresh
-	_, err = sgp22.InvokeAPDU(c.APDU, &request)
-	return
+	_, err := sgp22.InvokeAPDU(c.APDU, &request)
+	return err
 }
 
 // MemoryReset resets the eUICC memory.

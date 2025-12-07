@@ -26,7 +26,8 @@ func (tlv *TLV) Len() int {
 	return n
 }
 
-func (tlv *TLV) WriteTo(w io.Writer) (n int64, err error) {
+func (tlv *TLV) WriteTo(w io.Writer) (int64, error) {
+	var n int64
 	w = &countWriter{Writer: w, Written: &n}
 	length := contentLength(tlv)
 	switch {
@@ -37,25 +38,25 @@ func (tlv *TLV) WriteTo(w io.Writer) (n int64, err error) {
 	case length > 0xffffff:
 		return 0, fmt.Errorf("tlv: length exceeds maximum (%d), got %d", 0xffffff, length)
 	}
-	if _, err = w.Write(tlv.Tag); err != nil {
-		return
+	if _, err := w.Write(tlv.Tag); err != nil {
+		return n, err
 	}
-	if _, err = w.Write(marshalLength(uint32(length))); err != nil {
-		return
+	if _, err := w.Write(marshalLength(uint32(length))); err != nil {
+		return n, err
 	}
 	if tlv.Tag.Primitive() {
-		_, err = w.Write(tlv.Value)
-		return
+		_, err := w.Write(tlv.Value)
+		return n, err
 	}
 	for _, child := range tlv.Children {
 		if child == nil {
 			continue
 		}
-		if _, err = child.WriteTo(w); err != nil {
-			return
+		if _, err := child.WriteTo(w); err != nil {
+			return n, err
 		}
 	}
-	return
+	return n, nil
 }
 
 func (tlv *TLV) MarshalText() ([]byte, error) {

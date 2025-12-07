@@ -9,8 +9,8 @@ import (
 	"github.com/damonto/euicc-go/bertlv"
 )
 
-func SegmentedBoundProfilePackage(bpp *bertlv.TLV) (segments [][]byte, err error) {
-	if err = ValidBoundProfilePackage(bpp); err != nil {
+func SegmentedBoundProfilePackage(bpp *bertlv.TLV) ([][]byte, error) {
+	if err := ValidBoundProfilePackage(bpp); err != nil {
 		return nil, err
 	}
 	marshalHeader := func(tlv *bertlv.TLV) []byte {
@@ -41,6 +41,7 @@ func SegmentedBoundProfilePackage(bpp *bertlv.TLV) (segments [][]byte, err error
 		secondSequenceOf87             = bpp.First(bertlv.Constructed.ContextSpecific(2))
 		sequenceOf86                   = bpp.First(bertlv.Constructed.ContextSpecific(3))
 	)
+	var segments [][]byte
 	// Tag and length fields of the BoundProfilePackage TLV plus the initialiseSecureChannelRequest TLV
 	segments = append(segments, slices.Concat(
 		// Tag and length fields of the BoundProfilePackage TLV
@@ -66,7 +67,7 @@ func SegmentedBoundProfilePackage(bpp *bertlv.TLV) (segments [][]byte, err error
 	for _, child := range sequenceOf86.Children {
 		segments = append(segments, child.Bytes())
 	}
-	return
+	return segments, nil
 }
 
 func ValidBoundProfilePackage(bpp *bertlv.TLV) error {

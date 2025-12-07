@@ -29,10 +29,10 @@ func NewChildrenIter(tag Tag, children iter.Seq[*TLV]) *TLV {
 	return NewChildren(tag, elements...)
 }
 
-func MarshalValue(tag Tag, marshaler encoding.BinaryMarshaler) (tlv *TLV, err error) {
-	tlv = NewValue(tag, nil)
-	err = tlv.MarshalValue(marshaler)
-	return
+func MarshalValue(tag Tag, marshaler encoding.BinaryMarshaler) (*TLV, error) {
+	tlv := NewValue(tag, nil)
+	err := tlv.MarshalValue(marshaler)
+	return tlv, err
 }
 
 func (tlv *TLV) String() string {
@@ -42,12 +42,13 @@ func (tlv *TLV) String() string {
 	return fmt.Sprintf("%s (%d elem)", tlv.Tag.String(), len(tlv.Children))
 }
 
-func (tlv *TLV) MarshalValue(marshaler encoding.BinaryMarshaler) (err error) {
+func (tlv *TLV) MarshalValue(marshaler encoding.BinaryMarshaler) error {
 	if !tlv.Tag.Primitive() {
 		return errors.New("cannot marshal value on constructed")
 	}
+	var err error
 	tlv.Value, err = marshaler.MarshalBinary()
-	return
+	return err
 }
 
 func (tlv *TLV) UnmarshalValue(unmarshaler encoding.BinaryUnmarshaler) error {

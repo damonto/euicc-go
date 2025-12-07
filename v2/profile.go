@@ -21,7 +21,7 @@ type ProfileInfo struct {
 	NotificationConfigurationInfo NotificationConfigurationInfo
 }
 
-func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) (err error) {
+func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 	if !tlv.Tag.If(bertlv.Private, bertlv.Constructed, 3) && !tlv.Tag.If(bertlv.ContextSpecific, bertlv.Constructed, 37) {
 		return ErrUnexpectedTag
 	}
@@ -44,17 +44,17 @@ func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) (err error) {
 		p.Icon = icon.Value
 	}
 	if tlv.Tag.If(bertlv.Private, bertlv.Constructed, 3) {
-		if err = tlv.First(bertlv.ContextSpecific.Primitive(112)).UnmarshalValue(primitive.UnmarshalInt(&p.ProfileState)); err != nil {
+		if err := tlv.First(bertlv.ContextSpecific.Primitive(112)).UnmarshalValue(primitive.UnmarshalInt(&p.ProfileState)); err != nil {
 			return err
 		}
 	}
 	if notification := tlv.First(bertlv.ContextSpecific.Constructed(22)); notification != nil {
-		if err = p.NotificationConfigurationInfo.UnmarshalBERTLV(notification); err != nil {
+		if err := p.NotificationConfigurationInfo.UnmarshalBERTLV(notification); err != nil {
 			return err
 		}
 	}
 	if owner := tlv.First(bertlv.ContextSpecific.Constructed(23)); owner != nil {
-		if err = p.ProfileOwner.UnmarshalBERTLV(owner); err != nil {
+		if err := p.ProfileOwner.UnmarshalBERTLV(owner); err != nil {
 			return err
 		}
 	}

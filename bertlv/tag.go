@@ -25,22 +25,23 @@ func NewTag(class Class, form Form, value uint64) Tag {
 	return tag
 }
 
-func (t *Tag) ReadFrom(r io.Reader) (n int64, err error) {
+func (t *Tag) ReadFrom(r io.Reader) (int64, error) {
+	var n int64
 	var tag [11]byte
-	if _, err = io.ReadAtLeast(r, tag[0:1], 1); err != nil {
+	if _, err := io.ReadAtLeast(r, tag[0:1], 1); err != nil {
 		return n, fmt.Errorf("tag encoding with less than one byte\n%w", err)
 	}
 	if tag[0]&0x1f != 0x1f {
 		*t = tag[0:1]
-		return
+		return 1, nil
 	}
 	for n = 1; ; n++ {
-		if _, err = io.ReadAtLeast(r, tag[n:n+1], 1); err != nil {
+		if _, err := io.ReadAtLeast(r, tag[n:n+1], 1); err != nil {
 			return n, fmt.Errorf("tag encoding with more than %d bytes\n%w", n+1, err)
 		}
 		if tag[n]>>7 == 0b0 {
 			*t = tag[0 : n+1]
-			return
+			return n + 1, nil
 		}
 	}
 }

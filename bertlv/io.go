@@ -9,10 +9,10 @@ type countReader struct {
 	Length *int64
 }
 
-func (c *countReader) Read(p []byte) (n int, err error) {
-	n, err = c.Reader.Read(p)
+func (c *countReader) Read(p []byte) (int, error) {
+	n, err := c.Reader.Read(p)
 	*c.Length += int64(n)
-	return
+	return n, err
 }
 
 type countWriter struct {
@@ -20,8 +20,8 @@ type countWriter struct {
 	Written *int64
 }
 
-func (w *countWriter) Write(p []byte) (n int, err error) {
-	n, err = w.Writer.Write(p)
+func (w *countWriter) Write(p []byte) (int, error) {
+	n, err := w.Writer.Write(p)
 	*w.Written += int64(n)
-	return
+	return n, err
 }

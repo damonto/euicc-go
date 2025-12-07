@@ -14,7 +14,7 @@ import (
 
 type SequenceNumber int64
 
-func (n SequenceNumber) MarshalBinary() (data []byte, err error) {
+func (n SequenceNumber) MarshalBinary() ([]byte, error) {
 	return primitive.MarshalInt(n).MarshalBinary()
 }
 
@@ -33,7 +33,7 @@ func (n *NotificationEvent) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
-func (n *NotificationEvent) MarshalBinary() (data []byte, err error) {
+func (n *NotificationEvent) MarshalBinary() ([]byte, error) {
 	bits := make([]bool, 4)
 	bits[*n] = true
 	return primitive.MarshalBitString(bits).MarshalBinary()
@@ -57,14 +57,14 @@ type NotificationMetadata struct {
 	ICCID                      ICCID
 }
 
-func (n *NotificationMetadata) UnmarshalBERTLV(tlv *bertlv.TLV) (err error) {
+func (n *NotificationMetadata) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 	if !tlv.Tag.If(bertlv.ContextSpecific, bertlv.Constructed, 47) {
 		return ErrUnexpectedTag
 	}
 	*n = NotificationMetadata{
 		Address: string(tlv.First(bertlv.Universal.Primitive(12)).Value),
 	}
-	if err = tlv.First(bertlv.ContextSpecific.Primitive(0)).UnmarshalValue(primitive.UnmarshalInt(&n.SequenceNumber)); err != nil {
+	if err := tlv.First(bertlv.ContextSpecific.Primitive(0)).UnmarshalValue(primitive.UnmarshalInt(&n.SequenceNumber)); err != nil {
 		return err
 	}
 	if iccid := tlv.First(bertlv.Application.Primitive(26)); iccid != nil {
@@ -73,7 +73,7 @@ func (n *NotificationMetadata) UnmarshalBERTLV(tlv *bertlv.TLV) (err error) {
 	if err := tlv.First(bertlv.ContextSpecific.Primitive(1)).UnmarshalValue(&n.ProfileManagementOperation); err != nil {
 		return err
 	}
-	return
+	return nil
 }
 
 type PendingNotification struct {

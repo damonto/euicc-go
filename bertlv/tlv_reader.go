@@ -7,13 +7,15 @@ import (
 	"io"
 )
 
-func (tlv *TLV) ReadFrom(r io.Reader) (n int64, err error) {
+func (tlv *TLV) ReadFrom(r io.Reader) (int64, error) {
+	var n int64
 	r = &countReader{Reader: r, Length: &n}
 	var t TLV
-	var length uint32
-	if _, err = t.Tag.ReadFrom(r); err != nil {
-		return
+	if _, err := t.Tag.ReadFrom(r); err != nil {
+		return 0, err
 	}
+	var length uint32
+	var err error
 	if length, err = readLength(r); err != nil {
 		return n, fmt.Errorf("tag %02X: invalid length encoding\n%w", t.Tag, err)
 	}
@@ -29,12 +31,12 @@ func (tlv *TLV) ReadFrom(r io.Reader) (n int64, err error) {
 		}
 	} else if length > 0 {
 		t.Value = make([]byte, length)
-		if _, err = io.ReadAtLeast(r, t.Value, len(t.Value)); err != nil {
+		if _, err := io.ReadAtLeast(r, t.Value, len(t.Value)); err != nil {
 			return n, fmt.Errorf("tag %02X: invalid length encoding\n%w", t.Tag, err)
 		}
 	}
 	*tlv = t
-	return
+	return n, nil
 }
 
 func (tlv *TLV) UnmarshalText(text []byte) error {
