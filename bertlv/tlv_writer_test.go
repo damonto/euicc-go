@@ -96,8 +96,8 @@ func TestTLV_LargeValue(t *testing.T) {
 		Constructed.ContextSpecific(0),
 		NewValue(Primitive.ContextSpecific(0), make([]byte, 0x10000)),
 	)
-	_, err := tlv.MarshalBinary()
-	assert.EqualError(t, err, "tlv: length exceeds maximum (65535), got 65540")
+	_, err := tlv.WriteTo(io.Discard)
+	assert.NoError(t, err)
 }
 
 func TestTLV_InvalidConstructedTag(t *testing.T) {

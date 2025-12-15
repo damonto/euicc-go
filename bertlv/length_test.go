@@ -32,10 +32,10 @@ func TestLength_Error(t *testing.T) {
 		Error  string
 	}
 	fixtures := []*Fixture{
-		{[]byte{}, "failed to read length: expected 1 bytes, got 0"},
-		{[]byte{0x80}, "failed to read length: if length is greater than 127, first byte must indicate encoding of length"},
-		{[]byte{0x81}, "failed to read length: expected 1 bytes, got 0"},
-		{[]byte{0x82}, "failed to read length: expected 2 bytes, got 0"},
+		{[]byte{}, "read length: expected 1 bytes, got 0"},
+		{[]byte{0x80}, "read length: unsupported length encoding"},
+		{[]byte{0x81}, "read length: expected 1 bytes, got 0"},
+		{[]byte{0x82}, "read length: expected 2 bytes, got 0"},
 	}
 	var err error
 	for _, fixture := range fixtures {

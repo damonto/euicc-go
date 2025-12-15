@@ -15,7 +15,7 @@ func TestTLV_ReadFrom(t *testing.T) {
 	fixtures := []*Fixture{
 		{[]byte{}, "tag encoding with less than one byte\nEOF"},
 		{[]byte{0x80, 0x01}, "tag 80: invalid length encoding\nEOF"},
-		{[]byte{0x80, 0x81}, "tag 80: invalid length encoding\nfailed to read length: expected 1 bytes, got 0"},
+		{[]byte{0x80, 0x81}, "tag 80: invalid length encoding\nread length: expected 1 bytes, got 0"},
 		{[]byte{0xA0, 0x03, 0x00, 0x02}, "tag A0: invalid child object\ntag 00: invalid length encoding\nEOF"},
 	}
 	var err error

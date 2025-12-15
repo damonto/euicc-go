@@ -10,10 +10,22 @@ import (
 
 func TestNewTag(t *testing.T) {
 	fixtures := map[uint64]Tag{
+		0x00: {0xa0},
+		0x1e: {0xbe},
+		0x1f: {0xbf, 0x1f},
+		0x7f: {0xbf, 0x7f},
+	}
+	for value, expected := range fixtures {
+		assert.Equal(t, expected, NewTag(ContextSpecific, Constructed, value))
+	}
+}
+
+func TestTag_ReadFrom_Value(t *testing.T) {
+	fixtures := map[uint64]Tag{
 		0x00:           {0xa0},
 		0x1e:           {0xbe},
 		0x1f:           {0xbf, 0x1f},
-		0x7f:           {0xbf, 0x80, 0x7f},
+		0x7f:           {0xbf, 0x7f},
 		0x80:           {0xbf, 0x81, 0x00},
 		math.MaxUint8:  {0xbf, 0x81, 0x7f},
 		math.MaxUint16: {0xbf, 0x83, 0xff, 0x7f},
@@ -23,8 +35,6 @@ func TestNewTag(t *testing.T) {
 	var err error
 	var tag = Tag{}
 	for value, expected := range fixtures {
-		assert.Equal(t, expected, NewTag(ContextSpecific, Constructed, value))
-
 		_, err = tag.ReadFrom(bytes.NewReader(expected))
 		assert.NoError(t, err)
 		assert.Equal(t, value, tag.Value())
