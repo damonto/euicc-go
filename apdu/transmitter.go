@@ -10,7 +10,7 @@ import (
 
 type Transmitter struct {
 	MSS            int
-	mutex          sync.Mutex
+	mu             sync.Mutex
 	channel        SmartCardChannel
 	logicalChannel byte
 	response       *bytes.Buffer
@@ -62,8 +62,8 @@ func (t *Transmitter) Write(command []byte) (int, error) {
 }
 
 func (t *Transmitter) transmit(request *Request) (Response, error) {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.setChannelToCLA(request, t.logicalChannel)
 	b, err := t.channel.Transmit(request.APDU())
 	if err != nil {
