@@ -81,7 +81,7 @@ func (state ProfileState) String() string {
 type ProfileIcon []byte
 
 func (p ProfileIcon) Valid() bool    { return len(p.FileType()) > 0 }
-func (p ProfileIcon) String() string { return base64.URLEncoding.EncodeToString(p) }
+func (p ProfileIcon) String() string { return base64.StdEncoding.EncodeToString(p) }
 
 func (p ProfileIcon) FileType() string {
 	switch {
