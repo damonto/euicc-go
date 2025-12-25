@@ -73,7 +73,7 @@ func (state ProfileState) String() string {
 	case ProfileDisabled:
 		return "disabled"
 	case ProfileEnabled:
-		return "enable"
+		return "enabled"
 	}
 	return "unknown"
 }
