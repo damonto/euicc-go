@@ -50,13 +50,13 @@ func main() {
 	}
 	defer client.Close()
 
-	// testEID(client)
+	testEID(client)
 
-	testDownload(client)
+	// testDownload(client)
 
-	// testListProfiles(client)
+	testListProfiles(client)
 
-	// testDiscovery(client)
+	testDiscovery(client)
 }
 
 func testEID(client *lpa.Client) {
