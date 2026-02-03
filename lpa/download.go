@@ -121,13 +121,13 @@ func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, opts *
 	clientResponse, metadata, ccRequired, err := c.authenticateClient(ac)
 	if err != nil {
 		if clientResponse != nil && clientResponse.FunctionExecutionStatus().ExecutedSuccess() {
-			return nil, c.abort(ac, clientResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
+			return nil, c.abort(ac, clientResponse.TransactionID, err, sgp22.CancelSessionReasonMetadataMismatch)
 		}
 		return nil, err
 	}
 
 	if c.isCanceled(ctx) || (opts != nil && opts.OnConfirm != nil && !opts.OnConfirm(metadata)) {
-		_, err := c.cancelSession(ac, clientResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
+		_, err := c.cancelSession(ac, clientResponse.TransactionID, sgp22.CancelSessionReasonPostponed)
 		return nil, err
 	}
 
@@ -140,7 +140,7 @@ func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, opts *
 				ac,
 				clientResponse.TransactionID,
 				errors.New("confirmation code is required"),
-				sgp22.CancelSessionReasonEndUserRejection,
+				sgp22.CancelSessionReasonPostponed,
 			)
 		}
 	}
@@ -149,19 +149,19 @@ func (c *Client) DownloadProfile(ctx context.Context, ac *ActivationCode, opts *
 		opts.OnProgress(DownloadStageAuthenticateServer)
 	}
 	if c.isCanceled(ctx) {
-		_, err := c.cancelSession(ac, clientResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
+		_, err := c.cancelSession(ac, clientResponse.TransactionID, sgp22.CancelSessionReasonPostponed)
 		return nil, err
 	}
 	serverResponse, err := c.authenticateServer(ac, clientResponse)
 	if err != nil {
-		return nil, c.abort(ac, clientResponse.TransactionID, err, sgp22.CancelSessionReasonEndUserRejection)
+		return nil, c.abort(ac, clientResponse.TransactionID, err, sgp22.CancelSessionReasonPostponed)
 	}
 
 	if opts != nil && opts.OnProgress != nil {
 		opts.OnProgress(DownloadStageInstall)
 	}
 	if c.isCanceled(ctx) {
-		_, err := c.cancelSession(ac, serverResponse.TransactionID, sgp22.CancelSessionReasonEndUserRejection)
+		_, err := c.cancelSession(ac, serverResponse.TransactionID, sgp22.CancelSessionReasonPostponed)
 		return nil, err
 	}
 	result, err := c.install(serverResponse)
