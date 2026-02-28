@@ -28,7 +28,7 @@ type EventEntry struct {
 }
 
 func (e *EventEntry) URL() *url.URL {
-	return &url.URL{Scheme: "https:", Host: e.Address}
+	return &url.URL{Scheme: "https", Host: e.Address}
 }
 
 // endregion

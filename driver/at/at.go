@@ -59,6 +59,9 @@ func (a *AT) Transmit(command []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(sw) < 2 {
+		return nil, errors.New("invalid response status word")
+	}
 	if sw[len(sw)-2] != 0x90 && sw[len(sw)-2] != 0x61 {
 		return sw, fmt.Errorf("unexpected response: %X", sw)
 	}
@@ -70,7 +73,11 @@ func (a *AT) sw(sw string) ([]byte, error) {
 	if lastIdx == -1 {
 		return nil, errors.New("invalid response")
 	}
-	return hex.DecodeString(sw[lastIdx+2 : len(sw)-1])
+	start, end := lastIdx+2, len(sw)-1
+	if start >= end {
+		return nil, errors.New("invalid response")
+	}
+	return hex.DecodeString(sw[start:end])
 }
 
 func (a *AT) Connect() error {
@@ -86,6 +93,9 @@ func (a *AT) OpenLogicalChannel(AID []byte) (byte, error) {
 	if err != nil {
 		return 0, err
 	}
+	if len(channel) < 3 {
+		return 0, fmt.Errorf("open logical channel returned short response: %X", channel)
+	}
 	if channel[len(channel)-2] != 0x90 {
 		return 0, fmt.Errorf("open logical channel: %X", channel)
 	}
@@ -93,6 +103,9 @@ func (a *AT) OpenLogicalChannel(AID []byte) (byte, error) {
 	sw, err := a.Transmit(append([]byte{a.channel, 0xA4, 0x04, 0x00, byte(len(AID))}, AID...))
 	if err != nil {
 		return 0, err
+	}
+	if len(sw) < 2 {
+		return 0, fmt.Errorf("select AID returned short response: %X", sw)
 	}
 	if sw[len(sw)-2] != 0x90 && sw[len(sw)-2] != 0x61 {
 		return 0, fmt.Errorf("select AID: %X", sw)

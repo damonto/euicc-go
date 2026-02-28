@@ -79,6 +79,9 @@ func (c *CCIDReader) OpenLogicalChannel(AID []byte) (byte, error) {
 	if err != nil {
 		return 0, err
 	}
+	if len(channel) < 3 {
+		return 0, fmt.Errorf("open logical channel returned short response: %X", channel)
+	}
 	if channel[len(channel)-2] != 0x90 {
 		return 0, fmt.Errorf("open logical channel: %X", channel)
 	}
@@ -86,6 +89,9 @@ func (c *CCIDReader) OpenLogicalChannel(AID []byte) (byte, error) {
 	sw, err := c.Transmit(append([]byte{c.channel, 0xA4, 0x04, 0x00, byte(len(AID))}, AID...))
 	if err != nil {
 		return 0, err
+	}
+	if len(sw) < 2 {
+		return 0, fmt.Errorf("select AID returned short response: %X", sw)
 	}
 	if sw[len(sw)-2] != 0x90 && sw[len(sw)-2] != 0x61 {
 		return 0, fmt.Errorf("select AID: %X", sw)

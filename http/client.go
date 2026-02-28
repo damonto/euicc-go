@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,7 +20,10 @@ func (c *Client) NewRequest(u *url.URL, request any) (*http.Request, error) {
 	if err := json.NewEncoder(&body).Encode(request); err != nil {
 		return nil, err
 	}
-	httpRequest, _ := http.NewRequest(http.MethodPost, u.String(), &body)
+	httpRequest, err := http.NewRequest(http.MethodPost, u.String(), &body)
+	if err != nil {
+		return nil, err
+	}
 	httpRequest.Header = c.Header()
 	return httpRequest, nil
 }
@@ -33,11 +37,11 @@ func (c *Client) SendRequest(u *url.URL, request, response any) error {
 	if err != nil {
 		return err
 	}
+	defer httpResponse.Body.Close()
 	if httpResponse.StatusCode > 299 {
 		return fmt.Errorf("unexpected status code: %d", httpResponse.StatusCode)
 	}
-	defer httpResponse.Body.Close()
-	if err = json.NewDecoder(httpResponse.Body).Decode(response); err != nil && err != io.EOF {
+	if err = json.NewDecoder(httpResponse.Body).Decode(response); err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
 	return nil

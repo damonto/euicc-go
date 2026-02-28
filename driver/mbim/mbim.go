@@ -48,9 +48,15 @@ func (m *MBIM) connectToProxy() error {
 		syscall.Close(fd)
 		return fmt.Errorf("connect to mbim-proxy: %w", err)
 	}
-	m.conn, err = net.FileConn(os.NewFile(uintptr(fd), "euicc-go-mbim-proxy"))
+	f := os.NewFile(uintptr(fd), "euicc-go-mbim-proxy")
+	m.conn, err = net.FileConn(f)
 	if err != nil {
+		f.Close()
 		return fmt.Errorf("create net.Conn: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		m.conn.Close()
+		return fmt.Errorf("close mbim-proxy file descriptor: %w", err)
 	}
 	return nil
 }
@@ -142,7 +148,7 @@ func (m *MBIM) configureProxy() error {
 		Timeout:       30,
 	}
 	err := request.Request().Transmit(m.conn)
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return fmt.Errorf("device %s is not connected", m.device)
 	}
 	return err

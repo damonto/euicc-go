@@ -1,6 +1,7 @@
 package qmi
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -55,9 +56,15 @@ func newQMIConn() (net.Conn, error) {
 		syscall.Close(fd)
 		return nil, fmt.Errorf("connect to qmi-proxy: %w", err)
 	}
-	conn, err := net.FileConn(os.NewFile(uintptr(fd), "euicc-go-qmi-proxy"))
+	f := os.NewFile(uintptr(fd), "euicc-go-qmi-proxy")
+	conn, err := net.FileConn(f)
 	if err != nil {
+		f.Close()
 		return nil, fmt.Errorf("create net.Conn: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("close qmi-proxy file descriptor: %w", err)
 	}
 	return conn, nil
 }
@@ -69,7 +76,7 @@ func (q *QMI) openProxyConnection() error {
 		DevicePath:    []byte(q.device),
 	}
 	err := q.Transport.Transmit(request.Request())
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return fmt.Errorf("device %s is not connected", q.device)
 	}
 	return err
@@ -81,7 +88,7 @@ func (q *QMI) allocateClientID() error {
 		TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
 	}
 	err := q.Transport.Transmit(request.Request())
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return fmt.Errorf("device %s doesn't support QMI protocol", q.device)
 	}
 	if err != nil {
