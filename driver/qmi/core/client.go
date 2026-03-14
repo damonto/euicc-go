@@ -49,19 +49,21 @@ func (q *QMIClient) ensureSlotActivated() error {
 // waitForSlotActivation waits for the specified slot to be activated
 func (q *QMIClient) waitForSlotActivation() error {
 	var err error
-	for range 10 {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for attempt := range 10 {
+		if attempt > 0 {
+			<-ticker.C
+		}
 		request := GetCardStatusRequest{
 			ClientID:      q.ClientID,
 			TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
 		}
 		err = q.Transport.Transmit(request.Request())
-		if err != nil {
-			continue
-		}
-		if request.Response.Ready() {
+		if err == nil && request.Response.Ready() {
 			return nil
 		}
-		time.Sleep(500 * time.Millisecond)
 	}
 	return fmt.Errorf("sim did not become available after slot %d activation err: %w", q.Slot, err)
 }
