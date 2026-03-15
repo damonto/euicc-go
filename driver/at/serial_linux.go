@@ -4,6 +4,7 @@
 package at
 
 import (
+	"errors"
 	"io"
 	"os"
 
@@ -59,8 +60,14 @@ func (sp *SerialPort) Write(data []byte) (int, error) {
 }
 
 func (sp *SerialPort) Close() error {
-	if err := unix.IoctlSetTermios(int(sp.f.Fd()), unix.TCSETS, sp.oldTermios); err != nil {
-		return err
+	var errs []error
+	if sp.oldTermios != nil {
+		if err := unix.IoctlSetTermios(int(sp.f.Fd()), unix.TCSETS, sp.oldTermios); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return sp.f.Close()
+	if err := sp.f.Close(); err != nil {
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
 }

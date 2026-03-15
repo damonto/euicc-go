@@ -109,8 +109,16 @@ func (q *QMI) releaseClientID() error {
 
 // Disconnect releases the client ID and closes the connection
 func (q *QMI) Disconnect() error {
-	if err := q.releaseClientID(); err != nil {
-		return err
+	var errs []error
+	if q.ClientID != 0 {
+		if err := q.releaseClientID(); err != nil {
+			errs = append(errs, err)
+		} else {
+			q.ClientID = 0
+		}
 	}
-	return q.conn.Close()
+	if err := q.conn.Close(); err != nil {
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
 }

@@ -13,37 +13,44 @@ import (
 
 type AT struct {
 	s       io.ReadWriteCloser
+	reader  *bufio.Reader
 	channel byte
 }
 
 func New(device string) (apdu.SmartCardChannel, error) {
-	var at AT
-	var err error
-	if at.s, err = Open(device); err != nil {
+	s, err := Open(device)
+	if err != nil {
 		return nil, fmt.Errorf("open serial port %s: %w", device, err)
 	}
-	return &at, nil
+	return &AT{
+		s:      s,
+		reader: bufio.NewReader(s),
+	}, nil
 }
 
 func (a *AT) run(command string) (string, error) {
 	if _, err := a.s.Write([]byte(command + "\r\n")); err != nil {
 		return "", err
 	}
-	reader := bufio.NewReader(a.s)
 	var sb strings.Builder
 	for {
-		line, err := reader.ReadString('\n')
+		line, err := a.reader.ReadString('\n')
 		if err != nil {
 			return "", err
 		}
 		line = strings.TrimSpace(line)
 		switch {
-		case strings.Contains(line, "OK"):
+		case line == "", line == command:
+			continue
+		case line == "OK":
 			return strings.TrimSpace(sb.String()), nil
-		case strings.Contains(line, "ERR"):
+		case line == "ERROR", strings.HasPrefix(line, "+CME ERROR:"), strings.HasPrefix(line, "+CMS ERROR:"):
 			return "", errors.New(line)
 		default:
-			sb.WriteString(line + "\n")
+			if sb.Len() > 0 {
+				sb.WriteByte('\n')
+			}
+			sb.WriteString(line)
 		}
 	}
 }

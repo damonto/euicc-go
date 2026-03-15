@@ -132,25 +132,33 @@ func (sp *SerialPort) Write(p []byte) (int, error) {
 }
 
 func (sp *SerialPort) Close() error {
+	var errs []error
 	if err := windows.EscapeCommFunction(sp.handle, windows.CLRDTR); err != nil {
-		return err
+		errs = append(errs, err)
 	}
 	// Cancel any pending I/O operations
-	if err := windows.CancelIoEx(sp.handle, nil); err != nil {
-		return err
+	if err := windows.CancelIoEx(sp.handle, nil); err != nil && !errors.Is(err, windows.ERROR_NOT_FOUND) {
+		errs = append(errs, err)
 	}
 	// Purge all communication buffers and abort pending I/O
 	if err := windows.PurgeComm(sp.handle, windows.PURGE_RXABORT|windows.PURGE_TXABORT|windows.PURGE_RXCLEAR|windows.PURGE_TXCLEAR); err != nil {
-		return err
+		errs = append(errs, err)
 	}
 	// Close the event handles
 	if sp.readEvent != 0 {
-		windows.CloseHandle(sp.readEvent)
+		if err := windows.CloseHandle(sp.readEvent); err != nil {
+			errs = append(errs, err)
+		}
 		sp.readEvent = 0
 	}
 	if sp.writeEvent != 0 {
-		windows.CloseHandle(sp.writeEvent)
+		if err := windows.CloseHandle(sp.writeEvent); err != nil {
+			errs = append(errs, err)
+		}
 		sp.writeEvent = 0
 	}
-	return windows.CloseHandle(sp.handle)
+	if err := windows.CloseHandle(sp.handle); err != nil {
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
 }

@@ -98,7 +98,10 @@ func (t *Transport) Read(c net.Conn, r *core.Request) (int, error) {
 		if err := response.UnmarshalBinary(buf[:length]); err != nil {
 			return 0, err
 		}
-		if r.ClientID != response.ClientID && response.TransactionID != r.TransactionID {
+		if response.MessageType != core.QMIMessageTypeResponse ||
+			response.ServiceType != r.ServiceType ||
+			response.ClientID != r.ClientID ||
+			response.TransactionID != r.TransactionID {
 			continue
 		}
 		if err := r.Response.UnmarshalResponse(&response.Value); err != nil {
