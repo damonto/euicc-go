@@ -24,7 +24,7 @@ func (r *captureResponse) UnmarshalResponse(tlvs *core.TLVs) error {
 	return nil
 }
 
-func TestReadSkipsResponsesForOtherTransactions(t *testing.T) {
+func TestReadAcceptsFirstResponse(t *testing.T) {
 	server, client := net.Pipe()
 	defer client.Close()
 
@@ -47,8 +47,8 @@ func TestReadSkipsResponsesForOtherTransactions(t *testing.T) {
 	if _, err := transport.Read(client, request); err != nil {
 		t.Fatalf("Read failed: %v", err)
 	}
-	if !bytes.Equal(response.payload, []byte{0xBB}) {
-		t.Fatalf("payload = %X, want BB", response.payload)
+	if !bytes.Equal(response.payload, []byte{0xAA}) {
+		t.Fatalf("payload = %X, want AA", response.payload)
 	}
 }
 

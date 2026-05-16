@@ -11,46 +11,66 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const linuxReadTimeoutDeciseconds = 50
+
 type SerialPort struct {
 	f          *os.File
 	oldTermios *unix.Termios
 }
 
 func Open(name string) (io.ReadWriteCloser, error) {
-	f, err := os.OpenFile(name, os.O_RDWR|unix.O_NOCTTY, 0666)
+	fd, err := unix.Open(name, unix.O_RDWR|unix.O_NOCTTY|unix.O_NONBLOCK, 0666)
 	if err != nil {
 		return nil, err
 	}
-	sp := &SerialPort{f: f}
-	if err := sp.setTermios(unix.B115200); err != nil {
-		f.Close()
-		return nil, err
+
+	oldTermios, err := setTermios(fd, unix.B115200)
+	if err != nil {
+		return nil, errors.Join(err, unix.Close(fd))
 	}
-	return sp, nil
+	if err := flushSerial(fd); err != nil {
+		return nil, errors.Join(err, unix.IoctlSetTermios(fd, unix.TCSETS, oldTermios), unix.Close(fd))
+	}
+	if err := unix.SetNonblock(fd, false); err != nil {
+		return nil, errors.Join(err, unix.IoctlSetTermios(fd, unix.TCSETS, oldTermios), unix.Close(fd))
+	}
+
+	return &SerialPort{
+		f:          os.NewFile(uintptr(fd), name),
+		oldTermios: oldTermios,
+	}, nil
 }
 
-func (sp *SerialPort) setTermios(baudRate uint32) error {
-	fd := int(sp.f.Fd())
-	var err error
-	if sp.oldTermios, err = unix.IoctlGetTermios(fd, unix.TCGETS); err != nil {
-		return err
+func setTermios(fd int, baudRate uint32) (*unix.Termios, error) {
+	oldTermios, err := unix.IoctlGetTermios(fd, unix.TCGETS)
+	if err != nil {
+		return nil, err
 	}
-	t := unix.Termios{
-		Ispeed: baudRate,
-		Ospeed: baudRate,
-	}
-	t.Iflag &^= unix.IGNBRK | unix.BRKINT | unix.PARMRK | unix.ISTRIP | unix.INLCR | unix.IGNCR | unix.ICRNL | unix.IXON
+	t := *oldTermios
+	t.Iflag &^= unix.IGNBRK | unix.BRKINT | unix.PARMRK | unix.ISTRIP | unix.INLCR | unix.IGNCR | unix.ICRNL | unix.IXON | unix.IXOFF | unix.IXANY
 	t.Oflag &^= unix.OPOST
 	t.Lflag &^= unix.ECHO | unix.ECHONL | unix.ICANON | unix.ISIG | unix.IEXTEN
-	t.Cflag &^= unix.CSIZE | unix.PARENB
-	t.Cflag |= unix.CS8
-	t.Cc[unix.VMIN] = 1
-	t.Cc[unix.VTIME] = 0
-	return unix.IoctlSetTermios(fd, unix.TCSETS, &t)
+	t.Cflag &^= unix.CSIZE | unix.PARENB | unix.CSTOPB | unix.CRTSCTS | unix.CBAUD
+	t.Cflag |= unix.CS8 | unix.CREAD | unix.CLOCAL | baudRate
+	t.Ispeed = baudRate
+	t.Ospeed = baudRate
+	t.Cc[unix.VMIN] = 0
+	t.Cc[unix.VTIME] = linuxReadTimeoutDeciseconds
+	if err := unix.IoctlSetTermios(fd, unix.TCSETS, &t); err != nil {
+		return nil, err
+	}
+	return oldTermios, nil
+}
+
+func flushSerial(fd int) error {
+	return unix.IoctlSetInt(fd, unix.TCFLSH, unix.TCIOFLUSH)
 }
 
 func (sp *SerialPort) Read(buf []byte) (int, error) {
 	n, err := sp.f.Read(buf)
+	if n == 0 && err == nil {
+		return 0, errReadTimeout
+	}
 	return n, err
 }
 

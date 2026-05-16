@@ -1,14 +1,11 @@
 package mbim
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/damonto/euicc-go/apdu"
@@ -28,37 +25,16 @@ func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 	if slot == 0 {
 		return nil, fmt.Errorf("slot must be >= 1")
 	}
+	conn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: "\x00mbim-proxy", Net: "unix"})
+	if err != nil {
+		return nil, err
+	}
 	m := &MBIM{
 		device: device,
 		slot:   slot - 1, // Convert to 0-based
-	}
-	if err := m.connectToProxy(); err != nil {
-		return nil, err
+		conn:   conn,
 	}
 	return m, nil
-}
-
-// connectToProxy establishes connection to mbim-proxy using abstract Unix socket
-func (m *MBIM) connectToProxy() error {
-	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
-	if err != nil {
-		return fmt.Errorf("create socket: %w", err)
-	}
-	if err := syscall.Connect(fd, &syscall.SockaddrUnix{Name: "\x00mbim-proxy"}); err != nil {
-		syscall.Close(fd)
-		return fmt.Errorf("connect to mbim-proxy: %w", err)
-	}
-	f := os.NewFile(uintptr(fd), "euicc-go-mbim-proxy")
-	m.conn, err = net.FileConn(f)
-	if err != nil {
-		f.Close()
-		return fmt.Errorf("create net.Conn: %w", err)
-	}
-	if err := f.Close(); err != nil {
-		m.conn.Close()
-		return fmt.Errorf("close mbim-proxy file descriptor: %w", err)
-	}
-	return nil
 }
 
 // Connect establishes MBIM session and opens device
@@ -191,9 +167,8 @@ func (m *MBIM) Transmit(command []byte) ([]byte, error) {
 	if err := request.Request().Transmit(m.conn); err != nil {
 		return nil, err
 	}
-	sw := make([]byte, 2)
-	binary.LittleEndian.PutUint16(sw, uint16(request.Response.Status&0xFFFF))
-	response := append(request.Response.Response, sw...)
+	status := []byte{byte(request.Response.Status >> 8), byte(request.Response.Status)}
+	response := append(request.Response.Response, status...)
 	return response, nil
 }
 

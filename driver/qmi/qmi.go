@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"sync/atomic"
-	"syscall"
 
 	"github.com/damonto/euicc-go/apdu"
 	"github.com/damonto/euicc-go/driver/qmi/core"
@@ -23,7 +21,7 @@ type QMI struct {
 
 // New creates a new QMI connection to the specified device
 func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
-	conn, err := newQMIConn()
+	conn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: "\x00qmi-proxy", Net: "unix"})
 	if err != nil {
 		return nil, err
 	}
@@ -44,29 +42,6 @@ func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 		return nil, err
 	}
 	return q, nil
-}
-
-// newQMIConn establishes connection to qmi-proxy
-func newQMIConn() (net.Conn, error) {
-	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
-	if err != nil {
-		return nil, fmt.Errorf("create socket: %w", err)
-	}
-	if err := syscall.Connect(fd, &syscall.SockaddrUnix{Name: "\x00qmi-proxy"}); err != nil {
-		syscall.Close(fd)
-		return nil, fmt.Errorf("connect to qmi-proxy: %w", err)
-	}
-	f := os.NewFile(uintptr(fd), "euicc-go-qmi-proxy")
-	conn, err := net.FileConn(f)
-	if err != nil {
-		f.Close()
-		return nil, fmt.Errorf("create net.Conn: %w", err)
-	}
-	if err := f.Close(); err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("close qmi-proxy file descriptor: %w", err)
-	}
-	return conn, nil
 }
 
 // openProxyConnection sends a request to the qmi-proxy to open a connection

@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"net/url"
 
-	"github.com/damonto/euicc-go/driver/ccid"
+	"github.com/damonto/euicc-go/driver/qmi"
 	"github.com/damonto/euicc-go/lpa"
 	sgp22 "github.com/damonto/euicc-go/v2"
 )
@@ -18,28 +18,30 @@ func main() {
 	// if err != nil {
 	// 	panic(err)
 	// }
-	// ch, err := qmi.New("/dev/cdc-wdm0", 1)
+	ch, err := qmi.New("/dev/cdc-wdm1", 1)
 	// ch, err := qmi.NewQRTR(1)
-	// if err != nil {
-	// 	panic(err)
-	// }
+	if err != nil {
+		panic(err)
+	}
 	// ch, err := at.New("/dev/ttyUSB7")
 	// if err != nil {
 	// 	panic(err)
 	// }
-	ch, err := ccid.New()
-	if err != nil {
-		panic(err)
-	}
-	reader, err := ch.ListReaders()
-	if err != nil {
-		panic(err)
-	}
-	if len(reader) == 0 {
-		panic("No readers found")
-	}
-	fmt.Printf("Using reader: %s\n", reader[0])
-	ch.SetReader(reader[0])
+	// ch, err := ccid.New()
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// reader, err := ch.ListReaders()
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// if len(reader) == 0 {
+	// 	panic("No readers found")
+	// }
+	// fmt.Printf("Using reader: %s\n", reader[0])
+	// if err := ch.SetReader(reader[0]); err != nil {
+	// 	panic(err)
+	// }
 
 	client, err := lpa.New(&lpa.Options{
 		Channel: ch,
@@ -54,9 +56,9 @@ func main() {
 
 	// testDownload(client)
 
-	testListProfiles(client)
+	// testListProfiles(client)
 
-	testDiscovery(client)
+	// testDiscovery(client)
 }
 
 func testEID(client *lpa.Client) {
