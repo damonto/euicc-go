@@ -1,5 +1,7 @@
 package core
 
+import "fmt"
+
 // QMIError represents QMI protocol errors as defined in libqmi
 // These correspond to the "Error" field in QMI Result TLVs
 type QMIError uint16
@@ -209,6 +211,6 @@ func (q QMIError) Error() string {
 	case QMIErrorNoSim:
 		return "No SIM"
 	default:
-		return "Unknown error"
+		return fmt.Sprintf("QMI error %d", q)
 	}
 }

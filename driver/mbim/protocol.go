@@ -72,13 +72,41 @@ func (r *OpenDeviceRequest) Request() *Request {
 
 func (r *OpenDeviceRequest) MarshalBinary() ([]byte, error) {
 	buf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buf, 4096)
+	binary.LittleEndian.PutUint32(buf, maxControlTransfer)
 	return buf, nil
 }
 
 type OpenDeviceResponse struct{}
 
 func (p *OpenDeviceResponse) UnmarshalBinary(data []byte) error { return nil }
+
+// endregion
+
+// region Close Request
+
+type CloseRequest struct {
+	TransactionID uint32
+	Response      *CloseResponse
+}
+
+func (r *CloseRequest) Request() *Request {
+	r.Response = new(CloseResponse)
+	return &Request{
+		MessageType:   MessageTypeClose,
+		TransactionID: r.TransactionID,
+		ReadTimeout:   2 * time.Second,
+		Command:       r,
+		Response:      r.Response,
+	}
+}
+
+func (r *CloseRequest) MarshalBinary() ([]byte, error) {
+	return nil, nil
+}
+
+type CloseResponse struct{}
+
+func (r *CloseResponse) UnmarshalBinary(data []byte) error { return nil }
 
 // endregion
 
@@ -140,18 +168,26 @@ func (r *DeviceSlotMappingsResponse) UnmarshalBinary(data []byte) error {
 		return errors.New("device slot mappings response data too short")
 	}
 	r.MapCount = binary.LittleEndian.Uint32(data[0:4])
-	r.SlotMappings = make([]SlotMapping, r.MapCount)
-
 	if r.MapCount == 0 {
+		r.SlotMappings = nil
 		return nil
 	}
-	dataOffset := 4 + r.MapCount*8
-	if len(data) < int(dataOffset) {
+	if r.MapCount > uint32((len(data)-4)/8) {
+		return errors.New("device slot mappings response buffer too short")
+	}
+	r.SlotMappings = make([]SlotMapping, r.MapCount)
+	tableEnd := 4 + r.MapCount*8
+	if len(data) < int(tableEnd) {
 		return errors.New("device slot mappings response buffer too short")
 	}
 	for i := uint32(0); i < r.MapCount; i++ {
-		slotDataOffset := dataOffset + i*4
-		if len(data) < int(slotDataOffset+4) {
+		entryOffset := 4 + i*8
+		slotDataOffset := binary.LittleEndian.Uint32(data[entryOffset : entryOffset+4])
+		slotDataSize := binary.LittleEndian.Uint32(data[entryOffset+4 : entryOffset+8])
+		if slotDataSize != 4 {
+			return errors.New("device slot mappings response slot data has invalid size")
+		}
+		if slotDataOffset > uint32(len(data)) || slotDataSize > uint32(len(data))-slotDataOffset {
 			return errors.New("device slot mappings response slot data too short")
 		}
 		r.SlotMappings[i].Slot = binary.LittleEndian.Uint32(data[slotDataOffset : slotDataOffset+4])
@@ -240,6 +276,9 @@ type OpenLogicalChannelResponse struct {
 }
 
 func (r *OpenLogicalChannelResponse) UnmarshalBinary(data []byte) error {
+	if len(data) < 12 {
+		return errors.New("open logical channel response data too short")
+	}
 	r.Status = binary.LittleEndian.Uint32(data[0:4])
 	r.Channel = binary.LittleEndian.Uint32(data[4:8])
 	n := binary.LittleEndian.Uint32(data[8:12])
@@ -286,6 +325,9 @@ type CloseLogicalChannelResponse struct {
 }
 
 func (r *CloseLogicalChannelResponse) UnmarshalBinary(data []byte) error {
+	if len(data) < 4 {
+		return errors.New("close logical channel response data too short")
+	}
 	r.Status = binary.LittleEndian.Uint32(data[0:4])
 	return nil
 }

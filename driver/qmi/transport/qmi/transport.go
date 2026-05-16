@@ -39,33 +39,47 @@ func (t *Transport) bytes(r *core.Request) ([]byte, error) {
 	if _, err := r.Value.WriteTo(value); err != nil {
 		return nil, err
 	}
+	maxValueLength := core.MaxQMUXServiceTLVLength
+	if r.ServiceType == core.QMIServiceControl {
+		maxValueLength = core.MaxQMUXControlTLVLength
+	}
+	if value.Len() > maxValueLength {
+		return nil, fmt.Errorf("QMI message TLVs length %d exceeds limit %d", value.Len(), maxValueLength)
+	}
+
 	headerBuf := new(bytes.Buffer)
 	if r.ServiceType == core.QMIServiceControl {
-		binary.Write(headerBuf, binary.LittleEndian, Header[uint8]{
+		if err := binary.Write(headerBuf, binary.LittleEndian, Header[uint8]{
 			MessageType:   core.QMIMessageTypeRequest,
 			TransactionID: uint8(r.TransactionID),
 			MessageID:     r.MessageID,
 			MessageLength: uint16(value.Len()),
-		})
+		}); err != nil {
+			return nil, fmt.Errorf("write control QMI header: %w", err)
+		}
 	} else {
-		binary.Write(headerBuf, binary.LittleEndian, Header[uint16]{
+		if err := binary.Write(headerBuf, binary.LittleEndian, Header[uint16]{
 			MessageType:   core.QMIMessageTypeRequest,
 			TransactionID: r.TransactionID,
 			MessageID:     r.MessageID,
 			MessageLength: uint16(value.Len()),
-		})
+		}); err != nil {
+			return nil, fmt.Errorf("write service QMI header: %w", err)
+		}
 	}
 	headerBuf.Write(value.Bytes())
 
 	sduBytes := headerBuf.Bytes()
 	requestBuf := new(bytes.Buffer)
-	binary.Write(requestBuf, binary.LittleEndian, QMUXHeader{
+	if err := binary.Write(requestBuf, binary.LittleEndian, QMUXHeader{
 		IfType:       core.QMUXHeaderIfType,
 		Length:       uint16(len(sduBytes) + 5),
 		ControlFlags: core.QMUXHeaderControlFlagRequest,
 		ServiceType:  r.ServiceType,
 		ClientID:     r.ClientID,
-	})
+	}); err != nil {
+		return nil, fmt.Errorf("write QMUX header: %w", err)
+	}
 	requestBuf.Write(sduBytes)
 	return requestBuf.Bytes(), nil
 }
@@ -88,6 +102,9 @@ func (t *Transport) Read(c net.Conn, r *core.Request) (int, error) {
 		}
 
 		length := int(binary.LittleEndian.Uint16(header[1:3])) + 1
+		if length < len(header) {
+			return 0, fmt.Errorf("invalid QMUX length %d", length)
+		}
 		buf := make([]byte, length)
 		copy(buf[:3], header)
 		if _, err := io.ReadFull(c, buf[3:]); err != nil {
@@ -114,9 +131,23 @@ func (t *Transport) Transmit(request *core.Request) error {
 	if err != nil {
 		return err
 	}
-	if _, err = t.conn.Write(bs); err != nil {
+	if err := writeFull(t.conn, bs); err != nil {
 		return err
 	}
 	_, err = t.Read(t.conn, request)
 	return err
+}
+
+func writeFull(w io.Writer, p []byte) error {
+	for len(p) > 0 {
+		n, err := w.Write(p)
+		if err != nil {
+			return err
+		}
+		if n <= 0 {
+			return io.ErrShortWrite
+		}
+		p = p[n:]
+	}
+	return nil
 }

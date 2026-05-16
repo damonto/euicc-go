@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 )
 
@@ -116,8 +117,8 @@ type SwitchSlotRequest struct {
 
 func (r *SwitchSlotRequest) Request() *Request {
 	r.Response = new(SwitchSlotResponse)
-	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, r.PhysicalSlot)
+	physicalSlot := make([]byte, 4)
+	binary.LittleEndian.PutUint32(physicalSlot, r.PhysicalSlot)
 	return &Request{
 		ClientID:      r.ClientID,
 		TransactionID: r.TransactionID,
@@ -125,7 +126,7 @@ func (r *SwitchSlotRequest) Request() *Request {
 		ServiceType:   QMIServiceUIM,
 		Value: TLVs{
 			{Type: 0x01, Len: 1, Value: []byte{r.LogicalSlot}},
-			{Type: 0x02, Len: 4, Value: buf.Bytes()},
+			{Type: 0x02, Len: uint16(len(physicalSlot)), Value: physicalSlot},
 		},
 		Response: r.Response,
 	}
@@ -166,7 +167,7 @@ type Slot struct {
 	CardState   UIMPhysicalCardState
 	SlotState   UIMSlotState
 	LogicalSlot uint8
-	ICCID       [10]byte
+	ICCID       []byte
 }
 
 func (r *GetSlotStatusResponse) UnmarshalResponse(TLVs *TLVs) error {
@@ -174,19 +175,28 @@ func (r *GetSlotStatusResponse) UnmarshalResponse(TLVs *TLVs) error {
 	if !ok {
 		return errors.New("could not find slot status in response")
 	}
-	var slotCount uint8
-	buf := bytes.NewBuffer(value.Value)
-	binary.Read(buf, binary.LittleEndian, &slotCount)
+
+	buf := bytes.NewReader(value.Value)
+	slotCount, err := readUint8(buf, "slot count")
+	if err != nil {
+		return err
+	}
 	r.Slots = make([]Slot, 0, slotCount)
 	for i := range slotCount {
 		var slot Slot
-		binary.Read(buf, binary.LittleEndian, &slot.CardState)
-		binary.Read(buf, binary.LittleEndian, &slot.SlotState)
-		binary.Read(buf, binary.LittleEndian, &slot.LogicalSlot)
-		var iccidLen uint8
-		binary.Read(buf, binary.LittleEndian, &iccidLen)
-		if iccidLen > 0 {
-			binary.Read(buf, binary.LittleEndian, &slot.ICCID)
+		if err := readValue(buf, &slot.CardState, "physical card status"); err != nil {
+			return err
+		}
+		if err := readValue(buf, &slot.SlotState, "physical slot status"); err != nil {
+			return err
+		}
+		slot.LogicalSlot, err = readUint8(buf, "logical slot")
+		if err != nil {
+			return err
+		}
+		slot.ICCID, err = readUint8Array(buf, "ICCID")
+		if err != nil {
+			return err
 		}
 		if slot.SlotState == UIMSlotStateActive {
 			r.ActivatedSlot = uint8(i + 1)
@@ -241,31 +251,58 @@ func (r *GetCardStatusResponse) UnmarshalResponse(TLVs *TLVs) error {
 		return errors.New("could not find card status in response")
 	}
 
-	buf := bytes.NewBuffer(value.Value)
-	binary.Read(buf, binary.LittleEndian, &r.IndexGWPrimary)
-	binary.Read(buf, binary.LittleEndian, &r.Index1XPrimary)
-	binary.Read(buf, binary.LittleEndian, &r.IndexGWSecondary)
-	binary.Read(buf, binary.LittleEndian, &r.Index1XSecondary)
+	buf := bytes.NewReader(value.Value)
+	if err := readValue(buf, &r.IndexGWPrimary, "GW primary index"); err != nil {
+		return err
+	}
+	if err := readValue(buf, &r.Index1XPrimary, "1X primary index"); err != nil {
+		return err
+	}
+	if err := readValue(buf, &r.IndexGWSecondary, "GW secondary index"); err != nil {
+		return err
+	}
+	if err := readValue(buf, &r.Index1XSecondary, "1X secondary index"); err != nil {
+		return err
+	}
 
-	var cardLen uint8
-	binary.Read(buf, binary.LittleEndian, &cardLen)
+	cardLen, err := readUint8(buf, "card count")
+	if err != nil {
+		return err
+	}
 	r.Cards = make([]Card, 0, cardLen)
 	for range cardLen {
 		var card Card
-		binary.Read(buf, binary.LittleEndian, &card.State)
+		if err := readValue(buf, &card.State, "card state"); err != nil {
+			return err
+		}
+		if err := skipBytes(buf, 4, "card PIN/error status"); err != nil {
+			return err
+		}
 
-		buf.Next(4)
-
-		var appLen uint8
-		binary.Read(buf, binary.LittleEndian, &appLen)
+		appLen, err := readUint8(buf, "application count")
+		if err != nil {
+			return err
+		}
 		card.Applications = make([]Application, 0, appLen)
 		for range appLen {
 			var app Application
-			binary.Read(buf, binary.LittleEndian, &app.Type)
-			binary.Read(buf, binary.LittleEndian, &app.State)
+			if err := readValue(buf, &app.Type, "application type"); err != nil {
+				return err
+			}
+			if err := readValue(buf, &app.State, "application state"); err != nil {
+				return err
+			}
 			card.Applications = append(card.Applications, app)
 
-			buf.Next(28)
+			if err := skipBytes(buf, 4, "application personalization status"); err != nil {
+				return err
+			}
+			if _, err := readUint8Array(buf, "application identifier"); err != nil {
+				return err
+			}
+			if err := skipBytes(buf, 7, "application PIN status"); err != nil {
+				return err
+			}
 		}
 		r.Cards = append(r.Cards, card)
 	}
@@ -347,7 +384,6 @@ func (r *CloseLogicalChannelRequest) Request() *Request {
 		Value: TLVs{
 			{Type: 0x01, Len: 1, Value: []byte{r.Slot}},
 			{Type: 0x11, Len: 1, Value: []byte{r.Channel}},
-			{Type: 0x13, Len: 1, Value: []byte{0x01}},
 		},
 		Response: r.Response,
 	}
@@ -404,3 +440,40 @@ func (r *TransmitAPDUResponse) UnmarshalResponse(TLVs *TLVs) error {
 }
 
 // endregion
+
+func readValue(r io.Reader, out any, field string) error {
+	if err := binary.Read(r, binary.LittleEndian, out); err != nil {
+		return fmt.Errorf("read %s: %w", field, err)
+	}
+	return nil
+}
+
+func readUint8(r io.Reader, field string) (uint8, error) {
+	var v uint8
+	if err := readValue(r, &v, field); err != nil {
+		return 0, err
+	}
+	return v, nil
+}
+
+func readUint8Array(r *bytes.Reader, field string) ([]byte, error) {
+	n, err := readUint8(r, field+" length")
+	if err != nil {
+		return nil, err
+	}
+	value := make([]byte, n)
+	if _, err := io.ReadFull(r, value); err != nil {
+		return nil, fmt.Errorf("read %s: %w", field, err)
+	}
+	return value, nil
+}
+
+func skipBytes(r *bytes.Reader, n int, field string) error {
+	if r.Len() < n {
+		return fmt.Errorf("read %s: %w", field, io.ErrUnexpectedEOF)
+	}
+	if _, err := r.Seek(int64(n), io.SeekCurrent); err != nil {
+		return fmt.Errorf("skip %s: %w", field, err)
+	}
+	return nil
+}

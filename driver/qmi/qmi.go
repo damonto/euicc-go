@@ -21,6 +21,13 @@ type QMI struct {
 
 // New creates a new QMI connection to the specified device
 func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
+	if slot == 0 {
+		return nil, errors.New("slot must be >= 1")
+	}
+	if len(device) > 0xffff {
+		return nil, fmt.Errorf("device path length %d exceeds QMI TLV limit", len(device))
+	}
+
 	conn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: "\x00qmi-proxy", Net: "unix"})
 	if err != nil {
 		return nil, err

@@ -24,13 +24,13 @@ func (r *captureResponse) UnmarshalResponse(tlvs *core.TLVs) error {
 	return nil
 }
 
-func TestReadAcceptsFirstResponse(t *testing.T) {
+func TestReadAcceptsFirstResponseForSynchronousTransport(t *testing.T) {
 	server, client := net.Pipe()
 	defer client.Close()
 
 	go func() {
 		defer server.Close()
-		_, _ = server.Write(encodeResponse(t, core.QMIServiceUIM, 7, 41, 0xAA))
+		_, _ = server.Write(encodeResponse(t, core.QMIServiceUIM, 8, 41, 0xAA))
 		_, _ = server.Write(encodeResponse(t, core.QMIServiceUIM, 7, 42, 0xBB))
 	}()
 

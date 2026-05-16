@@ -3,12 +3,14 @@ package core
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 )
 
 // QMIClient implements the apdu.SmartCardChannel interface using QMI protocol
 type QMIClient struct {
+	mu        sync.Mutex
 	Transport Transport
 	Slot      uint8
 	ClientID  uint8
@@ -16,8 +18,18 @@ type QMIClient struct {
 	channel   byte
 }
 
+const (
+	maxAIDLength = 0xff
+
+	sendAPDUFixedTLVLength       = 4 + 5 + 4
+	maxTransmitAPDUCommandLength = MaxQMUXServiceTLVLength - sendAPDUFixedTLVLength
+)
+
 // Connect establishes QMI session and allocates UIM client ID
 func (q *QMIClient) Connect() error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
 	if err := q.ensureSlotActivated(); err != nil {
 		return err
 	}
@@ -93,6 +105,13 @@ func (q *QMIClient) switchSlot() error {
 
 // OpenLogicalChannel opens a logical channel with the specified AID
 func (q *QMIClient) OpenLogicalChannel(AID []byte) (byte, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	if len(AID) > maxAIDLength {
+		return 0, fmt.Errorf("AID length %d exceeds QMI limit %d", len(AID), maxAIDLength)
+	}
+
 	request := OpenLogicalChannelRequest{
 		ClientID:      q.ClientID,
 		TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
@@ -108,6 +127,9 @@ func (q *QMIClient) OpenLogicalChannel(AID []byte) (byte, error) {
 
 // CloseLogicalChannel closes the specified logical channel
 func (q *QMIClient) CloseLogicalChannel(channel byte) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
 	request := CloseLogicalChannelRequest{
 		ClientID:      q.ClientID,
 		TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
@@ -119,6 +141,13 @@ func (q *QMIClient) CloseLogicalChannel(channel byte) error {
 
 // Transmit sends an APDU command (basic channel implementation)
 func (q *QMIClient) Transmit(command []byte) ([]byte, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	if len(command) > maxTransmitAPDUCommandLength {
+		return nil, fmt.Errorf("APDU command length %d exceeds QMI limit %d", len(command), maxTransmitAPDUCommandLength)
+	}
+
 	request := TransmitAPDURequest{
 		ClientID:      q.ClientID,
 		TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),

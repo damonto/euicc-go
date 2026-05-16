@@ -2,6 +2,46 @@ package mbim
 
 import "fmt"
 
+// MBIMProtocolError represents protocol-level errors from MBIM error messages.
+type MBIMProtocolError uint32
+
+const (
+	MBIMProtocolErrorInvalid MBIMProtocolError = iota
+	MBIMProtocolErrorTimeoutFragment
+	MBIMProtocolErrorFragmentOutOfSequence
+	MBIMProtocolErrorLengthMismatch
+	MBIMProtocolErrorDuplicatedTID
+	MBIMProtocolErrorNotOpened
+	MBIMProtocolErrorUnknown
+	MBIMProtocolErrorCancel
+	MBIMProtocolErrorMaxTransfer
+)
+
+func (e MBIMProtocolError) Error() string {
+	switch e {
+	case MBIMProtocolErrorInvalid:
+		return "Invalid MBIM protocol error"
+	case MBIMProtocolErrorTimeoutFragment:
+		return "MBIM protocol error: Timeout Fragment"
+	case MBIMProtocolErrorFragmentOutOfSequence:
+		return "MBIM protocol error: Fragment Out Of Sequence"
+	case MBIMProtocolErrorLengthMismatch:
+		return "MBIM protocol error: Length Mismatch"
+	case MBIMProtocolErrorDuplicatedTID:
+		return "MBIM protocol error: Duplicated TID"
+	case MBIMProtocolErrorNotOpened:
+		return "MBIM protocol error: Not Opened"
+	case MBIMProtocolErrorUnknown:
+		return "MBIM protocol error: Unknown"
+	case MBIMProtocolErrorCancel:
+		return "MBIM protocol error: Cancel"
+	case MBIMProtocolErrorMaxTransfer:
+		return "MBIM protocol error: Max Transfer"
+	default:
+		return fmt.Sprintf("Unknown MBIM Protocol Error: %d", e)
+	}
+}
+
 // MBIMStatus represents status errors from the MBIM device.
 type MBIMStatus uint32
 

@@ -21,7 +21,7 @@ type Response struct {
 
 // UnmarshalBinary parses binary data into a Response
 func (r *Response) UnmarshalBinary(data []byte) error {
-	if len(data) < 11 {
+	if len(data) < 12 {
 		return fmt.Errorf("data too short: got %d bytes", len(data))
 	}
 
@@ -29,22 +29,44 @@ func (r *Response) UnmarshalBinary(data []byte) error {
 	if err := binary.Read(reader, binary.LittleEndian, &r.QMUXHeader); err != nil {
 		return fmt.Errorf("read QMUX header: %w", err)
 	}
-	binary.Read(reader, binary.LittleEndian, &r.MessageType)
-
+	if r.QMUXHeader.IfType != core.QMUXHeaderIfType {
+		return fmt.Errorf("unexpected QMUX marker 0x%02X", r.QMUXHeader.IfType)
+	}
+	if got, want := len(data), int(r.QMUXHeader.Length)+1; got != want {
+		return fmt.Errorf("QMUX length mismatch: got %d bytes, header declares %d", got, want)
+	}
 	switch r.QMUXHeader.ServiceType {
 	case core.QMIServiceControl:
-		var txnID uint8
-		binary.Read(reader, binary.LittleEndian, &txnID)
-		r.TransactionID = uint16(txnID)
+		var header Header[uint8]
+		if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
+			return fmt.Errorf("read control QMI header: %w", err)
+		}
+		r.MessageType = header.MessageType
+		r.TransactionID = uint16(header.TransactionID)
+		r.MessageID = header.MessageID
+		r.MessageLength = header.MessageLength
 	default:
-		binary.Read(reader, binary.LittleEndian, &r.TransactionID)
+		var header Header[uint16]
+		if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
+			return fmt.Errorf("read service QMI header: %w", err)
+		}
+		r.MessageType = header.MessageType
+		r.TransactionID = header.TransactionID
+		r.MessageID = header.MessageID
+		r.MessageLength = header.MessageLength
 	}
 
-	binary.Read(reader, binary.LittleEndian, &r.MessageID)
-	binary.Read(reader, binary.LittleEndian, &r.MessageLength)
+	if got, want := reader.Len(), int(r.MessageLength); got != want {
+		return fmt.Errorf("QMI TLV length mismatch: got %d bytes, header declares %d", got, want)
+	}
 	if r.MessageLength > 0 {
-		_, err := r.Value.ReadFrom(io.LimitReader(reader, int64(r.MessageLength)))
-		return err
+		n, err := r.Value.ReadFrom(io.LimitReader(reader, int64(r.MessageLength)))
+		if err != nil {
+			return err
+		}
+		if n != int64(r.MessageLength) {
+			return fmt.Errorf("QMI TLV length mismatch: parsed %d bytes, header declares %d", n, r.MessageLength)
+		}
 	}
 	return nil
 }

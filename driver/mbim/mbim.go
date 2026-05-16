@@ -5,14 +5,21 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/damonto/euicc-go/apdu"
 )
 
+var (
+	slotActivationPollInterval = 500 * time.Millisecond
+	slotActivationAttempts     = 10
+)
+
 // MBIM implements the apdu.SmartCardChannel interface using MBIM protocol
 type MBIM struct {
+	mu      sync.Mutex
 	device  string
 	slot    uint8
 	conn    net.Conn
@@ -38,7 +45,15 @@ func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 }
 
 // Connect establishes MBIM session and opens device
-func (m *MBIM) Connect() error {
+func (m *MBIM) Connect() (err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, m.conn.Close())
+		}
+	}()
 	if err := m.configureProxy(); err != nil {
 		return fmt.Errorf("configure proxy: %w", err)
 	}
@@ -99,10 +114,12 @@ func (m *MBIM) activateSlot(slot uint8) error {
 // waitForSlotActivation waits for the slot to become active by checking subscriber ready status
 func (m *MBIM) waitForSlotActivation() error {
 	var err error
-	ticker := time.NewTicker(500 * time.Millisecond)
+	var lastReadyState uint32
+	var sawReadyState bool
+	ticker := time.NewTicker(slotActivationPollInterval)
 	defer ticker.Stop()
 
-	for attempt := range 10 {
+	for attempt := range slotActivationAttempts {
 		if attempt > 0 {
 			<-ticker.C
 		}
@@ -110,12 +127,21 @@ func (m *MBIM) waitForSlotActivation() error {
 			TransactionID: atomic.AddUint32(&m.txnID, 1),
 		}
 		err = request.Request().Transmit(m.conn)
-		readyState := request.Response.ReadyState
-		if err == nil && (readyState == MBIMSubscriberReadyStateInitialized || readyState == MBIMSubscriberReadyStateNoEsimProfile) {
-			return nil
+		if err == nil {
+			sawReadyState = true
+			lastReadyState = request.Response.ReadyState
+			if lastReadyState == MBIMSubscriberReadyStateInitialized || lastReadyState == MBIMSubscriberReadyStateNoEsimProfile {
+				return nil
+			}
 		}
 	}
-	return fmt.Errorf("sim did not become available after slot %d activation err: %w", m.slot, err)
+	if err != nil {
+		if sawReadyState {
+			return fmt.Errorf("sim did not become available after slot %d activation, last ready state %#x: %w", m.slot, lastReadyState, err)
+		}
+		return fmt.Errorf("sim did not become available after slot %d activation: %w", m.slot, err)
+	}
+	return fmt.Errorf("sim did not become available after slot %d activation, last ready state %#x", m.slot, lastReadyState)
 }
 
 // configureProxy sends proxy configuration request with device path using the libmbim proxy protocol
@@ -142,6 +168,9 @@ func (m *MBIM) openDevice() error {
 
 // OpenLogicalChannel opens a logical channel for the specified Application ID
 func (m *MBIM) OpenLogicalChannel(AID []byte) (byte, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	request := OpenLogicalChannelRequest{
 		TransactionID: atomic.AddUint32(&m.txnID, 1),
 		AppId:         AID,
@@ -151,12 +180,18 @@ func (m *MBIM) OpenLogicalChannel(AID []byte) (byte, error) {
 	if err := request.Request().Transmit(m.conn); err != nil {
 		return 0, err
 	}
+	if request.Response.Status != 0 {
+		return 0, fmt.Errorf("open logical channel status %#x", request.Response.Status)
+	}
 	m.channel = request.Response.Channel
 	return byte(m.channel), nil
 }
 
 // Transmit implements apdu.SmartCardChannel.
 func (m *MBIM) Transmit(command []byte) ([]byte, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	request := TransmitAPDURequest{
 		TransactionID:   atomic.AddUint32(&m.txnID, 1),
 		Channel:         m.channel,
@@ -174,15 +209,31 @@ func (m *MBIM) Transmit(command []byte) ([]byte, error) {
 
 // CloseLogicalChannel closes the specified logical channel
 func (m *MBIM) CloseLogicalChannel(channel byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	request := CloseLogicalChannelRequest{
 		TransactionID: atomic.AddUint32(&m.txnID, 1),
 		Channel:       uint32(channel),
 		Group:         1,
 	}
-	return request.Request().Transmit(m.conn)
+	if err := request.Request().Transmit(m.conn); err != nil {
+		return err
+	}
+	if request.Response.Status != 0 {
+		return fmt.Errorf("close logical channel status %#x", request.Response.Status)
+	}
+	return nil
 }
 
 // Disconnect closes the MBIM connection and releases resources
 func (m *MBIM) Disconnect() error {
-	return m.conn.Close()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	request := CloseRequest{
+		TransactionID: atomic.AddUint32(&m.txnID, 1),
+	}
+	err := request.Request().Transmit(m.conn)
+	return errors.Join(err, m.conn.Close())
 }

@@ -5,19 +5,17 @@ type MessageType uint32
 // MBIM Message Types
 const (
 	// MBIM Core Message Types
-	MessageTypeOpen           MessageType = 0x00000001
-	MessageTypeClose          MessageType = 0x00000002
-	MessageTypeCommand        MessageType = 0x00000003
-	MessageTypeHostError      MessageType = 0x00000004
-	MessageTypeFunctionError  MessageType = 0x00000005
-	MessageTypeIndicateStatus MessageType = 0x00000007
+	MessageTypeOpen      MessageType = 0x00000001
+	MessageTypeClose     MessageType = 0x00000002
+	MessageTypeCommand   MessageType = 0x00000003
+	MessageTypeHostError MessageType = 0x00000004
 
 	// MBIM Response Message Types
-	MessageTypeOpenDone           MessageType = 0x80000001
-	MessageTypeCloseDone          MessageType = 0x80000002
-	MessageTypeCommandDone        MessageType = 0x80000003
-	MessageTypeFunctionErrorDone  MessageType = 0x80000005
-	MessageTypeIndicateStatusDone MessageType = 0x80000007
+	MessageTypeOpenDone       MessageType = 0x80000001
+	MessageTypeCloseDone      MessageType = 0x80000002
+	MessageTypeCommandDone    MessageType = 0x80000003
+	MessageTypeFunctionError  MessageType = 0x80000004
+	MessageTypeIndicateStatus MessageType = 0x80000007
 )
 
 // MBIM Services (UUIDs)

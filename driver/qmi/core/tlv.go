@@ -26,37 +26,58 @@ func (t *TLV) Error() error {
 type TLVs []TLV
 
 func (ts *TLVs) ReadFrom(r io.Reader) (int64, error) {
-	var len uint16
+	var read int64
 	for {
 		var t uint8
 		if err := binary.Read(r, binary.LittleEndian, &t); err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			return int64(len), fmt.Errorf("read TLV type: %w", err)
+			return read, fmt.Errorf("read TLV type: %w", err)
 		}
+		read++
 
 		var n uint16
-		binary.Read(r, binary.LittleEndian, &n)
+		if err := binary.Read(r, binary.LittleEndian, &n); err != nil {
+			return read, fmt.Errorf("read TLV length: %w", err)
+		}
+		read += 2
+
 		v := make([]byte, n)
-		if _, err := io.ReadFull(r, v); err != nil {
-			return int64(len), err
+		nr, err := io.ReadFull(r, v)
+		read += int64(nr)
+		if err != nil {
+			return read, err
 		}
 		*ts = append(*ts, TLV{Type: t, Len: n, Value: v})
-		len += n
 	}
-	return int64(len), ts.Error()
+	return read, ts.Error()
 }
 
 func (ts TLVs) WriteTo(w io.Writer) (int64, error) {
-	var len int64
+	var written int64
 	for _, tlv := range ts {
-		binary.Write(w, binary.LittleEndian, tlv.Type)
-		binary.Write(w, binary.LittleEndian, tlv.Len)
-		w.Write(tlv.Value)
-		len += int64(tlv.Len)
+		if int(tlv.Len) != len(tlv.Value) {
+			return written, fmt.Errorf("TLV type 0x%02X length mismatch: header %d, value %d", tlv.Type, tlv.Len, len(tlv.Value))
+		}
+		if err := binary.Write(w, binary.LittleEndian, tlv.Type); err != nil {
+			return written, fmt.Errorf("write TLV type: %w", err)
+		}
+		written++
+		if err := binary.Write(w, binary.LittleEndian, tlv.Len); err != nil {
+			return written, fmt.Errorf("write TLV length: %w", err)
+		}
+		written += 2
+		n, err := w.Write(tlv.Value)
+		written += int64(n)
+		if err != nil {
+			return written, fmt.Errorf("write TLV value: %w", err)
+		}
+		if n != len(tlv.Value) {
+			return written, io.ErrShortWrite
+		}
 	}
-	return len, nil
+	return written, nil
 }
 
 func (ts TLVs) Find(t uint8) (TLV, bool) {
