@@ -6,16 +6,16 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/damonto/euicc-go/driver/qmi/core"
+	"github.com/damonto/euicc-go/driver/qmi/protocol"
 )
 
 // Response represents a complete parsed QMI message
 type Response struct {
 	TransactionID uint16
-	MessageID     core.MessageID
-	MessageType   core.MessageType
+	MessageID     protocol.MessageID
+	MessageType   protocol.MessageType
 	MessageLength uint16
-	Value         core.TLVs
+	Value         protocol.TLVs
 }
 
 // UnmarshalBinary parses binary data into a Response

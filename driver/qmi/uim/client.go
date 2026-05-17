@@ -1,4 +1,4 @@
-package core
+package uim
 
 import (
 	"errors"
@@ -6,12 +6,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/damonto/euicc-go/driver/qmi/protocol"
 )
 
-// QMIClient implements the apdu.SmartCardChannel interface using QMI protocol
-type QMIClient struct {
+// Client implements UIM smart card operations over a QMI transport.
+type Client struct {
 	mu        sync.Mutex
-	Transport Transport
+	Transport protocol.Transport
 	Slot      uint8
 	ClientID  uint8
 	TxnID     uint32
@@ -22,11 +24,11 @@ const (
 	maxAIDLength = 0xff
 
 	sendAPDUFixedTLVLength       = 4 + 5 + 4
-	maxTransmitAPDUCommandLength = MaxQMUXServiceTLVLength - sendAPDUFixedTLVLength
+	maxTransmitAPDUCommandLength = protocol.MaxQMUXServiceTLVLength - sendAPDUFixedTLVLength
 )
 
 // Connect establishes QMI session and allocates UIM client ID
-func (q *QMIClient) Connect() error {
+func (q *Client) Connect() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -40,11 +42,11 @@ func (q *QMIClient) Connect() error {
 }
 
 // ensureSlotActivated checks if the desired slot is activated and activates it if necessary
-func (q *QMIClient) ensureSlotActivated() error {
+func (q *Client) ensureSlotActivated() error {
 	slot, err := q.currentActivatedSlot()
 	if err != nil {
 		// Some older devices do not support the GetSlotStatusRequest QMI command
-		if errors.Is(err, QMIErrorNotSupported) {
+		if errors.Is(err, protocol.QMIErrorNotSupported) {
 			return nil
 		}
 		return err
@@ -59,7 +61,7 @@ func (q *QMIClient) ensureSlotActivated() error {
 }
 
 // waitForSlotActivation waits for the specified slot to be activated
-func (q *QMIClient) waitForSlotActivation() error {
+func (q *Client) waitForSlotActivation() error {
 	var err error
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
@@ -81,7 +83,7 @@ func (q *QMIClient) waitForSlotActivation() error {
 }
 
 // currentActivatedSlot returns the currently active logical slot
-func (q *QMIClient) currentActivatedSlot() (uint8, error) {
+func (q *Client) currentActivatedSlot() (uint8, error) {
 	request := GetSlotStatusRequest{
 		ClientID:      q.ClientID,
 		TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
@@ -93,7 +95,7 @@ func (q *QMIClient) currentActivatedSlot() (uint8, error) {
 }
 
 // switchSlot switches to the specified logical and physical slot
-func (q *QMIClient) switchSlot() error {
+func (q *Client) switchSlot() error {
 	request := SwitchSlotRequest{
 		ClientID:      q.ClientID,
 		TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
@@ -104,7 +106,7 @@ func (q *QMIClient) switchSlot() error {
 }
 
 // OpenLogicalChannel opens a logical channel with the specified AID
-func (q *QMIClient) OpenLogicalChannel(AID []byte) (byte, error) {
+func (q *Client) OpenLogicalChannel(AID []byte) (byte, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -126,7 +128,7 @@ func (q *QMIClient) OpenLogicalChannel(AID []byte) (byte, error) {
 }
 
 // CloseLogicalChannel closes the specified logical channel
-func (q *QMIClient) CloseLogicalChannel(channel byte) error {
+func (q *Client) CloseLogicalChannel(channel byte) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -140,7 +142,7 @@ func (q *QMIClient) CloseLogicalChannel(channel byte) error {
 }
 
 // Transmit sends an APDU command (basic channel implementation)
-func (q *QMIClient) Transmit(command []byte) ([]byte, error) {
+func (q *Client) Transmit(command []byte) ([]byte, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 

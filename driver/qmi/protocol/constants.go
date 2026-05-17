@@ -1,4 +1,4 @@
-package core
+package protocol
 
 // ServiceType represents QMI service types
 type ServiceType uint8
@@ -61,57 +61,4 @@ type QMIResult uint16
 const (
 	QMIResultSuccess QMIResult = 0x0000 // Success
 	QMIResultFailure QMIResult = 0x0001 // Failure
-)
-
-// UIM Physical Card State
-type UIMPhysicalCardState uint32
-
-const (
-	UIMPhysicalCardStateUnknown UIMPhysicalCardState = 0x00
-	UIMPhysicalCardStateAbsent  UIMPhysicalCardState = 0x01
-	UIMPhysicalCardStatePresent UIMPhysicalCardState = 0x02
-)
-
-// UIM Slot State
-type UIMSlotState uint32
-
-const (
-	UIMSlotStateInactive UIMSlotState = 0x00
-	UIMSlotStateActive   UIMSlotState = 0x01
-)
-
-// Card Status
-
-type UIMCardState uint8
-
-const (
-	UIMCardStatusAbsent  UIMCardState = 0x00
-	UIMCardStatusPresent UIMCardState = 0x01
-	UIMCardStatusUnknown UIMCardState = 0x02
-)
-
-// UIM Card Application Type
-type UIMCardApplicationType uint8
-
-const (
-	UIMCardApplicationTypeUnknown UIMCardApplicationType = 0x00
-	UIMCardApplicationTypeSIM     UIMCardApplicationType = 0x01
-	UIMCardApplicationTypeUSIM    UIMCardApplicationType = 0x02
-	UIMCardApplicationTypeRUIM    UIMCardApplicationType = 0x03
-	UIMCardApplicationTypeCSIM    UIMCardApplicationType = 0x04
-	UIMCardApplicationTypeISIM    UIMCardApplicationType = 0x05
-)
-
-// UIM Card Application State
-type UIMCardApplicationState uint8
-
-const (
-	UIMCardApplicationStateUnknown                   UIMCardApplicationState = 0x00
-	UIMCardApplicationStateDetected                  UIMCardApplicationState = 0x01
-	UIMCardApplicationStatePIN1OrUPinPinRequired     UIMCardApplicationState = 0x02
-	UIMCardApplicationStatePUK1OrUPinPUKRequired     UIMCardApplicationState = 0x03
-	UIMCardApplicationStateCheckPersonalizationState UIMCardApplicationState = 0x04
-	UIMCardApplicationStatePIN1Blocked               UIMCardApplicationState = 0x05
-	UIMCardApplicationStateIllegal                   UIMCardApplicationState = 0x06
-	UIMCardApplicationStateReady                     UIMCardApplicationState = 0x07
 )

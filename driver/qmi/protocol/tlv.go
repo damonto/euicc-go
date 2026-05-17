@@ -1,4 +1,4 @@
-package core
+package protocol
 
 import (
 	"encoding/binary"
@@ -47,7 +47,7 @@ func (ts *TLVs) ReadFrom(r io.Reader) (int64, error) {
 		nr, err := io.ReadFull(r, v)
 		read += int64(nr)
 		if err != nil {
-			return read, err
+			return read, fmt.Errorf("read TLV value: %w", err)
 		}
 		*ts = append(*ts, TLV{Type: t, Len: n, Value: v})
 	}

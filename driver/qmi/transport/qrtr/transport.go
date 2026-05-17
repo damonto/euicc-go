@@ -3,40 +3,48 @@ package qrtr
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
+	"net"
+	"os"
 	"time"
 
-	"github.com/damonto/euicc-go/driver/qmi/core"
+	"github.com/damonto/euicc-go/driver/qmi/protocol"
 )
 
 type Transport struct {
-	conn io.ReadWriter
+	conn Conn
+}
+
+type Conn interface {
+	io.ReadWriter
+	SetReadDeadline(time.Time) error
 }
 
 type Header struct {
-	MessageType   core.MessageType
+	MessageType   protocol.MessageType
 	TransactionID uint16
-	MessageID     core.MessageID
+	MessageID     protocol.MessageID
 	MessageLength uint16
 }
 
-func New(conn io.ReadWriter) core.Transport {
+func New(conn Conn) protocol.Transport {
 	return &Transport{conn: conn}
 }
 
-func (t *Transport) bytes(r *core.Request) ([]byte, error) {
+func (t *Transport) bytes(r *protocol.Request) ([]byte, error) {
 	value := new(bytes.Buffer)
 	if _, err := r.Value.WriteTo(value); err != nil {
 		return nil, err
 	}
-	if value.Len() > core.MaxQRTRServiceTLVLength {
-		return nil, fmt.Errorf("QRTR QMI message TLVs length %d exceeds limit %d", value.Len(), core.MaxQRTRServiceTLVLength)
+	if value.Len() > protocol.MaxQRTRServiceTLVLength {
+		return nil, fmt.Errorf("QRTR QMI message TLVs length %d exceeds limit %d", value.Len(), protocol.MaxQRTRServiceTLVLength)
 	}
 
 	buf := new(bytes.Buffer)
 	if err := binary.Write(buf, binary.LittleEndian, Header{
-		MessageType:   core.QMIMessageTypeRequest,
+		MessageType:   protocol.QMIMessageTypeRequest,
 		TransactionID: r.TransactionID,
 		MessageID:     r.MessageID,
 		MessageLength: uint16(value.Len()),
@@ -48,15 +56,29 @@ func (t *Transport) bytes(r *core.Request) ([]byte, error) {
 }
 
 // Read reads a response from the connection and unmarshals it into the Request's Response field
-func (t *Transport) Read(c io.Reader, r *core.Request) (int, error) {
-	if r.ReadTimeout == 0 {
-		r.ReadTimeout = 30 * time.Second
+func (t *Transport) Read(c Conn, r *protocol.Request) (n int, err error) {
+	readTimeout := r.ReadTimeout
+	if readTimeout == 0 {
+		readTimeout = 30 * time.Second
 	}
-	deadline := time.Now().Add(r.ReadTimeout)
+	deadline := time.Now().Add(readTimeout)
+	if err := c.SetReadDeadline(deadline); err != nil {
+		return 0, err
+	}
+	defer func() {
+		clearErr := c.SetReadDeadline(time.Time{})
+		if clearErr != nil && !errors.Is(clearErr, net.ErrClosed) && err == nil {
+			err = clearErr
+		}
+	}()
+
 	for time.Now().Before(deadline) {
-		buf := make([]byte, core.MaxQRTRQMIMessageLength)
+		buf := make([]byte, protocol.MaxQRTRQMIMessageLength)
 		n, err := c.Read(buf)
 		if err != nil {
+			if errors.Is(err, os.ErrDeadlineExceeded) {
+				break
+			}
 			return 0, err
 		}
 
@@ -64,7 +86,7 @@ func (t *Transport) Read(c io.Reader, r *core.Request) (int, error) {
 		if err := response.UnmarshalBinary(buf[:n]); err != nil {
 			return 0, err
 		}
-		if response.TransactionID != r.TransactionID {
+		if response.MessageType != protocol.QMIMessageTypeResponse || response.TransactionID != r.TransactionID {
 			continue
 		}
 		if err := r.Response.UnmarshalResponse(&response.Value); err != nil {
@@ -75,7 +97,7 @@ func (t *Transport) Read(c io.Reader, r *core.Request) (int, error) {
 	return 0, fmt.Errorf("timed out waiting for response for transaction ID %d", r.TransactionID)
 }
 
-func (t *Transport) Transmit(request *core.Request) error {
+func (t *Transport) Transmit(request *protocol.Request) error {
 	bs, err := t.bytes(request)
 	if err != nil {
 		return err

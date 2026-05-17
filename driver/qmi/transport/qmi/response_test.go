@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/damonto/euicc-go/driver/qmi/core"
+	"github.com/damonto/euicc-go/driver/qmi/protocol"
 )
 
 func TestResponseRejectsQMUXLengthMismatch(t *testing.T) {
-	packet := encodeResponse(t, core.QMIServiceUIM, 7, 42, 0xAA)
+	packet := encodeResponse(t, protocol.QMIServiceUIM, 7, 42, 0xAA)
 	packet[1]--
 
 	var response Response
@@ -20,7 +20,7 @@ func TestResponseRejectsQMUXLengthMismatch(t *testing.T) {
 }
 
 func TestResponseRejectsTLVLengthMismatch(t *testing.T) {
-	packet := encodeResponse(t, core.QMIServiceUIM, 7, 42, 0xAA)
+	packet := encodeResponse(t, protocol.QMIServiceUIM, 7, 42, 0xAA)
 	packet[11]++
 
 	var response Response
@@ -31,13 +31,13 @@ func TestResponseRejectsTLVLengthMismatch(t *testing.T) {
 }
 
 func TestBytesRejectsOversizedQMUXPacket(t *testing.T) {
-	request := &core.Request{
+	request := &protocol.Request{
 		ClientID:      7,
 		TransactionID: 42,
-		ServiceType:   core.QMIServiceUIM,
-		MessageID:     core.QMIUIMSendAPDU,
-		Value: core.TLVs{
-			{Type: 0x10, Len: core.MaxEncodedMessageLength, Value: bytes.Repeat([]byte{0xAA}, core.MaxEncodedMessageLength)},
+		ServiceType:   protocol.QMIServiceUIM,
+		MessageID:     protocol.QMIUIMSendAPDU,
+		Value: protocol.TLVs{
+			{Type: 0x10, Len: protocol.MaxEncodedMessageLength, Value: bytes.Repeat([]byte{0xAA}, protocol.MaxEncodedMessageLength)},
 		},
 	}
 

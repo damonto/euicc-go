@@ -8,13 +8,14 @@ import (
 	"sync/atomic"
 
 	"github.com/damonto/euicc-go/apdu"
-	"github.com/damonto/euicc-go/driver/qmi/core"
+	"github.com/damonto/euicc-go/driver/qmi/protocol"
 	transport "github.com/damonto/euicc-go/driver/qmi/transport/qmi"
+	"github.com/damonto/euicc-go/driver/qmi/uim"
 )
 
 // QMI implements the apdu.SmartCardChannel interface using QMI protocol
 type QMI struct {
-	core.QMIClient
+	uim.Client
 	conn   net.Conn
 	device string
 }
@@ -35,7 +36,7 @@ func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 	q := &QMI{
 		conn:   conn,
 		device: device,
-		QMIClient: core.QMIClient{
+		Client: uim.Client{
 			Transport: transport.New(conn),
 			Slot:      slot,
 		},
@@ -53,7 +54,7 @@ func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 
 // openProxyConnection sends a request to the qmi-proxy to open a connection
 func (q *QMI) openProxyConnection() error {
-	request := core.InternalOpenRequest{
+	request := protocol.InternalOpenRequest{
 		TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
 		DevicePath:    []byte(q.device),
 	}
@@ -66,8 +67,9 @@ func (q *QMI) openProxyConnection() error {
 
 // allocateClientID sends a request to allocate a client ID for UIM service
 func (q *QMI) allocateClientID() error {
-	request := core.AllocateClientIDRequest{
+	request := protocol.AllocateClientIDRequest{
 		TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
+		ServiceType:   protocol.QMIServiceUIM,
 	}
 	err := q.Transport.Transmit(request.Request())
 	if errors.Is(err, io.EOF) {
@@ -82,9 +84,10 @@ func (q *QMI) allocateClientID() error {
 
 // releaseClientID sends a request to release the allocated client ID
 func (q *QMI) releaseClientID() error {
-	request := core.ReleaseClientIDRequest{
+	request := protocol.ReleaseClientIDRequest{
 		ClientID:      q.ClientID,
 		TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
+		ServiceType:   protocol.QMIServiceUIM,
 	}
 	return q.Transport.Transmit(request.Request())
 }

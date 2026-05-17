@@ -1,22 +1,24 @@
-package core
+package uim
 
 import (
 	"bytes"
 	"encoding/binary"
 	"testing"
+
+	"github.com/damonto/euicc-go/driver/qmi/protocol"
 )
 
 func TestGetSlotStatusParsesVariableLengthICCID(t *testing.T) {
 	value := new(bytes.Buffer)
 	value.WriteByte(1)
-	mustWrite(t, value, UIMPhysicalCardStatePresent)
-	mustWrite(t, value, UIMSlotStateActive)
+	mustWrite(t, value, PhysicalCardStatePresent)
+	mustWrite(t, value, SlotStateActive)
 	value.WriteByte(1)
 	value.WriteByte(3)
 	value.Write([]byte{0x89, 0x67, 0x45})
 
 	var response GetSlotStatusResponse
-	err := response.UnmarshalResponse(&TLVs{
+	err := response.UnmarshalResponse(&protocol.TLVs{
 		{Type: 0x10, Len: uint16(value.Len()), Value: value.Bytes()},
 	})
 	if err != nil {
@@ -37,15 +39,15 @@ func TestGetCardStatusParsesVariableLengthApplications(t *testing.T) {
 	mustWrite(t, value, uint16(0))
 	mustWrite(t, value, uint16(0))
 	value.WriteByte(1) // cards
-	value.WriteByte(byte(UIMCardStatusPresent))
+	value.WriteByte(byte(CardStatePresent))
 	value.Write([]byte{0x00, 0x00, 0x00, 0x00}) // UPIN state/retries and error.
 	value.WriteByte(2)                          // applications
 
-	writeCardApplication(t, value, UIMCardApplicationTypeSIM, UIMCardApplicationStateDetected, []byte{0xa0, 0x01})
-	writeCardApplication(t, value, UIMCardApplicationTypeUSIM, UIMCardApplicationStateReady, []byte{0xa0, 0x00, 0x00})
+	writeCardApplication(t, value, CardApplicationTypeSIM, CardApplicationStateDetected, []byte{0xa0, 0x01})
+	writeCardApplication(t, value, CardApplicationTypeUSIM, CardApplicationStateReady, []byte{0xa0, 0x00, 0x00})
 
 	var response GetCardStatusResponse
-	err := response.UnmarshalResponse(&TLVs{
+	err := response.UnmarshalResponse(&protocol.TLVs{
 		{Type: 0x10, Len: uint16(value.Len()), Value: value.Bytes()},
 	})
 	if err != nil {
@@ -56,7 +58,7 @@ func TestGetCardStatusParsesVariableLengthApplications(t *testing.T) {
 	}
 }
 
-func writeCardApplication(t *testing.T, w *bytes.Buffer, typ UIMCardApplicationType, state UIMCardApplicationState, aid []byte) {
+func writeCardApplication(t *testing.T, w *bytes.Buffer, typ CardApplicationType, state CardApplicationState, aid []byte) {
 	t.Helper()
 
 	w.WriteByte(byte(typ))

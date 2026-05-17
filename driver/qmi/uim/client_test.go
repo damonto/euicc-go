@@ -1,19 +1,23 @@
-package core
+package uim
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/damonto/euicc-go/driver/qmi/protocol"
+)
 
 type stubTransport struct {
 	called bool
 }
 
-func (s *stubTransport) Transmit(*Request) error {
+func (s *stubTransport) Transmit(*protocol.Request) error {
 	s.called = true
 	return nil
 }
 
 func TestOpenLogicalChannelRejectsOversizedAID(t *testing.T) {
 	transport := &stubTransport{}
-	client := &QMIClient{Transport: transport, Slot: 1}
+	client := &Client{Transport: transport, Slot: 1}
 
 	_, err := client.OpenLogicalChannel(make([]byte, maxAIDLength+1))
 	if err == nil {
@@ -26,7 +30,7 @@ func TestOpenLogicalChannelRejectsOversizedAID(t *testing.T) {
 
 func TestTransmitRejectsOversizedAPDU(t *testing.T) {
 	transport := &stubTransport{}
-	client := &QMIClient{Transport: transport, Slot: 1}
+	client := &Client{Transport: transport, Slot: 1}
 
 	_, err := client.Transmit(make([]byte, maxTransmitAPDUCommandLength+1))
 	if err == nil {

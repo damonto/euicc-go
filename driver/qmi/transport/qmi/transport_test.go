@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/damonto/euicc-go/driver/qmi/core"
+	"github.com/damonto/euicc-go/driver/qmi/protocol"
 )
 
 type captureResponse struct {
 	payload []byte
 }
 
-func (r *captureResponse) UnmarshalResponse(tlvs *core.TLVs) error {
+func (r *captureResponse) UnmarshalResponse(tlvs *protocol.TLVs) error {
 	value, ok := tlvs.Find(0x10)
 	if !ok {
 		return errors.New("missing payload TLV")
@@ -30,15 +30,15 @@ func TestReadAcceptsFirstResponseForSynchronousTransport(t *testing.T) {
 
 	go func() {
 		defer server.Close()
-		_, _ = server.Write(encodeResponse(t, core.QMIServiceUIM, 8, 41, 0xAA))
-		_, _ = server.Write(encodeResponse(t, core.QMIServiceUIM, 7, 42, 0xBB))
+		_, _ = server.Write(encodeResponse(t, protocol.QMIServiceUIM, 8, 41, 0xAA))
+		_, _ = server.Write(encodeResponse(t, protocol.QMIServiceUIM, 7, 42, 0xBB))
 	}()
 
 	response := &captureResponse{}
-	request := &core.Request{
+	request := &protocol.Request{
 		ClientID:      7,
 		TransactionID: 42,
-		ServiceType:   core.QMIServiceUIM,
+		ServiceType:   protocol.QMIServiceUIM,
 		Response:      response,
 		ReadTimeout:   100 * time.Millisecond,
 	}
@@ -52,11 +52,55 @@ func TestReadAcceptsFirstResponseForSynchronousTransport(t *testing.T) {
 	}
 }
 
-func encodeResponse(t *testing.T, serviceType core.ServiceType, clientID uint8, txnID uint16, payload byte) []byte {
+func TestReadUsesRequestDeadlineAndClearsIt(t *testing.T) {
+	stopErr := errors.New("stop read")
+	conn := &fakeDeadlineNetConn{readErr: stopErr}
+	request := &protocol.Request{
+		Response:    &captureResponse{},
+		ReadTimeout: 25 * time.Millisecond,
+	}
+
+	transport := &Transport{}
+	if _, err := transport.Read(conn, request); !errors.Is(err, stopErr) {
+		t.Fatalf("Read error = %v, want %v", err, stopErr)
+	}
+	if len(conn.readDeadlines) != 2 {
+		t.Fatalf("SetReadDeadline calls = %d, want 2", len(conn.readDeadlines))
+	}
+	if conn.readDeadlines[0].IsZero() {
+		t.Fatal("first deadline is zero, want request deadline")
+	}
+	if conn.readDeadlines[0].After(time.Now().Add(request.ReadTimeout)) {
+		t.Fatalf("deadline = %s, want within request timeout %s", conn.readDeadlines[0], request.ReadTimeout)
+	}
+	if !conn.readDeadlines[1].IsZero() {
+		t.Fatalf("second deadline = %s, want cleared deadline", conn.readDeadlines[1])
+	}
+}
+
+type fakeDeadlineNetConn struct {
+	readErr       error
+	readDeadlines []time.Time
+}
+
+func (c *fakeDeadlineNetConn) Read([]byte) (int, error)         { return 0, c.readErr }
+func (c *fakeDeadlineNetConn) Write(p []byte) (int, error)      { return len(p), nil }
+func (c *fakeDeadlineNetConn) Close() error                     { return nil }
+func (c *fakeDeadlineNetConn) LocalAddr() net.Addr              { return &net.IPAddr{} }
+func (c *fakeDeadlineNetConn) RemoteAddr() net.Addr             { return &net.IPAddr{} }
+func (c *fakeDeadlineNetConn) SetDeadline(time.Time) error      { return nil }
+func (c *fakeDeadlineNetConn) SetWriteDeadline(time.Time) error { return nil }
+
+func (c *fakeDeadlineNetConn) SetReadDeadline(t time.Time) error {
+	c.readDeadlines = append(c.readDeadlines, t)
+	return nil
+}
+
+func encodeResponse(t *testing.T, serviceType protocol.ServiceType, clientID uint8, txnID uint16, payload byte) []byte {
 	t.Helper()
 
 	value := new(bytes.Buffer)
-	tlvs := core.TLVs{
+	tlvs := protocol.TLVs{
 		{Type: 0x02, Len: 4, Value: []byte{0x00, 0x00, 0x00, 0x00}},
 		{Type: 0x10, Len: 1, Value: []byte{payload}},
 	}
@@ -66,9 +110,9 @@ func encodeResponse(t *testing.T, serviceType core.ServiceType, clientID uint8, 
 
 	sdu := new(bytes.Buffer)
 	if err := binary.Write(sdu, binary.LittleEndian, Header[uint16]{
-		MessageType:   core.QMIMessageTypeResponse,
+		MessageType:   protocol.QMIMessageTypeResponse,
 		TransactionID: txnID,
-		MessageID:     core.QMIUIMSendAPDU,
+		MessageID:     protocol.QMIUIMSendAPDU,
 		MessageLength: uint16(value.Len()),
 	}); err != nil {
 		t.Fatalf("write SDU header: %v", err)
@@ -79,9 +123,9 @@ func encodeResponse(t *testing.T, serviceType core.ServiceType, clientID uint8, 
 
 	packet := new(bytes.Buffer)
 	if err := binary.Write(packet, binary.LittleEndian, QMUXHeader{
-		IfType:       core.QMUXHeaderIfType,
+		IfType:       protocol.QMUXHeaderIfType,
 		Length:       uint16(sdu.Len() + 5),
-		ControlFlags: core.QMUXHeaderControlFlagRequest,
+		ControlFlags: protocol.QMUXHeaderControlFlagRequest,
 		ServiceType:  serviceType,
 		ClientID:     clientID,
 	}); err != nil {

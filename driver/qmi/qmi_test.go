@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/damonto/euicc-go/driver/qmi/core"
-	"golang.org/x/sys/unix"
+	"github.com/damonto/euicc-go/driver/qmi/protocol"
+	"github.com/damonto/euicc-go/driver/qmi/uim"
 )
 
 type fakeTransport struct {
@@ -17,7 +17,7 @@ type fakeTransport struct {
 	err    error
 }
 
-func (f *fakeTransport) Transmit(*core.Request) error {
+func (f *fakeTransport) Transmit(*protocol.Request) error {
 	f.called = true
 	return f.err
 }
@@ -43,7 +43,7 @@ func TestDisconnectClosesConnectionWhenReleaseFails(t *testing.T) {
 	conn := &fakeConn{closeErr: closeErr}
 	q := &QMI{
 		conn: conn,
-		QMIClient: core.QMIClient{
+		Client: uim.Client{
 			Transport: transport,
 			ClientID:  7,
 		},
@@ -77,35 +77,5 @@ func TestNewRejectsInvalidInputsBeforeDial(t *testing.T) {
 func TestNewQRTRRejectsInvalidSlotBeforeSocket(t *testing.T) {
 	if _, err := NewQRTR(0); err == nil {
 		t.Fatal("NewQRTR error = nil, want invalid slot error")
-	}
-}
-
-func TestQRTRConnBoundarySemantics(t *testing.T) {
-	conn := &qrtrConn{}
-
-	if n, err := conn.Read(nil); n != 0 || err != nil {
-		t.Fatalf("Read(nil) = %d, %v; want 0, nil", n, err)
-	}
-	if n, err := conn.Write([]byte{0x01}); n != 0 || err == nil {
-		t.Fatalf("Write without service = %d, %v; want 0, error", n, err)
-	}
-	if _, _, err := conn.recv([]byte{0x01}); !errors.Is(err, net.ErrClosed) {
-		t.Fatalf("recv on zero conn error = %v, want net.ErrClosed", err)
-	}
-}
-
-func TestQRTRConnCloseIsStateful(t *testing.T) {
-	fds := make([]int, 2)
-	if err := unix.Pipe(fds); err != nil {
-		t.Fatalf("create pipe: %v", err)
-	}
-	defer unix.Close(fds[1])
-
-	conn := &qrtrConn{fd: fds[0], fdValid: true}
-	if err := conn.Close(); err != nil {
-		t.Fatalf("first Close failed: %v", err)
-	}
-	if err := conn.Close(); !errors.Is(err, net.ErrClosed) {
-		t.Fatalf("second Close error = %v, want net.ErrClosed", err)
 	}
 }

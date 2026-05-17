@@ -1,4 +1,4 @@
-package core
+package uim
 
 import (
 	"bytes"
@@ -7,103 +7,9 @@ import (
 	"fmt"
 	"io"
 	"time"
+
+	"github.com/damonto/euicc-go/driver/qmi/protocol"
 )
-
-// region Internal Open Request
-
-type InternalOpenRequest struct {
-	TransactionID uint16
-	DevicePath    []byte
-	Response      *InternalOpenResponse
-}
-
-func (r *InternalOpenRequest) Request() *Request {
-	r.Response = new(InternalOpenResponse)
-	return &Request{
-		TransactionID: r.TransactionID,
-		MessageID:     QMICtlInternalProxyOpen,
-		ServiceType:   QMIServiceControl,
-		Value: TLVs{
-			{Type: 0x01, Len: uint16(len(r.DevicePath)), Value: r.DevicePath},
-		},
-		Response: r.Response,
-	}
-}
-
-type InternalOpenResponse struct{}
-
-func (r *InternalOpenResponse) UnmarshalResponse(TLVs *TLVs) error { return nil }
-
-// endregion
-
-// region Allocate Client ID Requests
-
-type AllocateClientIDRequest struct {
-	TransactionID uint16
-	Response      *AllocateClientIDResponse
-}
-
-func (r *AllocateClientIDRequest) Request() *Request {
-	r.Response = new(AllocateClientIDResponse)
-	return &Request{
-		TransactionID: r.TransactionID,
-		MessageID:     QMICtlCmdAllocateClientID,
-		ServiceType:   QMIServiceControl,
-		Value: TLVs{
-			{Type: 0x01, Len: 1, Value: []byte{byte(QMIServiceUIM)}},
-		},
-		Response: r.Response,
-	}
-}
-
-type AllocateClientIDResponse struct {
-	ClientID uint8
-}
-
-func (r *AllocateClientIDResponse) UnmarshalResponse(TLVs *TLVs) error {
-	if value, ok := TLVs.Find(0x01); ok && len(value.Value) >= 2 {
-		r.ClientID = value.Value[1]
-		return nil
-	}
-	return fmt.Errorf("could not find allocated client ID in response")
-}
-
-// endregion
-
-// region Release Client ID Request
-
-type ReleaseClientIDRequest struct {
-	ClientID      uint8
-	TransactionID uint16
-	Response      *ReleaseClientIDResponse
-}
-
-func (r *ReleaseClientIDRequest) Request() *Request {
-	r.Response = new(ReleaseClientIDResponse)
-	return &Request{
-		TransactionID: r.TransactionID,
-		MessageID:     QMICtlCmdReleaseClientID,
-		ServiceType:   QMIServiceControl,
-		Value: TLVs{
-			{Type: 0x01, Len: 2, Value: []byte{byte(QMIServiceUIM), r.ClientID}},
-		},
-		Response: r.Response,
-	}
-}
-
-type ReleaseClientIDResponse struct {
-	ClientID uint8
-}
-
-func (r *ReleaseClientIDResponse) UnmarshalResponse(TLVs *TLVs) error {
-	if value, ok := TLVs.Find(0x01); ok && len(value.Value) >= 2 {
-		r.ClientID = value.Value[1]
-		return nil
-	}
-	return fmt.Errorf("could not find released client ID in response")
-}
-
-// endregion
 
 // region Switch Slot Request
 
@@ -115,16 +21,16 @@ type SwitchSlotRequest struct {
 	Response      *SwitchSlotResponse
 }
 
-func (r *SwitchSlotRequest) Request() *Request {
+func (r *SwitchSlotRequest) Request() *protocol.Request {
 	r.Response = new(SwitchSlotResponse)
 	physicalSlot := make([]byte, 4)
 	binary.LittleEndian.PutUint32(physicalSlot, r.PhysicalSlot)
-	return &Request{
+	return &protocol.Request{
 		ClientID:      r.ClientID,
 		TransactionID: r.TransactionID,
-		MessageID:     QMIUIMSwitchSlot,
-		ServiceType:   QMIServiceUIM,
-		Value: TLVs{
+		MessageID:     protocol.QMIUIMSwitchSlot,
+		ServiceType:   protocol.QMIServiceUIM,
+		Value: protocol.TLVs{
 			{Type: 0x01, Len: 1, Value: []byte{r.LogicalSlot}},
 			{Type: 0x02, Len: uint16(len(physicalSlot)), Value: physicalSlot},
 		},
@@ -134,7 +40,7 @@ func (r *SwitchSlotRequest) Request() *Request {
 
 type SwitchSlotResponse struct{}
 
-func (r *SwitchSlotResponse) UnmarshalResponse(TLVs *TLVs) error { return nil }
+func (r *SwitchSlotResponse) UnmarshalResponse(TLVs *protocol.TLVs) error { return nil }
 
 // endregion
 
@@ -146,13 +52,13 @@ type GetSlotStatusRequest struct {
 	Response      *GetSlotStatusResponse
 }
 
-func (r *GetSlotStatusRequest) Request() *Request {
+func (r *GetSlotStatusRequest) Request() *protocol.Request {
 	r.Response = new(GetSlotStatusResponse)
-	return &Request{
+	return &protocol.Request{
 		ClientID:      r.ClientID,
 		TransactionID: r.TransactionID,
-		MessageID:     QMIUIMGetSlotStatus,
-		ServiceType:   QMIServiceUIM,
+		MessageID:     protocol.QMIUIMGetSlotStatus,
+		ServiceType:   protocol.QMIServiceUIM,
 		ReadTimeout:   1 * time.Second,
 		Response:      r.Response,
 	}
@@ -164,13 +70,13 @@ type GetSlotStatusResponse struct {
 }
 
 type Slot struct {
-	CardState   UIMPhysicalCardState
-	SlotState   UIMSlotState
+	CardState   PhysicalCardState
+	SlotState   SlotState
 	LogicalSlot uint8
 	ICCID       []byte
 }
 
-func (r *GetSlotStatusResponse) UnmarshalResponse(TLVs *TLVs) error {
+func (r *GetSlotStatusResponse) UnmarshalResponse(TLVs *protocol.TLVs) error {
 	value, ok := TLVs.Find(0x10)
 	if !ok {
 		return errors.New("could not find slot status in response")
@@ -198,7 +104,7 @@ func (r *GetSlotStatusResponse) UnmarshalResponse(TLVs *TLVs) error {
 		if err != nil {
 			return err
 		}
-		if slot.SlotState == UIMSlotStateActive {
+		if slot.SlotState == SlotStateActive {
 			r.ActivatedSlot = uint8(i + 1)
 		}
 		r.Slots = append(r.Slots, slot)
@@ -216,13 +122,13 @@ type GetCardStatusRequest struct {
 	Response      *GetCardStatusResponse
 }
 
-func (r *GetCardStatusRequest) Request() *Request {
+func (r *GetCardStatusRequest) Request() *protocol.Request {
 	r.Response = new(GetCardStatusResponse)
-	return &Request{
+	return &protocol.Request{
 		ClientID:      r.ClientID,
 		TransactionID: r.TransactionID,
-		MessageID:     QMIUIMGetCardStatus,
-		ServiceType:   QMIServiceUIM,
+		MessageID:     protocol.QMIUIMGetCardStatus,
+		ServiceType:   protocol.QMIServiceUIM,
 		Response:      r.Response,
 	}
 }
@@ -236,16 +142,16 @@ type GetCardStatusResponse struct {
 }
 
 type Card struct {
-	State        UIMCardState
+	State        CardState
 	Applications []Application
 }
 
 type Application struct {
-	Type  UIMCardApplicationType
-	State UIMCardApplicationState
+	Type  CardApplicationType
+	State CardApplicationState
 }
 
-func (r *GetCardStatusResponse) UnmarshalResponse(TLVs *TLVs) error {
+func (r *GetCardStatusResponse) UnmarshalResponse(TLVs *protocol.TLVs) error {
 	value, ok := TLVs.Find(0x10)
 	if !ok {
 		return errors.New("could not find card status in response")
@@ -311,9 +217,9 @@ func (r *GetCardStatusResponse) UnmarshalResponse(TLVs *TLVs) error {
 
 func (r *GetCardStatusResponse) Ready() bool {
 	for _, card := range r.Cards {
-		if card.State == UIMCardStatusPresent {
+		if card.State == CardStatePresent {
 			for _, app := range card.Applications {
-				if app.Type == UIMCardApplicationTypeUSIM && app.State == UIMCardApplicationStateReady {
+				if app.Type == CardApplicationTypeUSIM && app.State == CardApplicationStateReady {
 					return true
 				}
 			}
@@ -334,15 +240,15 @@ type OpenLogicalChannelRequest struct {
 	Response      *OpenLogicalChannelResponse
 }
 
-func (r *OpenLogicalChannelRequest) Request() *Request {
+func (r *OpenLogicalChannelRequest) Request() *protocol.Request {
 	value := append([]byte{byte(len(r.AID))}, r.AID...)
 	r.Response = new(OpenLogicalChannelResponse)
-	return &Request{
+	return &protocol.Request{
 		ClientID:      r.ClientID,
 		TransactionID: r.TransactionID,
-		MessageID:     QMIUIMOpenLogicalChannel,
-		ServiceType:   QMIServiceUIM,
-		Value: TLVs{
+		MessageID:     protocol.QMIUIMOpenLogicalChannel,
+		ServiceType:   protocol.QMIServiceUIM,
+		Value: protocol.TLVs{
 			{Type: 0x10, Len: uint16(len(value)), Value: value},
 			{Type: 0x01, Len: 1, Value: []byte{r.Slot}},
 		},
@@ -354,7 +260,7 @@ type OpenLogicalChannelResponse struct {
 	Channel byte
 }
 
-func (r *OpenLogicalChannelResponse) UnmarshalResponse(TLVs *TLVs) error {
+func (r *OpenLogicalChannelResponse) UnmarshalResponse(TLVs *protocol.TLVs) error {
 	if value, ok := TLVs.Find(0x10); ok && len(value.Value) >= 1 {
 		r.Channel = value.Value[0]
 		return nil
@@ -374,14 +280,14 @@ type CloseLogicalChannelRequest struct {
 	Response      *CloseLogicalChannelResponse
 }
 
-func (r *CloseLogicalChannelRequest) Request() *Request {
+func (r *CloseLogicalChannelRequest) Request() *protocol.Request {
 	r.Response = new(CloseLogicalChannelResponse)
-	return &Request{
+	return &protocol.Request{
 		ClientID:      r.ClientID,
 		TransactionID: r.TransactionID,
-		MessageID:     QMIUIMCloseLogicalChannel,
-		ServiceType:   QMIServiceUIM,
-		Value: TLVs{
+		MessageID:     protocol.QMIUIMCloseLogicalChannel,
+		ServiceType:   protocol.QMIServiceUIM,
+		Value: protocol.TLVs{
 			{Type: 0x01, Len: 1, Value: []byte{r.Slot}},
 			{Type: 0x11, Len: 1, Value: []byte{r.Channel}},
 		},
@@ -391,7 +297,7 @@ func (r *CloseLogicalChannelRequest) Request() *Request {
 
 type CloseLogicalChannelResponse struct{}
 
-func (r *CloseLogicalChannelResponse) UnmarshalResponse(TLVs *TLVs) error { return nil }
+func (r *CloseLogicalChannelResponse) UnmarshalResponse(TLVs *protocol.TLVs) error { return nil }
 
 // endregion
 
@@ -406,16 +312,16 @@ type TransmitAPDURequest struct {
 	Response      *TransmitAPDUResponse
 }
 
-func (r *TransmitAPDURequest) Request() *Request {
+func (r *TransmitAPDURequest) Request() *protocol.Request {
 	length := len(r.Command)
 	value := append([]byte{byte(length), byte(length >> 8)}, r.Command...)
 	r.Response = new(TransmitAPDUResponse)
-	return &Request{
+	return &protocol.Request{
 		ClientID:      r.ClientID,
 		TransactionID: r.TransactionID,
-		MessageID:     QMIUIMSendAPDU,
-		ServiceType:   QMIServiceUIM,
-		Value: TLVs{
+		MessageID:     protocol.QMIUIMSendAPDU,
+		ServiceType:   protocol.QMIServiceUIM,
+		Value: protocol.TLVs{
 			{Type: 0x10, Len: 1, Value: []byte{r.Channel}},
 			{Type: 0x02, Len: uint16(len(value)), Value: value},
 			{Type: 0x01, Len: 1, Value: []byte{r.Slot}},
@@ -428,7 +334,7 @@ type TransmitAPDUResponse struct {
 	Response []byte
 }
 
-func (r *TransmitAPDUResponse) UnmarshalResponse(TLVs *TLVs) error {
+func (r *TransmitAPDUResponse) UnmarshalResponse(TLVs *protocol.TLVs) error {
 	if value, ok := TLVs.Find(0x10); ok && len(value.Value) >= 2 {
 		n := int(value.Value[0]) | (int(value.Value[1]) << 8)
 		if len(value.Value) >= 2+n {

@@ -6,17 +6,17 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/damonto/euicc-go/driver/qmi/core"
+	"github.com/damonto/euicc-go/driver/qmi/protocol"
 )
 
 // Response represents a complete parsed QMI message
 type Response struct {
 	QMUXHeader
 	TransactionID uint16
-	MessageID     core.MessageID
-	MessageType   core.MessageType
+	MessageID     protocol.MessageID
+	MessageType   protocol.MessageType
 	MessageLength uint16
-	Value         core.TLVs
+	Value         protocol.TLVs
 }
 
 // UnmarshalBinary parses binary data into a Response
@@ -29,14 +29,14 @@ func (r *Response) UnmarshalBinary(data []byte) error {
 	if err := binary.Read(reader, binary.LittleEndian, &r.QMUXHeader); err != nil {
 		return fmt.Errorf("read QMUX header: %w", err)
 	}
-	if r.QMUXHeader.IfType != core.QMUXHeaderIfType {
+	if r.QMUXHeader.IfType != protocol.QMUXHeaderIfType {
 		return fmt.Errorf("unexpected QMUX marker 0x%02X", r.QMUXHeader.IfType)
 	}
 	if got, want := len(data), int(r.QMUXHeader.Length)+1; got != want {
 		return fmt.Errorf("QMUX length mismatch: got %d bytes, header declares %d", got, want)
 	}
 	switch r.QMUXHeader.ServiceType {
-	case core.QMIServiceControl:
+	case protocol.QMIServiceControl:
 		var header Header[uint8]
 		if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
 			return fmt.Errorf("read control QMI header: %w", err)
