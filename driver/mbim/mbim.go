@@ -1,6 +1,7 @@
 package mbim
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -180,8 +181,8 @@ func (m *MBIM) OpenLogicalChannel(AID []byte) (byte, error) {
 	if err := request.Request().Transmit(m.conn); err != nil {
 		return 0, err
 	}
-	if request.Response.Status != 0 {
-		return 0, fmt.Errorf("open logical channel status %#x", request.Response.Status)
+	if !uiccStatusOK(request.Response.Status) {
+		return 0, fmt.Errorf("open logical channel status %04X", uiccStatusCode(request.Response.Status))
 	}
 	m.channel = request.Response.Channel
 	return byte(m.channel), nil
@@ -202,8 +203,7 @@ func (m *MBIM) Transmit(command []byte) ([]byte, error) {
 	if err := request.Request().Transmit(m.conn); err != nil {
 		return nil, err
 	}
-	status := []byte{byte(request.Response.Status >> 8), byte(request.Response.Status)}
-	response := append(request.Response.Response, status...)
+	response := append(request.Response.Response, uiccStatusWord(request.Response.Status)...)
 	return response, nil
 }
 
@@ -220,8 +220,8 @@ func (m *MBIM) CloseLogicalChannel(channel byte) error {
 	if err := request.Request().Transmit(m.conn); err != nil {
 		return err
 	}
-	if request.Response.Status != 0 {
-		return fmt.Errorf("close logical channel status %#x", request.Response.Status)
+	if !uiccStatusOK(request.Response.Status) {
+		return fmt.Errorf("close logical channel status %04X", uiccStatusCode(request.Response.Status))
 	}
 	return nil
 }
@@ -236,4 +236,18 @@ func (m *MBIM) Disconnect() error {
 	}
 	err := request.Request().Transmit(m.conn)
 	return errors.Join(err, m.conn.Close())
+}
+
+func uiccStatusOK(status uint32) bool {
+	return status == 0 || uiccStatusCode(status) == 0x9000
+}
+
+func uiccStatusWord(status uint32) []byte {
+	sw := make([]byte, 2)
+	binary.LittleEndian.PutUint16(sw, uint16(status&0xffff))
+	return sw
+}
+
+func uiccStatusCode(status uint32) uint16 {
+	return binary.BigEndian.Uint16(uiccStatusWord(status))
 }

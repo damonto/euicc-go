@@ -363,7 +363,7 @@ func TestReadFromReturnsFunctionError(t *testing.T) {
 
 func TestReadFromReassemblesCommandDoneFragments(t *testing.T) {
 	apduPayload := make([]byte, 12)
-	binary.LittleEndian.PutUint32(apduPayload[0:4], 0x9000)
+	binary.LittleEndian.PutUint32(apduPayload[0:4], 0x90)
 	binary.LittleEndian.PutUint32(apduPayload[4:8], 4)
 	apduPayload = append(apduPayload, 0xde, 0xad, 0xbe, 0xef)
 	fragments := fragmentCommandDone(1, ServiceMsUiccLowLevelAccess, CIDUiccAPDU, apduPayload, 12, 12, 12, 8)
@@ -381,11 +381,26 @@ func TestReadFromReassemblesCommandDoneFragments(t *testing.T) {
 	if n != 48+len(apduPayload) {
 		t.Fatalf("ReadFrom n = %d, want %d", n, 48+len(apduPayload))
 	}
-	if response.Status != 0x9000 {
-		t.Fatalf("Status = %#x, want 0x9000", response.Status)
+	if response.Status != 0x90 {
+		t.Fatalf("Status = %#x, want 0x90", response.Status)
 	}
 	if !bytes.Equal(response.Response, []byte{0xde, 0xad, 0xbe, 0xef}) {
 		t.Fatalf("Response = % X, want DE AD BE EF", response.Response)
+	}
+}
+
+func TestTransmitAppendsAPDUStatusWordInWireOrder(t *testing.T) {
+	apduPayload := make([]byte, 12)
+	binary.LittleEndian.PutUint32(apduPayload[0:4], 0x90)
+	conn := newFakeConn(commandDone(1, ServiceMsUiccLowLevelAccess, CIDUiccAPDU, apduPayload))
+	m := &MBIM{conn: conn}
+
+	response, err := m.Transmit([]byte{0xbf, 0x3e, 0x03, 0x5c, 0x01, 0x5a})
+	if err != nil {
+		t.Fatalf("Transmit failed: %v", err)
+	}
+	if !bytes.Equal(response, []byte{0x90, 0x00}) {
+		t.Fatalf("Transmit response = % X, want 90 00", response)
 	}
 }
 
@@ -505,7 +520,7 @@ func TestDeviceSlotMappingsResponseRejectsInvalidSlotSize(t *testing.T) {
 
 func TestOpenLogicalChannelRejectsPayloadStatus(t *testing.T) {
 	payload := make([]byte, 16)
-	binary.LittleEndian.PutUint32(payload[0:4], 1)
+	binary.LittleEndian.PutUint32(payload[0:4], 0x826a)
 	conn := newFakeConn(commandDone(1, ServiceMsUiccLowLevelAccess, CIDUiccOpenChannel, payload))
 	m := &MBIM{conn: conn}
 
@@ -513,7 +528,7 @@ func TestOpenLogicalChannelRejectsPayloadStatus(t *testing.T) {
 	if err == nil {
 		t.Fatal("OpenLogicalChannel error = nil, want status error")
 	}
-	if !strings.Contains(err.Error(), "status 0x1") {
+	if !strings.Contains(err.Error(), "status 6A82") {
 		t.Fatalf("OpenLogicalChannel error = %q, want status", err.Error())
 	}
 	if m.channel != 0 {
@@ -521,9 +536,25 @@ func TestOpenLogicalChannelRejectsPayloadStatus(t *testing.T) {
 	}
 }
 
+func TestOpenLogicalChannelAcceptsUICCStatusOK(t *testing.T) {
+	payload := make([]byte, 16)
+	binary.LittleEndian.PutUint32(payload[0:4], 0x90)
+	binary.LittleEndian.PutUint32(payload[4:8], 2)
+	conn := newFakeConn(commandDone(1, ServiceMsUiccLowLevelAccess, CIDUiccOpenChannel, payload))
+	m := &MBIM{conn: conn}
+
+	channel, err := m.OpenLogicalChannel([]byte{0xA0, 0x00})
+	if err != nil {
+		t.Fatalf("OpenLogicalChannel failed: %v", err)
+	}
+	if channel != 2 {
+		t.Fatalf("channel = %d, want 2", channel)
+	}
+}
+
 func TestCloseLogicalChannelRejectsPayloadStatus(t *testing.T) {
 	payload := make([]byte, 4)
-	binary.LittleEndian.PutUint32(payload, 2)
+	binary.LittleEndian.PutUint32(payload[0:4], 0x8569)
 	conn := newFakeConn(commandDone(1, ServiceMsUiccLowLevelAccess, CIDUiccCloseChannel, payload))
 	m := &MBIM{conn: conn}
 
@@ -531,8 +562,19 @@ func TestCloseLogicalChannelRejectsPayloadStatus(t *testing.T) {
 	if err == nil {
 		t.Fatal("CloseLogicalChannel error = nil, want status error")
 	}
-	if !strings.Contains(err.Error(), "status 0x2") {
+	if !strings.Contains(err.Error(), "status 6985") {
 		t.Fatalf("CloseLogicalChannel error = %q, want status", err.Error())
+	}
+}
+
+func TestCloseLogicalChannelAcceptsUICCStatusOK(t *testing.T) {
+	payload := make([]byte, 4)
+	binary.LittleEndian.PutUint32(payload[0:4], 0x90)
+	conn := newFakeConn(commandDone(1, ServiceMsUiccLowLevelAccess, CIDUiccCloseChannel, payload))
+	m := &MBIM{conn: conn}
+
+	if err := m.CloseLogicalChannel(1); err != nil {
+		t.Fatalf("CloseLogicalChannel failed: %v", err)
 	}
 }
 
