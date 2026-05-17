@@ -27,3 +27,8 @@ go.work.sum
 
 /.idea
 /.vscode
+
+# References to libraries that are not part of the project
+driver/qmi/libqrtr-glib
+driver/qmi/libqmi
+driver/mbim/libmbim
