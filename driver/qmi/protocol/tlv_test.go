@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"os"
+	"regexp"
 	"testing"
 )
 
@@ -58,5 +60,47 @@ func TestQMIErrorFallbackIncludesCode(t *testing.T) {
 	}
 	if !errors.Is(err, QMIError(65000)) {
 		t.Fatal("QMIError should remain comparable through errors.Is")
+	}
+}
+
+func TestQMIErrorInvalidArgumentHasText(t *testing.T) {
+	if got, want := QMIErrorInvalidArgument.Error(), "Invalid argument"; got != want {
+		t.Fatalf("Error() = %q, want %q", got, want)
+	}
+}
+
+func TestQMIErrorLaterCodesHaveText(t *testing.T) {
+	tests := map[QMIError]string{
+		QMIErrorInvalidIndex:               "Invalid index",
+		QMIErrorOperationInProgress:        "Operation in progress",
+		QMIErrorCatEnvelopeCommandFailed:   "CAT envelope command failed",
+		QMIErrorFwUpdateDiscontinuousFrame: "Firmware update discontinuous frame",
+	}
+
+	for code, want := range tests {
+		if got := code.Error(); got != want {
+			t.Fatalf("%d Error() = %q, want %q", code, got, want)
+		}
+	}
+}
+
+func TestQMIErrorTextCoversDeclaredErrors(t *testing.T) {
+	data, err := os.ReadFile("errors.go")
+	if err != nil {
+		t.Fatalf("read errors.go: %v", err)
+	}
+
+	constRe := regexp.MustCompile(`(?m)^\s*(QMIError[A-Za-z0-9]+)\s+QMIError\s*=`)
+	mapRe := regexp.MustCompile(`(?m)^\s*(QMIError[A-Za-z0-9]+):\s*"`)
+
+	mapped := make(map[string]bool)
+	for _, match := range mapRe.FindAllStringSubmatch(string(data), -1) {
+		mapped[match[1]] = true
+	}
+
+	for _, match := range constRe.FindAllStringSubmatch(string(data), -1) {
+		if !mapped[match[1]] {
+			t.Fatalf("%s is declared but not mapped to text", match[1])
+		}
 	}
 }

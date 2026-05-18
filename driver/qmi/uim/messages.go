@@ -290,6 +290,10 @@ func (r *CloseLogicalChannelRequest) Request() *protocol.Request {
 		Value: protocol.TLVs{
 			{Type: 0x01, Len: 1, Value: []byte{r.Slot}},
 			{Type: 0x11, Len: 1, Value: []byte{r.Channel}},
+			// Optional TLV 0x13: Terminate Application. Value 0x01 asks the
+			// modem to terminate the selected application while closing the
+			// logical channel. libqmi/qmicli do not send it by default.
+			// {Type: 0x13, Len: 1, Value: []byte{0x01}},
 		},
 		Response: r.Response,
 	}

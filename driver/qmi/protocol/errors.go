@@ -134,83 +134,137 @@ const (
 	QMIErrorCatEnvelopeCommandFailed    QMIError = 61445 /*< nick=CatEnvelopeCommandFailed >*/
 )
 
+var qmiErrorText = map[QMIError]string{
+	QMIErrorNone:                        "No error",
+	QMIErrorMalformedMessage:            "Malformed message",
+	QMIErrorNoMemory:                    "No memory",
+	QMIErrorInternal:                    "Internal error",
+	QMIErrorAborted:                     "Aborted",
+	QMIErrorClientIdsExhausted:          "Client IDs exhausted",
+	QMIErrorUnabortableTransaction:      "Unabortable transaction",
+	QMIErrorInvalidClientId:             "Invalid client ID",
+	QMIErrorNoThresholdsProvided:        "No thresholds provided",
+	QMIErrorInvalidHandle:               "Invalid handle",
+	QMIErrorInvalidProfile:              "Invalid profile",
+	QMIErrorInvalidPinId:                "Invalid PIN ID",
+	QMIErrorIncorrectPin:                "Incorrect PIN",
+	QMIErrorNoNetworkFound:              "No network found",
+	QMIErrorCallFailed:                  "Call failed",
+	QMIErrorOutOfCall:                   "Out of call",
+	QMIErrorNotProvisioned:              "Not provisioned",
+	QMIErrorMissingArgument:             "Missing argument",
+	QMIErrorArgumentTooLong:             "Argument too long",
+	QMIErrorInvalidTransactionId:        "Invalid transaction ID",
+	QMIErrorDeviceInUse:                 "Device in use",
+	QMIErrorNetworkUnsupported:          "Network unsupported",
+	QMIErrorDeviceUnsupported:           "Device unsupported",
+	QMIErrorNoEffect:                    "No effect",
+	QMIErrorNoFreeProfile:               "No free profile",
+	QMIErrorInvalidPdpType:              "Invalid PDP type",
+	QMIErrorInvalidTechnologyPreference: "Invalid technology preference",
+	QMIErrorInvalidProfileType:          "Invalid profile type",
+	QMIErrorInvalidServiceType:          "Invalid service type",
+	QMIErrorInvalidRegisterAction:       "Invalid register action",
+	QMIErrorInvalidPsAttachAction:       "Invalid PS attach action",
+	QMIErrorAuthenticationFailed:        "Authentication failed",
+	QMIErrorPinBlocked:                  "PIN blocked",
+	QMIErrorPinAlwaysBlocked:            "PIN always blocked",
+	QMIErrorUimUninitialized:            "UIM uninitialized",
+	QMIErrorMaximumQosRequestsInUse:     "Maximum QoS requests in use",
+	QMIErrorIncorrectFlowFilter:         "Incorrect flow filter",
+	QMIErrorNetworkQosUnaware:           "Network QoS unaware",
+	QMIErrorInvalidQosId:                "Invalid QoS ID",
+	QMIErrorRequestedNumberUnsupported:  "Requested number unsupported",
+	QMIErrorInterfaceNotFound:           "Interface not found",
+	QMIErrorFlowSuspended:               "Flow suspended",
+	QMIErrorInvalidDataFormat:           "Invalid data format",
+	QMIErrorGeneralError:                "General error",
+	QMIErrorUnknownError:                "Unknown error",
+	QMIErrorInvalidArgument:             "Invalid argument",
+	QMIErrorInvalidIndex:                "Invalid index",
+	QMIErrorNoEntry:                     "No entry",
+	QMIErrorDeviceStorageFull:           "Device storage full",
+	QMIErrorDeviceNotReady:              "Device not ready",
+	QMIErrorNetworkNotReady:             "Network not ready",
+	QMIErrorWmsCauseCode:                "WMS cause code",
+	QMIErrorWmsMessageNotSent:           "WMS message not sent",
+	QMIErrorWmsMessageDeliveryFailure:   "WMS message delivery failure",
+	QMIErrorWmsInvalidMessageId:         "WMS invalid message ID",
+	QMIErrorWmsEncoding:                 "WMS encoding",
+	QMIErrorAuthenticationLock:          "Authentication lock",
+	QMIErrorInvalidTransition:           "Invalid transition",
+	QMIErrorNotMcastInterface:           "Not multicast interface",
+	QMIErrorMaximumMcastRequestsInUse:   "Maximum multicast requests in use",
+	QMIErrorInvalidMcastHandle:          "Invalid multicast handle",
+	QMIErrorInvalidIpFamilyPreference:   "Invalid IP family preference",
+	QMIErrorSessionInactive:             "Session inactive",
+	QMIErrorSessionInvalid:              "Session invalid",
+	QMIErrorSessionOwnership:            "Session ownership",
+	QMIErrorInsufficientResources:       "Insufficient resources",
+	QMIErrorDisabled:                    "Disabled",
+	QMIErrorInvalidOperation:            "Invalid operation",
+	QMIErrorInvalidQmiCommand:           "Invalid QMI command",
+	QMIErrorWmsTPduType:                 "WMS TPDU type",
+	QMIErrorWmsSmscAddress:              "WMS SMSC address",
+	QMIErrorInformationUnavailable:      "Information unavailable",
+	QMIErrorSegmentTooLong:              "Segment too long",
+	QMIErrorSegmentOrder:                "Segment order",
+	QMIErrorBundlingNotSupported:        "Bundling not supported",
+	QMIErrorOperationPartialFailure:     "Operation partial failure",
+	QMIErrorPolicyMismatch:              "Policy mismatch",
+	QMIErrorSimFileNotFound:             "SIM file not found",
+	QMIErrorExtendedInternal:            "Extended internal error",
+	QMIErrorAccessDenied:                "Access denied",
+	QMIErrorHardwareRestricted:          "Hardware restricted",
+	QMIErrorAckNotSent:                  "ACK not sent",
+	QMIErrorInjectTimeout:               "Inject timeout",
+	QMIErrorIncompatibleState:           "Incompatible state",
+	QMIErrorFdnRestrict:                 "FDN restrict",
+	QMIErrorSupsFailureCase:             "SUPS failure case",
+	QMIErrorNoRadio:                     "No radio",
+	QMIErrorNotSupported:                "Not supported",
+	QMIErrorNoSubscription:              "No subscription",
+	QMIErrorCardCallControlFailed:       "Card call control failed",
+	QMIErrorNetworkAborted:              "Network aborted",
+	QMIErrorMsgBlocked:                  "Message blocked",
+	QMIErrorInvalidSessionType:          "Invalid session type",
+	QMIErrorInvalidPbType:               "Invalid phonebook type",
+	QMIErrorNoSim:                       "No SIM",
+	QMIErrorPbNotReady:                  "Phonebook not ready",
+	QMIErrorPinRestriction:              "PIN restriction",
+	QMIErrorPin2Restriction:             "PIN2 restriction",
+	QMIErrorPukRestriction:              "PUK restriction",
+	QMIErrorPuk2Restriction:             "PUK2 restriction",
+	QMIErrorPbAccessRestricted:          "Phonebook access restricted",
+	QMIErrorPbDeleteInProgress:          "Phonebook delete in progress",
+	QMIErrorPbTextTooLong:               "Phonebook text too long",
+	QMIErrorPbNumberTooLong:             "Phonebook number too long",
+	QMIErrorPbHiddenKeyRestriction:      "Phonebook hidden key restriction",
+	QMIErrorPbNotAvailable:              "Phonebook not available",
+	QMIErrorDeviceMemoryError:           "Device memory error",
+	QMIErrorNoPermission:                "No permission",
+	QMIErrorTooSoon:                     "Too soon",
+	QMIErrorTimeNotAcquired:             "Time not acquired",
+	QMIErrorOperationInProgress:         "Operation in progress",
+	QMIErrorFwWriteFailed:               "Firmware write failed",
+	QMIErrorFwInfoReadFailed:            "Firmware info read failed",
+	QMIErrorFwFileNotFound:              "Firmware file not found",
+	QMIErrorFwDirNotFound:               "Firmware directory not found",
+	QMIErrorFwAlreadyActivated:          "Firmware already activated",
+	QMIErrorFwCannotGenericImage:        "Firmware cannot generic image",
+	QMIErrorFwFileOpenFailed:            "Firmware file open failed",
+	QMIErrorFwUpdateDiscontinuousFrame:  "Firmware update discontinuous frame",
+	QMIErrorFwUpdateFailed:              "Firmware update failed",
+	QMIErrorCatEventRegistrationFailed:  "CAT event registration failed",
+	QMIErrorCatInvalidTerminalResponse:  "CAT invalid terminal response",
+	QMIErrorCatInvalidEnvelopeCommand:   "CAT invalid envelope command",
+	QMIErrorCatEnvelopeCommandBusy:      "CAT envelope command busy",
+	QMIErrorCatEnvelopeCommandFailed:    "CAT envelope command failed",
+}
+
 func (q QMIError) Error() string {
-	switch q {
-	case QMIErrorNone:
-		return "No error"
-	case QMIErrorMalformedMessage:
-		return "Malformed message"
-	case QMIErrorNoMemory:
-		return "No memory"
-	case QMIErrorInternal:
-		return "Internal error"
-	case QMIErrorAborted:
-		return "Aborted"
-	case QMIErrorClientIdsExhausted:
-		return "Client IDs exhausted"
-	case QMIErrorUnabortableTransaction:
-		return "Unabortable transaction"
-	case QMIErrorInvalidClientId:
-		return "Invalid client ID"
-	case QMIErrorNoThresholdsProvided:
-		return "No thresholds provided"
-	case QMIErrorInvalidHandle:
-		return "Invalid handle"
-	case QMIErrorInvalidProfile:
-		return "Invalid profile"
-	case QMIErrorInvalidPinId:
-		return "Invalid PIN ID"
-	case QMIErrorIncorrectPin:
-		return "Incorrect PIN"
-	case QMIErrorNoNetworkFound:
-		return "No network found"
-	case QMIErrorCallFailed:
-		return "Call failed"
-	case QMIErrorOutOfCall:
-		return "Out of call"
-	case QMIErrorNotProvisioned:
-		return "Not provisioned"
-	case QMIErrorMissingArgument:
-		return "Missing argument"
-	case QMIErrorArgumentTooLong:
-		return "Argument too long"
-	case QMIErrorInvalidTransactionId:
-		return "Invalid transaction ID"
-	case QMIErrorDeviceInUse:
-		return "Device in use"
-	case QMIErrorNetworkUnsupported:
-		return "Network unsupported"
-	case QMIErrorDeviceUnsupported:
-		return "Device unsupported"
-	case QMIErrorNoEffect:
-		return "No effect"
-	case QMIErrorNoFreeProfile:
-		return "No free profile"
-	case QMIErrorInvalidPdpType:
-		return "Invalid PDP type"
-	case QMIErrorInvalidTechnologyPreference:
-		return "Invalid technology preference"
-	case QMIErrorInvalidProfileType:
-		return "Invalid profile type"
-	case QMIErrorInvalidServiceType:
-		return "Invalid service type"
-	case QMIErrorInvalidRegisterAction:
-		return "Invalid register action"
-	case QMIErrorInvalidPsAttachAction:
-		return "Invalid PS attach action"
-	case QMIErrorAuthenticationFailed:
-		return "Authentication failed"
-	case QMIErrorPinBlocked:
-		return "PIN blocked"
-	case QMIErrorPinAlwaysBlocked:
-		return "PIN always blocked"
-	case QMIErrorUimUninitialized:
-		return "UIM uninitialized"
-	case QMIErrorNotSupported:
-		return "Not supported"
-	case QMIErrorNoSim:
-		return "No SIM"
-	default:
-		return fmt.Sprintf("QMI error %d", q)
+	if text, ok := qmiErrorText[q]; ok {
+		return text
 	}
+	return fmt.Sprintf("QMI error %d", q)
 }
