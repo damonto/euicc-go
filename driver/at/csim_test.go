@@ -2,11 +2,40 @@ package at
 
 import (
 	"bytes"
+	"encoding"
 	"strings"
 	"testing"
 )
 
-func TestDecodeCSIMResponse(t *testing.T) {
+var (
+	_ encoding.TextMarshaler   = CSIMCommand(nil)
+	_ encoding.TextMarshaler   = CSIMResponse(nil)
+	_ encoding.TextUnmarshaler = (*CSIMResponse)(nil)
+)
+
+func TestCSIMCommandMarshalText(t *testing.T) {
+	command := CSIMCommand{0x00, 0xA4, 0x04, 0x00}
+	got, err := command.MarshalText()
+	if err != nil {
+		t.Fatalf("CSIMCommand.MarshalText failed: %v", err)
+	}
+	if string(got) != `AT+CSIM=8,"00A40400"` {
+		t.Fatalf("CSIMCommand.MarshalText = %q, want %q", got, `AT+CSIM=8,"00A40400"`)
+	}
+}
+
+func TestCSIMResponseMarshalText(t *testing.T) {
+	response := CSIMResponse{0x90, 0x00}
+	got, err := response.MarshalText()
+	if err != nil {
+		t.Fatalf("CSIMResponse.MarshalText failed: %v", err)
+	}
+	if string(got) != `4,"9000"` {
+		t.Fatalf("CSIMResponse.MarshalText = %q, want %q", got, `4,"9000"`)
+	}
+}
+
+func TestCSIMResponseUnmarshalText(t *testing.T) {
 	tests := []struct {
 		name     string
 		response string
@@ -41,53 +70,56 @@ func TestDecodeCSIMResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := decodeCSIMResponse(tt.response)
-			if err != nil {
-				t.Fatalf("decodeCSIMResponse failed: %v", err)
+			var got CSIMResponse
+			if err := got.UnmarshalText([]byte(tt.response)); err != nil {
+				t.Fatalf("CSIMResponse.UnmarshalText failed: %v", err)
 			}
 			if !bytes.Equal(got, tt.want) {
-				t.Fatalf("decodeCSIMResponse = % X, want % X", got, tt.want)
+				t.Fatalf("CSIMResponse.UnmarshalText = % X, want % X", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestDecodeCSIMResponseRejectsLengthMismatch(t *testing.T) {
-	_, err := decodeCSIMResponse("+CSIM: 2,\"9000\"")
-	if err == nil {
-		t.Fatal("decodeCSIMResponse error = nil, want error")
+func TestCSIMResponseUnmarshalTextRejectsLengthMismatch(t *testing.T) {
+	var response CSIMResponse
+	if err := response.UnmarshalText([]byte("+CSIM: 2,\"9000\"")); err == nil {
+		t.Fatal("CSIMResponse.UnmarshalText error = nil, want error")
 	}
 }
 
-func TestDecodeCSIMResponseReportsBareDecodeError(t *testing.T) {
-	_, err := decodeCSIMResponse("not-hex")
+func TestCSIMResponseUnmarshalTextReportsBareDecodeError(t *testing.T) {
+	var response CSIMResponse
+	err := response.UnmarshalText([]byte("not-hex"))
 	if err == nil {
-		t.Fatal("decodeCSIMResponse error = nil, want error")
+		t.Fatal("CSIMResponse.UnmarshalText error = nil, want error")
 	}
 	if !strings.Contains(err.Error(), `"not-hex"`) {
-		t.Fatalf("decodeCSIMResponse error = %q, want line context", err.Error())
+		t.Fatalf("CSIMResponse.UnmarshalText error = %q, want line context", err.Error())
 	}
 	if !strings.Contains(err.Error(), "invalid CSIM response data") {
-		t.Fatalf("decodeCSIMResponse error = %q, want data error", err.Error())
+		t.Fatalf("CSIMResponse.UnmarshalText error = %q, want data error", err.Error())
 	}
 }
 
-func TestDecodeCSIMResponseRejectsBareShortResponse(t *testing.T) {
-	_, err := decodeCSIMResponse("90")
+func TestCSIMResponseUnmarshalTextRejectsBareShortResponse(t *testing.T) {
+	var response CSIMResponse
+	err := response.UnmarshalText([]byte("90"))
 	if err == nil {
-		t.Fatal("decodeCSIMResponse error = nil, want error")
+		t.Fatal("CSIMResponse.UnmarshalText error = nil, want error")
 	}
 	if !strings.Contains(err.Error(), "missing response status word") {
-		t.Fatalf("decodeCSIMResponse error = %q, want status word error", err.Error())
+		t.Fatalf("CSIMResponse.UnmarshalText error = %q, want status word error", err.Error())
 	}
 }
 
-func TestDecodeCSIMResponseRejectsUnknownBareStatusWord(t *testing.T) {
-	_, err := decodeCSIMResponse("DEADBEEF")
+func TestCSIMResponseUnmarshalTextRejectsUnknownBareStatusWord(t *testing.T) {
+	var response CSIMResponse
+	err := response.UnmarshalText([]byte("DEADBEEF"))
 	if err == nil {
-		t.Fatal("decodeCSIMResponse error = nil, want error")
+		t.Fatal("CSIMResponse.UnmarshalText error = nil, want error")
 	}
 	if !strings.Contains(err.Error(), "unrecognized APDU status word") {
-		t.Fatalf("decodeCSIMResponse error = %q, want status word error", err.Error())
+		t.Fatalf("CSIMResponse.UnmarshalText error = %q, want status word error", err.Error())
 	}
 }

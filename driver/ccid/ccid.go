@@ -178,8 +178,8 @@ func (c *CCIDReader) openChannel() (byte, error) {
 		return 0, fmt.Errorf("open logical channel: %X", response)
 	}
 	channel := response[0]
-	if err := validateLogicalChannel(channel); err != nil {
-		return 0, fmt.Errorf("open logical channel returned %w", err)
+	if channel == 0 || channel > maxLogicalChannel {
+		return 0, fmt.Errorf("open logical channel returned invalid logical channel %d", channel)
 	}
 	return channel, nil
 }
@@ -203,8 +203,8 @@ func (c *CCIDReader) selectAID(channel byte, AID []byte) error {
 }
 
 func (c *CCIDReader) closeLogicalChannel(channel byte) error {
-	if err := validateLogicalChannel(channel); err != nil {
-		return err
+	if channel == 0 || channel > maxLogicalChannel {
+		return fmt.Errorf("invalid logical channel %d", channel)
 	}
 	response, err := c.transmit([]byte{0x00, 0x70, 0x80, channel, 0x00})
 	if err != nil {
@@ -311,13 +311,6 @@ func classByteForChannel(cla, channel byte) (byte, error) {
 		return (cla & 0xB0) | 0x40 | (channel - 4), nil
 	}
 	return 0, fmt.Errorf("logical channel %d exceeds maximum %d", channel, maxLogicalChannel)
-}
-
-func validateLogicalChannel(channel byte) error {
-	if channel == 0 || channel > maxLogicalChannel {
-		return fmt.Errorf("invalid logical channel %d", channel)
-	}
-	return nil
 }
 
 func statusOK(response []byte) bool {

@@ -73,20 +73,22 @@ func (a *AT) Transmit(command []byte) ([]byte, error) {
 }
 
 func (a *AT) transmitAPDU(command []byte) ([]byte, error) {
-	cmd := fmt.Sprintf("%X", command)
-	cmd = fmt.Sprintf("AT+CSIM=%d,%q", len(cmd), cmd)
-	rawResponse, err := a.sendCommand(cmd)
+	cmd, err := CSIMCommand(command).MarshalText()
 	if err != nil {
 		return nil, err
 	}
-	response, err := decodeCSIMResponse(rawResponse)
+	rawResponse, err := a.sendCommand(string(cmd))
 	if err != nil {
+		return nil, err
+	}
+	var response CSIMResponse
+	if err := response.UnmarshalText([]byte(rawResponse)); err != nil {
 		return nil, err
 	}
 	if len(response) < 2 {
 		return nil, errors.New("invalid response status word")
 	}
-	return response, nil
+	return []byte(response), nil
 }
 
 func writeFull(w io.Writer, p []byte) error {
@@ -151,8 +153,8 @@ func (a *AT) openChannel() (byte, error) {
 		return 0, fmt.Errorf("open logical channel: %X", response)
 	}
 	channel := response[0]
-	if err := validateLogicalChannel(channel); err != nil {
-		return 0, fmt.Errorf("open logical channel returned %w", err)
+	if channel == 0 || channel > maxLogicalChannel {
+		return 0, fmt.Errorf("open logical channel returned invalid logical channel %d", channel)
 	}
 	return channel, nil
 }
@@ -183,8 +185,8 @@ func (a *AT) CloseLogicalChannel(channel byte) error {
 }
 
 func (a *AT) closeLogicalChannel(channel byte) error {
-	if err := validateLogicalChannel(channel); err != nil {
-		return err
+	if channel == 0 || channel > maxLogicalChannel {
+		return fmt.Errorf("invalid logical channel %d", channel)
 	}
 	response, err := a.transmitAPDU([]byte{0x00, 0x70, 0x80, channel, 0x00})
 	if err != nil {
@@ -231,11 +233,4 @@ func classByteForChannel(cla, channel byte) (byte, error) {
 		return (cla & 0xB0) | 0x40 | (channel - 4), nil
 	}
 	return 0, fmt.Errorf("logical channel %d exceeds maximum %d", channel, maxLogicalChannel)
-}
-
-func validateLogicalChannel(channel byte) error {
-	if channel == 0 || channel > maxLogicalChannel {
-		return fmt.Errorf("invalid logical channel %d", channel)
-	}
-	return nil
 }
