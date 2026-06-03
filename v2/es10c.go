@@ -30,14 +30,14 @@ func (r *ProfileInfoListRequest) MarshalBERTLV() (*bertlv.TLV, error) {
 				return
 			}
 		}
-		if tags := slices.Concat(r.unqiueTags(r.Tags)...); len(tags) > 0 {
+		if tags := slices.Concat(r.uniqueTags(r.Tags)...); len(tags) > 0 {
 			yield(bertlv.NewValue(bertlv.Application.Primitive(28), tags))
 		}
 	})
 	return request, nil
 }
 
-func (r *ProfileInfoListRequest) unqiueTags(tags []bertlv.Tag) []bertlv.Tag {
+func (r *ProfileInfoListRequest) uniqueTags(tags []bertlv.Tag) []bertlv.Tag {
 	slow := 0
 	seen := make(map[byte]bool)
 	for fast := range tags {
