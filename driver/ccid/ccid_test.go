@@ -2,101 +2,170 @@ package ccid
 
 import (
 	"bytes"
+	"context"
+	"errors"
+	"strings"
 	"testing"
 )
 
-func TestClassByteForChannel(t *testing.T) {
-	tests := []struct {
-		name    string
-		cla     byte
-		channel byte
-		want    byte
-		wantErr bool
-	}{
-		{name: "basic channel", cla: 0x00, channel: 0, want: 0x00},
-		{name: "channel one", cla: 0x00, channel: 1, want: 0x01},
-		{name: "preserves proprietary class", cla: 0x80, channel: 2, want: 0x82},
-		{name: "first extended channel", cla: 0x00, channel: 4, want: 0x40},
-		{name: "last extended channel", cla: 0x00, channel: 19, want: 0x4F},
-		{name: "extended proprietary class", cla: 0x80, channel: 4, want: 0xC0},
-		{name: "too high", cla: 0x00, channel: 20, wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := classByteForChannel(tt.cla, tt.channel)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("classByteForChannel error = nil, want error")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("classByteForChannel failed: %v", err)
-			}
-			if got != tt.want {
-				t.Fatalf("classByteForChannel = %02X, want %02X", got, tt.want)
-			}
-		})
-	}
+type fakeReader struct {
+	requests  [][]byte
+	responses [][]byte
+	closed    bool
 }
 
-func TestCloseLogicalChannelRejectsInvalidChannel(t *testing.T) {
-	reader := &CCIDReader{}
+func (f *fakeReader) Transmit(_ context.Context, req []byte) ([]byte, error) {
+	f.requests = append(f.requests, append([]byte(nil), req...))
+	if len(f.responses) == 0 {
+		return nil, errors.New("unexpected transmit")
+	}
+	response := f.responses[0]
+	f.responses = f.responses[1:]
+	return response, nil
+}
 
-	if err := reader.closeLogicalChannel(0); err == nil {
-		t.Fatal("closeLogicalChannel(0) error = nil, want invalid channel error")
-	}
-	if err := reader.closeLogicalChannel(maxLogicalChannel + 1); err == nil {
-		t.Fatal("closeLogicalChannel(max+1) error = nil, want invalid channel error")
-	}
+func (f *fakeReader) Close() error {
+	f.closed = true
+	return nil
 }
 
 func TestSetReaderReturnsStateErrors(t *testing.T) {
 	reader := &CCIDReader{closed: true}
 	if err := reader.SetReader("reader"); err == nil {
-		t.Fatal("SetReader error = nil, want closed reader error")
+		t.Fatal("SetReader() error = nil, want closed reader error")
 	}
 
 	reader = &CCIDReader{open: true}
 	if err := reader.SetReader("reader"); err == nil {
-		t.Fatal("SetReader error = nil, want connected reader error")
+		t.Fatal("SetReader() error = nil, want connected reader error")
 	}
 }
 
-func TestSelectAIDCommandRejectsOversizedAID(t *testing.T) {
-	_, err := selectAIDCommand(1, make([]byte, 256))
-	if err == nil {
-		t.Fatal("selectAIDCommand error = nil, want oversized AID error")
-	}
-	if err.Error() != "AID length 256 exceeds short APDU limit" {
-		t.Fatalf("selectAIDCommand error = %q, want oversized AID error", err.Error())
-	}
-}
+func TestNewWithReaderOpensLazilyOnConnect(t *testing.T) {
+	oldOpenReader := openReader
+	defer func() { openReader = oldOpenReader }()
 
-func TestSelectAIDCommand(t *testing.T) {
-	aid := []byte{0xA0, 0x00, 0x00, 0x05, 0x59}
-	got, err := selectAIDCommand(4, aid)
+	called := false
+	fake := &fakeReader{responses: [][]byte{{0x90, 0x00}}}
+	openReader = func(_ context.Context, reader string) (transmitter, error) {
+		called = true
+		if reader != "reader-1" {
+			t.Fatalf("openReader reader = %q, want reader-1", reader)
+		}
+		return fake, nil
+	}
+
+	reader, err := NewWithReader("reader-1")
 	if err != nil {
-		t.Fatalf("selectAIDCommand failed: %v", err)
+		t.Fatalf("NewWithReader() error = %v", err)
 	}
-	want := []byte{0x40, 0xA4, 0x04, 0x00, byte(len(aid)), 0xA0, 0x00, 0x00, 0x05, 0x59}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("selectAIDCommand = % X, want % X", got, want)
+	if called {
+		t.Fatal("NewWithReader() called opener before Connect()")
+	}
+	if err := reader.Connect(); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	if !called {
+		t.Fatal("Connect() did not call opener")
+	}
+	if err := reader.Disconnect(); err != nil {
+		t.Fatalf("Disconnect() error = %v", err)
+	}
+	if !fake.closed {
+		t.Fatal("Disconnect() did not close reader")
 	}
 }
 
-func TestStatusWords(t *testing.T) {
-	if !statusOK([]byte{0xDE, 0xAD, 0x90, 0x00}) {
-		t.Fatal("statusOK returned false for 9000")
+func TestChannelOpenLogicalChannelSelectsAID(t *testing.T) {
+	fake := &fakeReader{responses: [][]byte{
+		{0x90, 0x00},
+		{0x04, 0x90, 0x00},
+		{0x61, 0x10},
+	}}
+	reader := &CCIDReader{reader: "reader-1"}
+	oldOpenReader := openReader
+	defer func() { openReader = oldOpenReader }()
+	openReader = func(context.Context, string) (transmitter, error) {
+		return fake, nil
 	}
-	if statusOK([]byte{0x90}) {
-		t.Fatal("statusOK returned true for short response")
+
+	if err := reader.Connect(); err != nil {
+		t.Fatalf("Connect() error = %v", err)
 	}
-	if !statusHasMore([]byte{0x61, 0x10}) {
-		t.Fatal("statusHasMore returned false for 61xx")
+	got, err := reader.OpenLogicalChannel([]byte{0xA0, 0x00})
+	if err != nil {
+		t.Fatalf("OpenLogicalChannel() error = %v", err)
 	}
-	if statusHasMore([]byte{0x90, 0x00}) {
-		t.Fatal("statusHasMore returned true for 9000")
+	if got != 4 {
+		t.Fatalf("OpenLogicalChannel() = %d, want 4", got)
+	}
+	wantSelect := []byte{0x40, 0xA4, 0x04, 0x00, 0x02, 0xA0, 0x00}
+	if !bytes.Equal(fake.requests[2], wantSelect) {
+		t.Fatalf("select request = % X, want % X", fake.requests[2], wantSelect)
+	}
+}
+
+func TestChannelOpenLogicalChannelClosesWhenSelectFails(t *testing.T) {
+	fake := &fakeReader{responses: [][]byte{
+		{0x90, 0x00},
+		{0x01, 0x90, 0x00},
+		{0x6A, 0x82},
+		{0x90, 0x00},
+	}}
+	reader := &CCIDReader{reader: "reader-1"}
+	oldOpenReader := openReader
+	defer func() { openReader = oldOpenReader }()
+	openReader = func(context.Context, string) (transmitter, error) {
+		return fake, nil
+	}
+
+	if err := reader.Connect(); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	_, err := reader.OpenLogicalChannel([]byte{0xA0, 0x00})
+	if err == nil {
+		t.Fatal("OpenLogicalChannel() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "select AID: 6A82") {
+		t.Fatalf("OpenLogicalChannel() error = %q, want select failure", err.Error())
+	}
+	wantClose := []byte{0x00, 0x70, 0x80, 0x01, 0x00}
+	if !bytes.Equal(fake.requests[3], wantClose) {
+		t.Fatalf("close request = % X, want % X", fake.requests[3], wantClose)
+	}
+}
+
+func TestConnectRequiresReader(t *testing.T) {
+	reader, err := New()
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	err = reader.Connect()
+	if err == nil {
+		t.Fatal("Connect() error = nil, want reader required error")
+	}
+	if err.Error() != "ccid reader is required" {
+		t.Fatalf("Connect() error = %q, want reader required", err.Error())
+	}
+}
+
+func TestListReadersUsesInjectedLister(t *testing.T) {
+	oldListReaders := listReaders
+	defer func() { listReaders = oldListReaders }()
+
+	listReaders = func(context.Context) ([]string, error) {
+		return []string{"reader-1"}, nil
+	}
+	reader, err := New()
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	got, err := reader.ListReaders()
+	if err != nil {
+		t.Fatalf("ListReaders() error = %v", err)
+	}
+	if len(got) != 1 || got[0] != "reader-1" {
+		t.Fatalf("ListReaders() = %v, want [reader-1]", got)
 	}
 }

@@ -14,7 +14,7 @@ import (
 func main() {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
-	// ch, err := mbim.New("/dev/cdc-wdm1", 1)
+	// ch, err := mbim.New("/dev/cdc-wdm0", 1)
 	// if err != nil {
 	// 	panic(err)
 	// }

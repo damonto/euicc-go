@@ -1,12 +1,13 @@
 package ccid
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 
-	"github.com/ElMostafaIdrassi/goscard"
 	"github.com/damonto/euicc-go/apdu"
+	uiccccid "github.com/damonto/uicc-go/ccid"
 )
 
 const (
@@ -14,44 +15,49 @@ const (
 	maxShortAPDUDataLength = 255
 )
 
-var pcsc struct {
-	mu   sync.Mutex
-	refs int
+var connectAPDU = []byte{0x80, 0xAA, 0x00, 0x00, 0x0A, 0xA9, 0x08, 0x81, 0x00, 0x82, 0x01, 0x01, 0x83, 0x01, 0x07}
+
+type transmitter interface {
+	Transmit(ctx context.Context, command []byte) ([]byte, error)
+	Close() error
 }
 
+type readerOpener func(context.Context, string) (transmitter, error)
+type readerLister func(context.Context) ([]string, error)
+
+var (
+	openReader  readerOpener = openUICCReader
+	listReaders readerLister = uiccccid.ListReaders
+)
+
+// CCID is a PC/SC smart card channel.
 type CCID interface {
 	apdu.SmartCardChannel
 	ListReaders() ([]string, error)
 	SetReader(reader string) error
 }
 
+// CCIDReader is a PC/SC smart card channel.
 type CCIDReader struct {
-	mu      sync.Mutex
-	context goscard.Context
-	card    goscard.Card
-	ioSend  *goscard.SCardIORequest
-	channel byte
-	reader  string
-	open    bool
-	closed  bool
+	mu     sync.Mutex
+	reader string
+	tx     *channel
+	open   bool
+	closed bool
 }
 
+// New creates a CCID channel.
 func New() (*CCIDReader, error) {
 	return NewWithReader("")
 }
 
 // NewWithReader creates a CCID channel with reader preselected.
 func NewWithReader(reader string) (*CCIDReader, error) {
-	if err := acquirePCSC(); err != nil {
-		return nil, err
-	}
-	context, _, err := goscard.NewContext(goscard.SCardScopeSystem, nil, nil)
-	if err != nil {
-		releasePCSC()
-		return nil, err
-	}
-	ccid := &CCIDReader{context: context, reader: reader}
-	return ccid, nil
+	return &CCIDReader{reader: reader}, nil
+}
+
+func openUICCReader(ctx context.Context, reader string) (transmitter, error) {
+	return uiccccid.Open(ctx, reader)
 }
 
 func (c *CCIDReader) ListReaders() ([]string, error) {
@@ -61,11 +67,7 @@ func (c *CCIDReader) ListReaders() ([]string, error) {
 	if c.closed {
 		return nil, errors.New("ccid reader is closed")
 	}
-	readers, _, err := c.context.ListReaders(nil)
-	if err != nil {
-		return nil, err
-	}
-	return readers, nil
+	return listReaders(context.Background())
 }
 
 // SetReader selects the reader used by Connect.
@@ -90,29 +92,23 @@ func (c *CCIDReader) Connect() error {
 	if c.closed {
 		return errors.New("ccid reader is closed")
 	}
+	if c.open {
+		return nil
+	}
 	if c.reader == "" {
 		return errors.New("ccid reader is required")
 	}
 
-	var err error
-	c.card, _, err = c.context.Connect(c.reader, goscard.SCardShareShared, goscard.SCardProtocolAny)
+	reader, err := openReader(context.Background(), c.reader)
 	if err != nil {
 		return err
 	}
-	c.ioSend, err = ioRequestForProtocol(c.card.ActiveProtocol())
-	if err != nil {
-		c.open = true
-		return errors.Join(err, c.disconnectCard())
+	tx := newChannel(reader)
+	if err := tx.Connect(); err != nil {
+		return errors.Join(err, tx.Disconnect())
 	}
+	c.tx = tx
 	c.open = true
-
-	response, err := c.transmit([]byte{0x80, 0xAA, 0x00, 0x00, 0x0A, 0xA9, 0x08, 0x81, 0x00, 0x82, 0x01, 0x01, 0x83, 0x01, 0x07})
-	if err != nil {
-		return errors.Join(err, c.disconnectCard())
-	}
-	if !statusOK(response) && !statusHasMore(response) {
-		return errors.Join(fmt.Errorf("connect APDU: %X", response), c.disconnectCard())
-	}
 	return nil
 }
 
@@ -120,31 +116,118 @@ func (c *CCIDReader) Disconnect() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	return c.disconnect()
+	if c.closed {
+		return nil
+	}
+	c.closed = true
+	c.open = false
+	if c.tx == nil {
+		return nil
+	}
+	return c.tx.Disconnect()
 }
 
 func (c *CCIDReader) Transmit(command []byte) ([]byte, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
+	tx := c.tx
+	closed := c.closed
+	c.mu.Unlock()
 
-	return c.transmit(command)
-}
-
-func (c *CCIDReader) transmit(command []byte) ([]byte, error) {
-	if !c.open {
-		if c.closed {
+	if tx == nil {
+		if closed {
 			return nil, errors.New("ccid reader is closed")
 		}
 		return nil, errors.New("ccid reader is not connected")
 	}
-	r, _, err := c.card.Transmit(c.ioSend, command, nil)
-	return r, err
+	return tx.Transmit(command)
 }
 
 func (c *CCIDReader) OpenLogicalChannel(AID []byte) (byte, error) {
 	c.mu.Lock()
+	tx := c.tx
+	closed := c.closed
+	c.mu.Unlock()
+
+	if tx == nil {
+		if closed {
+			return 0, errors.New("ccid reader is closed")
+		}
+		return 0, errors.New("ccid reader is not connected")
+	}
+	return tx.OpenLogicalChannel(AID)
+}
+
+func (c *CCIDReader) CloseLogicalChannel(channel byte) error {
+	c.mu.Lock()
+	tx := c.tx
+	closed := c.closed
+	c.mu.Unlock()
+
+	if tx == nil {
+		if closed {
+			return errors.New("ccid reader is closed")
+		}
+		return errors.New("ccid reader is not connected")
+	}
+	return tx.CloseLogicalChannel(channel)
+}
+
+type channel struct {
+	mu      sync.Mutex
+	tx      transmitter
+	channel byte
+	closed  bool
+}
+
+func newChannel(tx transmitter) *channel {
+	return &channel{tx: tx}
+}
+
+func (c *channel) Connect() error {
+	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	if c.closed {
+		return errors.New("smart card channel is closed")
+	}
+	response, err := c.tx.Transmit(context.Background(), connectAPDU)
+	if err != nil {
+		return err
+	}
+	if !statusOK(response) && !statusHasMore(response) {
+		return fmt.Errorf("connect APDU: %X", response)
+	}
+	return nil
+}
+
+func (c *channel) Disconnect() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.closed {
+		return nil
+	}
+	c.closed = true
+	return c.tx.Close()
+}
+
+func (c *channel) Transmit(command []byte) ([]byte, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.closed {
+		return nil, errors.New("smart card channel is closed")
+	}
+	return c.tx.Transmit(context.Background(), command)
+}
+
+func (c *channel) OpenLogicalChannel(AID []byte) (byte, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.closed {
+		return 0, errors.New("smart card channel is closed")
+	}
 	if len(AID) > maxShortAPDUDataLength {
 		return 0, fmt.Errorf("AID length %d exceeds short APDU limit", len(AID))
 	}
@@ -159,15 +242,15 @@ func (c *CCIDReader) OpenLogicalChannel(AID []byte) (byte, error) {
 	return channel, nil
 }
 
-func (c *CCIDReader) CloseLogicalChannel(channel byte) error {
+func (c *channel) CloseLogicalChannel(channel byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	return c.closeLogicalChannel(channel)
 }
 
-func (c *CCIDReader) openChannel() (byte, error) {
-	response, err := c.transmit([]byte{0x00, 0x70, 0x00, 0x00, 0x01})
+func (c *channel) openChannel() (byte, error) {
+	response, err := c.tx.Transmit(context.Background(), []byte{0x00, 0x70, 0x00, 0x00, 0x01})
 	if err != nil {
 		return 0, err
 	}
@@ -184,12 +267,12 @@ func (c *CCIDReader) openChannel() (byte, error) {
 	return channel, nil
 }
 
-func (c *CCIDReader) selectAID(channel byte, AID []byte) error {
+func (c *channel) selectAID(channel byte, AID []byte) error {
 	command, err := selectAIDCommand(channel, AID)
 	if err != nil {
 		return err
 	}
-	response, err := c.transmit(command)
+	response, err := c.tx.Transmit(context.Background(), command)
 	if err != nil {
 		return err
 	}
@@ -202,11 +285,11 @@ func (c *CCIDReader) selectAID(channel byte, AID []byte) error {
 	return nil
 }
 
-func (c *CCIDReader) closeLogicalChannel(channel byte) error {
+func (c *channel) closeLogicalChannel(channel byte) error {
 	if channel == 0 || channel > maxLogicalChannel {
 		return fmt.Errorf("invalid logical channel %d", channel)
 	}
-	response, err := c.transmit([]byte{0x00, 0x70, 0x80, channel, 0x00})
+	response, err := c.tx.Transmit(context.Background(), []byte{0x00, 0x70, 0x80, channel, 0x00})
 	if err != nil {
 		return err
 	}
@@ -220,73 +303,6 @@ func (c *CCIDReader) closeLogicalChannel(channel byte) error {
 		c.channel = 0
 	}
 	return nil
-}
-
-func (c *CCIDReader) disconnect() error {
-	if c.closed {
-		return nil
-	}
-	if c.open {
-		if err := c.disconnectCard(); err != nil {
-			return err
-		}
-	}
-	if _, err := c.context.Release(); err != nil {
-		return err
-	}
-	c.closed = true
-	releasePCSC()
-	return nil
-}
-
-func (c *CCIDReader) disconnectCard() error {
-	if !c.open {
-		return nil
-	}
-	if _, err := c.card.Disconnect(goscard.SCardLeaveCard); err != nil {
-		return err
-	}
-	c.open = false
-	c.ioSend = nil
-	c.channel = 0
-	return nil
-}
-
-func acquirePCSC() error {
-	pcsc.mu.Lock()
-	defer pcsc.mu.Unlock()
-
-	if pcsc.refs == 0 {
-		if err := goscard.Initialize(goscard.NewDefaultLogger(goscard.LogLevelNone)); err != nil {
-			return err
-		}
-	}
-	pcsc.refs++
-	return nil
-}
-
-func releasePCSC() {
-	pcsc.mu.Lock()
-	defer pcsc.mu.Unlock()
-
-	if pcsc.refs == 0 {
-		return
-	}
-	pcsc.refs--
-	if pcsc.refs == 0 {
-		goscard.Finalize()
-	}
-}
-
-func ioRequestForProtocol(protocol goscard.SCardProtocol) (*goscard.SCardIORequest, error) {
-	switch protocol {
-	case goscard.SCardProtocolT0:
-		return &goscard.SCardIoRequestT0, nil
-	case goscard.SCardProtocolT1:
-		return &goscard.SCardIoRequestT1, nil
-	default:
-		return nil, fmt.Errorf("unsupported active PC/SC protocol: %s", protocol.String())
-	}
 }
 
 func selectAIDCommand(channel byte, AID []byte) ([]byte, error) {

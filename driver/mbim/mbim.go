@@ -1,191 +1,80 @@
 package mbim
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
-	"net"
 	"sync"
-	"sync/atomic"
-	"time"
 
 	"github.com/damonto/euicc-go/apdu"
+	uiccmbim "github.com/damonto/uicc-go/mbim"
 )
 
-var (
-	slotActivationPollInterval = 500 * time.Millisecond
-	slotActivationAttempts     = 10
-)
+type reader interface {
+	OpenChannel(ctx context.Context, aid []byte) (uint32, error)
+	TransmitAPDU(ctx context.Context, channel uint32, command []byte) ([]byte, uint32, error)
+	CloseChannel(ctx context.Context, channel uint32) error
+	Close() error
+}
 
-// MBIM implements the apdu.SmartCardChannel interface using MBIM protocol
+type mbimOpener func(context.Context, ...uiccmbim.Option) (reader, error)
+
+var openReader mbimOpener = func(ctx context.Context, opts ...uiccmbim.Option) (reader, error) {
+	return uiccmbim.Open(ctx, opts...)
+}
+
+// MBIM implements apdu.SmartCardChannel over an MBIM proxy connection.
 type MBIM struct {
 	mu      sync.Mutex
 	device  string
 	slot    uint8
-	conn    net.Conn
-	txnID   uint32
+	reader  reader
 	channel uint32
+	closed  bool
 }
 
-// New creates a new MBIM proxy connection to the specified device
+// New creates a new MBIM proxy channel to the specified device.
 func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 	if slot == 0 {
 		return nil, fmt.Errorf("slot must be >= 1")
 	}
-	conn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: "\x00mbim-proxy", Net: "unix"})
-	if err != nil {
-		return nil, err
-	}
-	m := &MBIM{
-		device: device,
-		slot:   slot - 1, // Convert to 0-based
-		conn:   conn,
-	}
-	return m, nil
+	return &MBIM{device: device, slot: slot}, nil
 }
 
-// Connect establishes MBIM session and opens device
-func (m *MBIM) Connect() (err error) {
+// Connect establishes the MBIM session and opens the device.
+func (m *MBIM) Connect() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	defer func() {
-		if err != nil {
-			err = errors.Join(err, m.conn.Close())
-		}
-	}()
-	if err := m.configureProxy(); err != nil {
-		return fmt.Errorf("configure proxy: %w", err)
+	if m.closed {
+		return errors.New("mbim reader is closed")
 	}
-	if err := m.openDevice(); err != nil {
-		return fmt.Errorf("open device: %w", err)
-	}
-	if err := m.ensureSlotActivated(); err != nil {
-		return fmt.Errorf("ensure slot is activated: %w", err)
-	}
-	return nil
-}
-
-// ensureSlotActivated checks if the desired slot is activated and activates it if necessary
-func (m *MBIM) ensureSlotActivated() error {
-	slot, err := m.currentActivatedSlot()
-	if err != nil {
-		return err
-	}
-	if slot == m.slot {
+	if m.reader != nil {
 		return nil
 	}
-	if err := m.activateSlot(m.slot); err != nil {
+	reader, err := openReader(context.Background(), uiccmbim.WithProxy(m.device), uiccmbim.WithSlot(int(m.slot)))
+	if err != nil {
 		return err
 	}
-	return m.waitForSlotActivation()
-}
-
-// currentActivatedSlot queries the current active slot mapping
-func (m *MBIM) currentActivatedSlot() (uint8, error) {
-	request := DeviceSlotMappingsRequest{
-		TransactionID: atomic.AddUint32(&m.txnID, 1),
-		MapCount:      0, // Query operation
-	}
-	if err := request.Request().Transmit(m.conn); err != nil {
-		return 0, err
-	}
-	if len(request.Response.SlotMappings) == 0 {
-		return 0, errors.New("no slot mappings found")
-	}
-	return uint8(request.Response.SlotMappings[0].Slot), nil
-}
-
-// activateSlot sets the device to use the specified slot
-func (m *MBIM) activateSlot(slot uint8) error {
-	request := DeviceSlotMappingsRequest{
-		TransactionID: atomic.AddUint32(&m.txnID, 1),
-		MapCount:      1,
-		SlotMappings: []SlotMapping{
-			{Slot: uint32(slot)},
-		},
-	}
-	if err := request.Request().Transmit(m.conn); err != nil {
-		return err
-	}
+	m.reader = reader
 	return nil
 }
 
-// waitForSlotActivation waits for the slot to become active by checking subscriber ready status
-func (m *MBIM) waitForSlotActivation() error {
-	var err error
-	var lastReadyState uint32
-	var sawReadyState bool
-	ticker := time.NewTicker(slotActivationPollInterval)
-	defer ticker.Stop()
-
-	for attempt := range slotActivationAttempts {
-		if attempt > 0 {
-			<-ticker.C
-		}
-		request := SubscriberReadyStatusRequest{
-			TransactionID: atomic.AddUint32(&m.txnID, 1),
-		}
-		err = request.Request().Transmit(m.conn)
-		if err == nil {
-			sawReadyState = true
-			lastReadyState = request.Response.ReadyState
-			if lastReadyState == MBIMSubscriberReadyStateInitialized || lastReadyState == MBIMSubscriberReadyStateNoEsimProfile {
-				return nil
-			}
-		}
-	}
-	if err != nil {
-		if sawReadyState {
-			return fmt.Errorf("sim did not become available after slot %d activation, last ready state %#x: %w", m.slot, lastReadyState, err)
-		}
-		return fmt.Errorf("sim did not become available after slot %d activation: %w", m.slot, err)
-	}
-	return fmt.Errorf("sim did not become available after slot %d activation, last ready state %#x", m.slot, lastReadyState)
-}
-
-// configureProxy sends proxy configuration request with device path using the libmbim proxy protocol
-func (m *MBIM) configureProxy() error {
-	request := ProxyConfigRequest{
-		TransactionID: atomic.AddUint32(&m.txnID, 1),
-		DevicePath:    m.device,
-		Timeout:       30,
-	}
-	err := request.Request().Transmit(m.conn)
-	if errors.Is(err, io.EOF) {
-		return fmt.Errorf("device %s is not connected", m.device)
-	}
-	return err
-}
-
-// openDevice sends MBIM Open message to establish connection
-func (m *MBIM) openDevice() error {
-	request := OpenDeviceRequest{
-		TransactionID: atomic.AddUint32(&m.txnID, 1),
-	}
-	return request.Request().Transmit(m.conn)
-}
-
-// OpenLogicalChannel opens a logical channel for the specified Application ID
+// OpenLogicalChannel opens a logical channel for the specified Application ID.
 func (m *MBIM) OpenLogicalChannel(AID []byte) (byte, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	request := OpenLogicalChannelRequest{
-		TransactionID: atomic.AddUint32(&m.txnID, 1),
-		AppId:         AID,
-		SelectP2Arg:   0,
-		Group:         1,
-	}
-	if err := request.Request().Transmit(m.conn); err != nil {
+	if err := m.ensureOpen(); err != nil {
 		return 0, err
 	}
-	if !uiccStatusOK(request.Response.Status) {
-		return 0, fmt.Errorf("open logical channel status %04X", uiccStatusCode(request.Response.Status))
+	channel, err := m.reader.OpenChannel(context.Background(), AID)
+	if err != nil {
+		return 0, err
 	}
-	m.channel = request.Response.Channel
-	return byte(m.channel), nil
+	m.channel = channel
+	return byte(channel), nil
 }
 
 // Transmit implements apdu.SmartCardChannel.
@@ -193,61 +82,60 @@ func (m *MBIM) Transmit(command []byte) ([]byte, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	request := TransmitAPDURequest{
-		TransactionID:   atomic.AddUint32(&m.txnID, 1),
-		Channel:         m.channel,
-		SecureMessaging: 0,
-		ClassByteType:   0,
-		APDU:            command,
-	}
-	if err := request.Request().Transmit(m.conn); err != nil {
+	if err := m.ensureOpen(); err != nil {
 		return nil, err
 	}
-	response := append(request.Response.Response, uiccStatusWord(request.Response.Status)...)
-	return response, nil
+	response, status, err := m.reader.TransmitAPDU(context.Background(), m.channel, command)
+	if err != nil {
+		return nil, err
+	}
+	return append(response, uiccStatusWord(status)...), nil
 }
 
-// CloseLogicalChannel closes the specified logical channel
+// CloseLogicalChannel closes the specified logical channel.
 func (m *MBIM) CloseLogicalChannel(channel byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	request := CloseLogicalChannelRequest{
-		TransactionID: atomic.AddUint32(&m.txnID, 1),
-		Channel:       uint32(channel),
-		Group:         1,
-	}
-	if err := request.Request().Transmit(m.conn); err != nil {
+	if err := m.ensureOpen(); err != nil {
 		return err
 	}
-	if !uiccStatusOK(request.Response.Status) {
-		return fmt.Errorf("close logical channel status %04X", uiccStatusCode(request.Response.Status))
+	if err := m.reader.CloseChannel(context.Background(), uint32(channel)); err != nil {
+		return err
+	}
+	if m.channel == uint32(channel) {
+		m.channel = 0
 	}
 	return nil
 }
 
-// Disconnect closes the MBIM connection and releases resources
+// Disconnect closes the MBIM connection and releases resources.
 func (m *MBIM) Disconnect() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	request := CloseRequest{
-		TransactionID: atomic.AddUint32(&m.txnID, 1),
+	if m.closed {
+		return nil
 	}
-	err := request.Request().Transmit(m.conn)
-	return errors.Join(err, m.conn.Close())
+	m.closed = true
+	if m.reader == nil {
+		return nil
+	}
+	return m.reader.Close()
 }
 
-func uiccStatusOK(status uint32) bool {
-	return status == 0 || uiccStatusCode(status) == 0x9000
+func (m *MBIM) ensureOpen() error {
+	if m.closed {
+		return errors.New("mbim reader is closed")
+	}
+	if m.reader == nil {
+		return errors.New("mbim reader is not connected")
+	}
+	return nil
 }
 
 func uiccStatusWord(status uint32) []byte {
 	sw := make([]byte, 2)
 	binary.LittleEndian.PutUint16(sw, uint16(status&0xffff))
 	return sw
-}
-
-func uiccStatusCode(status uint32) uint16 {
-	return binary.BigEndian.Uint16(uiccStatusWord(status))
 }

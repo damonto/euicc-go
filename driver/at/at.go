@@ -1,148 +1,121 @@
 package at
 
 import (
-	"bufio"
+	"context"
 	"errors"
 	"fmt"
-	"io"
-	"strings"
 	"sync"
 
 	"github.com/damonto/euicc-go/apdu"
+	uiccat "github.com/damonto/uicc-go/at"
 )
 
 const (
 	maxLogicalChannel      = 19
 	maxShortAPDUDataLength = 255
+	defaultBaudRate        = 115200
 )
 
-type AT struct {
-	mu      sync.Mutex
-	s       io.ReadWriteCloser
-	reader  *bufio.Reader
-	channel byte
+var connectAPDU = []byte{0x80, 0xAA, 0x00, 0x00, 0x0A, 0xA9, 0x08, 0x81, 0x00, 0x82, 0x01, 0x01, 0x83, 0x01, 0x07}
+
+type transmitter interface {
+	Transmit(ctx context.Context, command []byte) ([]byte, error)
+	Close() error
 }
 
-var (
-	errReadTimeout = errors.New("read timeout")
-)
+// AT is an AT smart card channel.
+type AT struct {
+	*channel
+}
 
+// New creates an AT smart card channel.
 func New(device string) (apdu.SmartCardChannel, error) {
-	s, err := Open(device)
+	reader, err := uiccat.Open(context.Background(), device, defaultBaudRate, uiccat.WithoutInit())
 	if err != nil {
 		return nil, fmt.Errorf("open serial port %s: %w", device, err)
 	}
-	return &AT{
-		s:      s,
-		reader: bufio.NewReader(s),
-	}, nil
+	return &AT{channel: newChannel(reader)}, nil
 }
 
-func (a *AT) sendCommand(command string) (string, error) {
-	if err := writeFull(a.s, []byte(command+"\r\n")); err != nil {
-		return "", err
-	}
-	var sb strings.Builder
-	for {
-		line, err := a.reader.ReadString('\n')
-		if err != nil {
-			return "", err
-		}
-		line = strings.TrimSpace(line)
-		switch {
-		case line == "", line == command:
-			continue
-		case line == "OK":
-			return strings.TrimSpace(sb.String()), nil
-		case line == "ERROR", strings.HasPrefix(line, "+CME ERROR:"), strings.HasPrefix(line, "+CMS ERROR:"):
-			return "", errors.New(line)
-		default:
-			if sb.Len() > 0 {
-				sb.WriteByte('\n')
-			}
-			sb.WriteString(line)
-		}
-	}
+type channel struct {
+	mu      sync.Mutex
+	tx      transmitter
+	channel byte
+	closed  bool
 }
 
-func (a *AT) Transmit(command []byte) ([]byte, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	return a.transmitAPDU(command)
+func newChannel(tx transmitter) *channel {
+	return &channel{tx: tx}
 }
 
-func (a *AT) transmitAPDU(command []byte) ([]byte, error) {
-	cmd, err := CSIMCommand(command).MarshalText()
-	if err != nil {
-		return nil, err
-	}
-	rawResponse, err := a.sendCommand(string(cmd))
-	if err != nil {
-		return nil, err
-	}
-	var response CSIMResponse
-	if err := response.UnmarshalText([]byte(rawResponse)); err != nil {
-		return nil, err
-	}
-	if len(response) < 2 {
-		return nil, errors.New("invalid response status word")
-	}
-	return []byte(response), nil
-}
+func (c *channel) Connect() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-func writeFull(w io.Writer, p []byte) error {
-	for len(p) > 0 {
-		n, err := w.Write(p)
-		if err != nil {
-			return err
-		}
-		if n <= 0 {
-			return io.ErrShortWrite
-		}
-		p = p[n:]
+	if c.closed {
+		return errors.New("smart card channel is closed")
 	}
-	return nil
-}
-
-func (a *AT) Connect() error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if _, err := a.sendCommand("AT+CSIM=?"); err != nil {
-		return err
-	}
-	response, err := a.transmitAPDU([]byte{0x80, 0xAA, 0x00, 0x00, 0x0A, 0xA9, 0x08, 0x81, 0x00, 0x82, 0x01, 0x01, 0x83, 0x01, 0x07})
+	response, err := c.tx.Transmit(context.Background(), connectAPDU)
 	if err != nil {
 		return err
 	}
-	// The initialization APDU only needs an accepted status; response data is ignored.
 	if !statusOK(response) && !statusHasMore(response) {
 		return fmt.Errorf("connect APDU: %X", response)
 	}
 	return nil
 }
 
-func (a *AT) OpenLogicalChannel(AID []byte) (byte, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+func (c *channel) Disconnect() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
+	if c.closed {
+		return nil
+	}
+	c.closed = true
+	return c.tx.Close()
+}
+
+func (c *channel) Transmit(command []byte) ([]byte, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.closed {
+		return nil, errors.New("smart card channel is closed")
+	}
+	return c.tx.Transmit(context.Background(), command)
+}
+
+func (c *channel) OpenLogicalChannel(AID []byte) (byte, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.closed {
+		return 0, errors.New("smart card channel is closed")
+	}
 	if len(AID) > maxShortAPDUDataLength {
 		return 0, fmt.Errorf("AID length %d exceeds short APDU limit", len(AID))
 	}
-	channel, err := a.openChannel()
+	channel, err := c.openChannel()
 	if err != nil {
 		return 0, err
 	}
-	if err := a.selectAID(channel, AID); err != nil {
-		return 0, errors.Join(err, a.closeLogicalChannel(channel))
+	if err := c.selectAID(channel, AID); err != nil {
+		return 0, errors.Join(err, c.closeLogicalChannel(channel))
 	}
-	a.channel = channel
+	c.channel = channel
 	return channel, nil
 }
 
-func (a *AT) openChannel() (byte, error) {
-	response, err := a.transmitAPDU([]byte{0x00, 0x70, 0x00, 0x00, 0x01})
+func (c *channel) CloseLogicalChannel(channel byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.closeLogicalChannel(channel)
+}
+
+func (c *channel) openChannel() (byte, error) {
+	response, err := c.tx.Transmit(context.Background(), []byte{0x00, 0x70, 0x00, 0x00, 0x01})
 	if err != nil {
 		return 0, err
 	}
@@ -159,12 +132,12 @@ func (a *AT) openChannel() (byte, error) {
 	return channel, nil
 }
 
-func (a *AT) selectAID(channel byte, AID []byte) error {
+func (c *channel) selectAID(channel byte, AID []byte) error {
 	command, err := selectAIDCommand(channel, AID)
 	if err != nil {
 		return err
 	}
-	response, err := a.transmitAPDU(command)
+	response, err := c.tx.Transmit(context.Background(), command)
 	if err != nil {
 		return err
 	}
@@ -177,18 +150,11 @@ func (a *AT) selectAID(channel byte, AID []byte) error {
 	return nil
 }
 
-func (a *AT) CloseLogicalChannel(channel byte) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	return a.closeLogicalChannel(channel)
-}
-
-func (a *AT) closeLogicalChannel(channel byte) error {
+func (c *channel) closeLogicalChannel(channel byte) error {
 	if channel == 0 || channel > maxLogicalChannel {
 		return fmt.Errorf("invalid logical channel %d", channel)
 	}
-	response, err := a.transmitAPDU([]byte{0x00, 0x70, 0x80, channel, 0x00})
+	response, err := c.tx.Transmit(context.Background(), []byte{0x00, 0x70, 0x80, channel, 0x00})
 	if err != nil {
 		return err
 	}
@@ -198,17 +164,10 @@ func (a *AT) closeLogicalChannel(channel byte) error {
 	if !statusOK(response) {
 		return fmt.Errorf("close logical channel: %X", response)
 	}
-	if a.channel == channel {
-		a.channel = 0
+	if c.channel == channel {
+		c.channel = 0
 	}
 	return nil
-}
-
-func (a *AT) Disconnect() error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	return a.s.Close()
 }
 
 func selectAIDCommand(channel byte, AID []byte) ([]byte, error) {
@@ -233,4 +192,12 @@ func classByteForChannel(cla, channel byte) (byte, error) {
 		return (cla & 0xB0) | 0x40 | (channel - 4), nil
 	}
 	return 0, fmt.Errorf("logical channel %d exceeds maximum %d", channel, maxLogicalChannel)
+}
+
+func statusOK(response []byte) bool {
+	return len(response) >= 2 && response[len(response)-2] == 0x90 && response[len(response)-1] == 0x00
+}
+
+func statusHasMore(response []byte) bool {
+	return len(response) >= 2 && response[len(response)-2] == 0x61
 }

@@ -1,81 +1,59 @@
 package qmi
 
 import (
-	"errors"
-	"io"
-	"net"
-	"strings"
+	"context"
 	"testing"
-	"time"
-
-	"github.com/damonto/euicc-go/driver/qmi/protocol"
-	"github.com/damonto/euicc-go/driver/qmi/uim"
 )
 
-type fakeTransport struct {
-	called bool
-	err    error
+type fakeUIMReader struct {
+	closed bool
 }
 
-func (f *fakeTransport) Transmit(*protocol.Request) error {
-	f.called = true
-	return f.err
+func (f *fakeUIMReader) ActivateSlot(context.Context) error { return nil }
+func (f *fakeUIMReader) OpenLogicalChannel(context.Context, []byte) (uint8, error) {
+	return 1, nil
+}
+func (f *fakeUIMReader) SendAPDU(context.Context, uint8, []byte) ([]byte, error) {
+	return []byte{0x90, 0x00}, nil
+}
+func (f *fakeUIMReader) CloseLogicalChannel(context.Context, uint8) error { return nil }
+func (f *fakeUIMReader) Close() error {
+	f.closed = true
+	return nil
 }
 
-type fakeConn struct {
-	closed   bool
-	closeErr error
-}
+func TestDisconnectClosesReader(t *testing.T) {
+	reader := &fakeUIMReader{}
+	q := &QMI{channel: newChannel(reader)}
 
-func (c *fakeConn) Read([]byte) (int, error)         { return 0, io.EOF }
-func (c *fakeConn) Write(p []byte) (int, error)      { return len(p), nil }
-func (c *fakeConn) Close() error                     { c.closed = true; return c.closeErr }
-func (c *fakeConn) LocalAddr() net.Addr              { return nil }
-func (c *fakeConn) RemoteAddr() net.Addr             { return nil }
-func (c *fakeConn) SetDeadline(time.Time) error      { return nil }
-func (c *fakeConn) SetReadDeadline(time.Time) error  { return nil }
-func (c *fakeConn) SetWriteDeadline(time.Time) error { return nil }
-
-func TestDisconnectClosesConnectionWhenReleaseFails(t *testing.T) {
-	releaseErr := errors.New("release client id")
-	closeErr := errors.New("close conn")
-	transport := &fakeTransport{err: releaseErr}
-	conn := &fakeConn{closeErr: closeErr}
-	q := &QMI{
-		conn: conn,
-		Client: uim.Client{
-			Transport: transport,
-			ClientID:  7,
-		},
+	if err := q.Disconnect(); err != nil {
+		t.Fatalf("Disconnect() error = %v", err)
 	}
-
-	err := q.Disconnect()
-	if !transport.called {
-		t.Fatal("releaseClientID was not called")
-	}
-	if !conn.closed {
-		t.Fatal("connection was not closed")
-	}
-	if !errors.Is(err, releaseErr) {
-		t.Fatalf("disconnect error %v does not include release error", err)
-	}
-	if !errors.Is(err, closeErr) {
-		t.Fatalf("disconnect error %v does not include close error", err)
+	if !reader.closed {
+		t.Fatal("Disconnect() did not close reader")
 	}
 }
 
-func TestNewRejectsInvalidInputsBeforeDial(t *testing.T) {
-	if _, err := New("/dev/cdc-wdm1", 0); err == nil {
-		t.Fatal("New error = nil, want invalid slot error")
-	}
-
-	if _, err := New(strings.Repeat("x", 0x10000), 1); err == nil {
-		t.Fatal("New error = nil, want oversized device path error")
+func TestNewRejectsInvalidSlotBeforeOpen(t *testing.T) {
+	for _, slot := range []uint8{0, 6} {
+		_, err := New("/dev/cdc-wdm1", slot)
+		if err == nil {
+			t.Fatalf("New() error = nil for slot %d, want invalid slot error", slot)
+		}
+		if err.Error() != "slot must be between 1 and 5" {
+			t.Fatalf("New() error = %q, want local slot validation", err.Error())
+		}
 	}
 }
 
-func TestNewQRTRRejectsInvalidSlotBeforeSocket(t *testing.T) {
-	if _, err := NewQRTR(0); err == nil {
-		t.Fatal("NewQRTR error = nil, want invalid slot error")
+func TestNewQRTRRejectsInvalidSlotBeforeOpen(t *testing.T) {
+	for _, slot := range []uint8{0, 6} {
+		_, err := NewQRTR(slot)
+		if err == nil {
+			t.Fatalf("NewQRTR() error = nil for slot %d, want invalid slot error", slot)
+		}
+		if err.Error() != "slot must be between 1 and 5" {
+			t.Fatalf("NewQRTR() error = %q, want local slot validation", err.Error())
+		}
 	}
 }

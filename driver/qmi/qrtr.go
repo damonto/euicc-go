@@ -1,41 +1,33 @@
 package qmi
 
 import (
-	"errors"
+	"context"
 
 	"github.com/damonto/euicc-go/apdu"
-	"github.com/damonto/euicc-go/driver/qmi/protocol"
-	"github.com/damonto/euicc-go/driver/qmi/qrtr"
-	transport "github.com/damonto/euicc-go/driver/qmi/transport/qrtr"
-	"github.com/damonto/euicc-go/driver/qmi/uim"
+	uiccqrtr "github.com/damonto/uicc-go/qualcomm/qrtr"
+	"github.com/damonto/uicc-go/qualcomm/uim"
 )
 
-// QRTR implements the apdu.SmartCardChannel interface using QRTR protocol.
+// QRTR implements apdu.SmartCardChannel over QRTR.
 type QRTR struct {
-	conn *qrtr.Conn
-	uim.Client
+	*channel
 }
 
 // NewQRTR creates a new QRTR connection to the UIM service.
 func NewQRTR(slot uint8) (apdu.SmartCardChannel, error) {
-	if slot == 0 {
-		return nil, errors.New("slot must be >= 1")
+	if err := validateSlot(slot); err != nil {
+		return nil, err
 	}
 
-	conn, err := qrtr.Open(protocol.QMIServiceUIM)
+	ctx := context.Background()
+	transport, err := uiccqrtr.Open(ctx)
 	if err != nil {
 		return nil, err
 	}
-	q := &QRTR{
-		conn: conn,
-		Client: uim.Client{
-			Transport: transport.New(conn),
-			Slot:      slot,
-		},
+	reader, err := uim.New(ctx, transport, uim.WithSlot(slot))
+	if err != nil {
+		_ = transport.Close()
+		return nil, err
 	}
-	return q, nil
-}
-
-func (c *QRTR) Disconnect() error {
-	return c.conn.Close()
+	return &QRTR{channel: newChannel(reader)}, nil
 }
