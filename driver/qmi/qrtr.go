@@ -19,7 +19,8 @@ func NewQRTR(slot uint8) (apdu.SmartCardChannel, error) {
 		return nil, err
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
 	transport, err := uiccqrtr.Open(ctx)
 	if err != nil {
 		return nil, err

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/damonto/euicc-go/apdu"
 	uiccmbim "github.com/damonto/uicc-go/mbim"
@@ -17,6 +18,8 @@ type reader interface {
 	CloseChannel(ctx context.Context, channel uint32) error
 	Close() error
 }
+
+const defaultTimeout = 30 * time.Second
 
 type mbimOpener func(context.Context, ...uiccmbim.Option) (reader, error)
 
@@ -53,7 +56,9 @@ func (m *MBIM) Connect() error {
 	if m.reader != nil {
 		return nil
 	}
-	reader, err := openReader(context.Background(), uiccmbim.WithProxy(m.device), uiccmbim.WithSlot(int(m.slot)))
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+	reader, err := openReader(ctx, uiccmbim.WithProxy(m.device), uiccmbim.WithSlot(int(m.slot)))
 	if err != nil {
 		return err
 	}
@@ -69,7 +74,9 @@ func (m *MBIM) OpenLogicalChannel(AID []byte) (byte, error) {
 	if err := m.ensureOpen(); err != nil {
 		return 0, err
 	}
-	channel, err := m.reader.OpenChannel(context.Background(), AID)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+	channel, err := m.reader.OpenChannel(ctx, AID)
 	if err != nil {
 		return 0, err
 	}
@@ -85,7 +92,9 @@ func (m *MBIM) Transmit(command []byte) ([]byte, error) {
 	if err := m.ensureOpen(); err != nil {
 		return nil, err
 	}
-	response, status, err := m.reader.TransmitAPDU(context.Background(), m.channel, command)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+	response, status, err := m.reader.TransmitAPDU(ctx, m.channel, command)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +109,9 @@ func (m *MBIM) CloseLogicalChannel(channel byte) error {
 	if err := m.ensureOpen(); err != nil {
 		return err
 	}
-	if err := m.reader.CloseChannel(context.Background(), uint32(channel)); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+	if err := m.reader.CloseChannel(ctx, uint32(channel)); err != nil {
 		return err
 	}
 	if m.channel == uint32(channel) {

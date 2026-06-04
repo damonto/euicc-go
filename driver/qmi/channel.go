@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 )
 
 const maxSlot = 5
+const defaultTimeout = 30 * time.Second
 
 type uimReader interface {
 	ActivateSlot(ctx context.Context) error
@@ -42,7 +44,9 @@ func (c *channel) Connect() error {
 	if c.closed {
 		return errors.New("smart card channel is closed")
 	}
-	return c.reader.ActivateSlot(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+	return c.reader.ActivateSlot(ctx)
 }
 
 func (c *channel) Disconnect() error {
@@ -63,7 +67,9 @@ func (c *channel) OpenLogicalChannel(AID []byte) (byte, error) {
 	if c.closed {
 		return 0, errors.New("smart card channel is closed")
 	}
-	channel, err := c.reader.OpenLogicalChannel(context.Background(), AID)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+	channel, err := c.reader.OpenLogicalChannel(ctx, AID)
 	if err != nil {
 		return 0, err
 	}
@@ -78,7 +84,9 @@ func (c *channel) Transmit(command []byte) ([]byte, error) {
 	if c.closed {
 		return nil, errors.New("smart card channel is closed")
 	}
-	return c.reader.SendAPDU(context.Background(), c.channel, command)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+	return c.reader.SendAPDU(ctx, c.channel, command)
 }
 
 func (c *channel) CloseLogicalChannel(channel byte) error {
@@ -88,7 +96,9 @@ func (c *channel) CloseLogicalChannel(channel byte) error {
 	if c.closed {
 		return errors.New("smart card channel is closed")
 	}
-	if err := c.reader.CloseLogicalChannel(context.Background(), channel); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+	if err := c.reader.CloseLogicalChannel(ctx, channel); err != nil {
 		return err
 	}
 	if c.channel == channel {

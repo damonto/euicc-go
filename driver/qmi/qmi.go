@@ -19,7 +19,8 @@ func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
 		return nil, err
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
 	transport, err := uiccqmi.Open(ctx, uiccqmi.WithProxy(device))
 	if err != nil {
 		return nil, err
