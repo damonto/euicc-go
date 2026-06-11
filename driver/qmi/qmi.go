@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/damonto/euicc-go/apdu"
-	uiccqmi "github.com/damonto/uicc-go/qualcomm/qmi"
-	"github.com/damonto/uicc-go/qualcomm/uim"
+	uiccqmi "github.com/damonto/uicc-go/qcom/qmi"
+	"github.com/damonto/uicc-go/qcom/uim"
 )
 
 // QMI implements apdu.SmartCardChannel over a QMI proxy connection.

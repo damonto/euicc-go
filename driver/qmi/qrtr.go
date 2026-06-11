@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/damonto/euicc-go/apdu"
-	uiccqrtr "github.com/damonto/uicc-go/qualcomm/qrtr"
-	"github.com/damonto/uicc-go/qualcomm/uim"
+	uiccqrtr "github.com/damonto/uicc-go/qcom/qrtr"
+	"github.com/damonto/uicc-go/qcom/uim"
 )
 
 // QRTR implements apdu.SmartCardChannel over QRTR.
