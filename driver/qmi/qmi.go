@@ -1,34 +1,33 @@
+// Package qmi provides deprecated compatibility aliases for the Qualcomm driver.
+//
+// Deprecated: use github.com/damonto/euicc-go/driver/qcom.
 package qmi
 
 import (
-	"context"
-
 	"github.com/damonto/euicc-go/apdu"
-	uiccqmi "github.com/damonto/uicc-go/qcom/qmi"
-	"github.com/damonto/uicc-go/qcom/uim"
+	"github.com/damonto/euicc-go/driver/qcom"
 )
 
-// QMI implements apdu.SmartCardChannel over a QMI proxy connection.
-type QMI struct {
-	*channel
-}
+// QMI is an alias for qcom.QMI.
+//
+// Deprecated: use qcom.QMI.
+type QMI = qcom.QMI
+
+// QRTR is an alias for qcom.QRTR.
+//
+// Deprecated: use qcom.QRTR.
+type QRTR = qcom.QRTR
 
 // New creates a new QMI connection to the specified device.
+//
+// Deprecated: use qcom.NewQMI.
 func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
-	if err := validateSlot(slot); err != nil {
-		return nil, err
-	}
+	return qcom.NewQMI(device, slot)
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-	transport, err := uiccqmi.Open(ctx, uiccqmi.WithProxy(device))
-	if err != nil {
-		return nil, err
-	}
-	reader, err := uim.New(ctx, transport, uim.WithSlot(slot))
-	if err != nil {
-		_ = transport.Close()
-		return nil, err
-	}
-	return &QMI{channel: newChannel(reader)}, nil
+// NewQRTR creates a new QRTR connection to the UIM service.
+//
+// Deprecated: use qcom.NewQRTR.
+func NewQRTR(slot uint8) (apdu.SmartCardChannel, error) {
+	return qcom.NewQRTR(slot)
 }

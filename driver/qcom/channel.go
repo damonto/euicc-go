@@ -1,4 +1,4 @@
-package qmi
+package qcom
 
 import (
 	"context"

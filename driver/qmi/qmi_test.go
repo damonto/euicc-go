@@ -1,59 +1,39 @@
 package qmi
 
 import (
-	"context"
 	"testing"
+
+	"github.com/damonto/euicc-go/driver/qcom"
 )
 
-type fakeUIMReader struct {
-	closed bool
-}
-
-func (f *fakeUIMReader) ActivateSlot(context.Context) error { return nil }
-func (f *fakeUIMReader) OpenLogicalChannel(context.Context, []byte) (uint8, error) {
-	return 1, nil
-}
-func (f *fakeUIMReader) SendAPDU(context.Context, uint8, []byte) ([]byte, error) {
-	return []byte{0x90, 0x00}, nil
-}
-func (f *fakeUIMReader) CloseLogicalChannel(context.Context, uint8) error { return nil }
-func (f *fakeUIMReader) Close() error {
-	f.closed = true
-	return nil
-}
-
-func TestDisconnectClosesReader(t *testing.T) {
-	reader := &fakeUIMReader{}
-	q := &QMI{channel: newChannel(reader)}
-
-	if err := q.Disconnect(); err != nil {
-		t.Fatalf("Disconnect() error = %v", err)
-	}
-	if !reader.closed {
-		t.Fatal("Disconnect() did not close reader")
-	}
-}
-
-func TestNewRejectsInvalidSlotBeforeOpen(t *testing.T) {
+func TestNewMatchesNewQMIInvalidSlot(t *testing.T) {
 	for _, slot := range []uint8{0, 6} {
-		_, err := New("/dev/cdc-wdm1", slot)
-		if err == nil {
+		_, deprecatedErr := New("/dev/cdc-wdm1", slot)
+		_, currentErr := qcom.NewQMI("/dev/cdc-wdm1", slot)
+		if deprecatedErr == nil {
 			t.Fatalf("New() error = nil for slot %d, want invalid slot error", slot)
 		}
-		if err.Error() != "slot must be between 1 and 5" {
-			t.Fatalf("New() error = %q, want local slot validation", err.Error())
+		if currentErr == nil {
+			t.Fatalf("NewQMI() error = nil for slot %d, want invalid slot error", slot)
+		}
+		if deprecatedErr.Error() != currentErr.Error() {
+			t.Fatalf("New() error = %q, want %q", deprecatedErr.Error(), currentErr.Error())
 		}
 	}
 }
 
-func TestNewQRTRRejectsInvalidSlotBeforeOpen(t *testing.T) {
+func TestNewQRTRMatchesQCOMInvalidSlot(t *testing.T) {
 	for _, slot := range []uint8{0, 6} {
-		_, err := NewQRTR(slot)
-		if err == nil {
+		_, deprecatedErr := NewQRTR(slot)
+		_, currentErr := qcom.NewQRTR(slot)
+		if deprecatedErr == nil {
 			t.Fatalf("NewQRTR() error = nil for slot %d, want invalid slot error", slot)
 		}
-		if err.Error() != "slot must be between 1 and 5" {
-			t.Fatalf("NewQRTR() error = %q, want local slot validation", err.Error())
+		if currentErr == nil {
+			t.Fatalf("qcom.NewQRTR() error = nil for slot %d, want invalid slot error", slot)
+		}
+		if deprecatedErr.Error() != currentErr.Error() {
+			t.Fatalf("NewQRTR() error = %q, want %q", deprecatedErr.Error(), currentErr.Error())
 		}
 	}
 }
