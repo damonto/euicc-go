@@ -43,6 +43,13 @@ func TestTLV_UnmarshalJSONWithNewline(t *testing.T) {
 	assert.Equal(t, []byte{0xff}, tlv.Value)
 }
 
+func TestTLV_UnmarshalJSONWithoutPadding(t *testing.T) {
+	var tlv TLV
+	assert.NoError(t, json.Unmarshal([]byte(`"gAL/7g"`), &tlv))
+	assert.Equal(t, Primitive.ContextSpecific(0), tlv.Tag)
+	assert.Equal(t, []byte{0xff, 0xee}, tlv.Value)
+}
+
 func TestTLV_UnmarshalBERTLV(t *testing.T) {
 	original := NewChildren(
 		Constructed.Application(0),

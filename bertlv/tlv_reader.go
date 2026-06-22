@@ -40,8 +40,16 @@ func (tlv *TLV) ReadFrom(r io.Reader) (int64, error) {
 }
 
 func (tlv *TLV) UnmarshalText(text []byte) error {
-	_, err := tlv.ReadFrom(base64.NewDecoder(base64.StdEncoding, bytes.NewReader(text)))
-	return err
+	var t TLV
+	if _, err := t.ReadFrom(base64.NewDecoder(base64.StdEncoding, bytes.NewReader(text))); err == nil {
+		*tlv = t
+		return nil
+	}
+	if _, err := t.ReadFrom(base64.NewDecoder(base64.RawStdEncoding, bytes.NewReader(text))); err != nil {
+		return err
+	}
+	*tlv = t
+	return nil
 }
 
 func (tlv *TLV) UnmarshalBinary(data []byte) error {
