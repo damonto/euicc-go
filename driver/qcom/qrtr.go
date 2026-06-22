@@ -3,18 +3,18 @@ package qcom
 import (
 	"context"
 
-	"github.com/damonto/euicc-go/apdu"
+	"github.com/damonto/euicc-go/driver"
 	uiccqrtr "github.com/damonto/uicc-go/qcom/qrtr"
 	"github.com/damonto/uicc-go/qcom/uim"
 )
 
-// QRTR implements apdu.SmartCardChannel over QRTR.
+// QRTR implements driver.SmartCardChannel over QRTR.
 type QRTR struct {
 	*channel
 }
 
 // NewQRTR creates a new QRTR connection to the UIM service.
-func NewQRTR(slot uint8) (apdu.SmartCardChannel, error) {
+func NewQRTR(slot uint8) (driver.SmartCardChannel, error) {
 	if err := validateSlot(slot); err != nil {
 		return nil, err
 	}

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/damonto/euicc-go/apdu"
+	"github.com/damonto/euicc-go/driver"
 	uiccccid "github.com/damonto/uicc-go/ccid"
 )
 
@@ -34,7 +34,7 @@ var (
 
 // CCID is a PC/SC smart card channel.
 type CCID interface {
-	apdu.SmartCardChannel
+	driver.SmartCardChannel
 	ListReaders() ([]string, error)
 	SetReader(reader string) error
 }

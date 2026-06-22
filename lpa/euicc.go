@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/damonto/euicc-go/apdu"
 	"github.com/damonto/euicc-go/driver"
 	"github.com/damonto/euicc-go/http"
 	sgp22 "github.com/damonto/euicc-go/v2"
@@ -28,7 +27,7 @@ type Client struct {
 // It includes the channel for APDU communication, logger, AID, maximum APDU size (MSS), admin protocol version, and timeout.
 type Options struct {
 	// Channel is the channel for APDU communication. It is required for APDU communication.
-	Channel apdu.SmartCardChannel
+	Channel driver.SmartCardChannel
 	// AID is the application identifier for the GSMA ISD-R application. It defaults to GSMA ISD-R Application AID.
 	AID []byte
 	// MSS is the maximum APDU size. It defaults to 254.

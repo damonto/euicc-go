@@ -3,18 +3,18 @@ package qcom
 import (
 	"context"
 
-	"github.com/damonto/euicc-go/apdu"
+	"github.com/damonto/euicc-go/driver"
 	uiccqmi "github.com/damonto/uicc-go/qcom/qmi"
 	"github.com/damonto/uicc-go/qcom/uim"
 )
 
-// QMI implements apdu.SmartCardChannel over a QMI proxy connection.
+// QMI implements driver.SmartCardChannel over a QMI proxy connection.
 type QMI struct {
 	*channel
 }
 
 // NewQMI creates a new QMI connection to the specified device.
-func NewQMI(device string, slot uint8) (apdu.SmartCardChannel, error) {
+func NewQMI(device string, slot uint8) (driver.SmartCardChannel, error) {
 	if err := validateSlot(slot); err != nil {
 		return nil, err
 	}

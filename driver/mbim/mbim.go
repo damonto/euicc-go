@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/damonto/euicc-go/apdu"
+	"github.com/damonto/euicc-go/driver"
 	uiccmbim "github.com/damonto/uicc-go/mbim"
 )
 
@@ -27,7 +27,7 @@ var openReader mbimOpener = func(ctx context.Context, opts ...uiccmbim.Option) (
 	return uiccmbim.Open(ctx, opts...)
 }
 
-// MBIM implements apdu.SmartCardChannel over an MBIM proxy connection.
+// MBIM implements driver.SmartCardChannel over an MBIM proxy connection.
 type MBIM struct {
 	mu      sync.Mutex
 	device  string
@@ -38,7 +38,7 @@ type MBIM struct {
 }
 
 // New creates a new MBIM proxy channel to the specified device.
-func New(device string, slot uint8) (apdu.SmartCardChannel, error) {
+func New(device string, slot uint8) (driver.SmartCardChannel, error) {
 	if slot == 0 {
 		return nil, fmt.Errorf("slot must be >= 1")
 	}
@@ -84,7 +84,7 @@ func (m *MBIM) OpenLogicalChannel(AID []byte) (byte, error) {
 	return byte(channel), nil
 }
 
-// Transmit implements apdu.SmartCardChannel.
+// Transmit implements driver.SmartCardChannel.
 func (m *MBIM) Transmit(command []byte) ([]byte, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

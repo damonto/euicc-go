@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/damonto/euicc-go/apdu"
+	"github.com/damonto/euicc-go/driver"
 	uiccat "github.com/damonto/uicc-go/at"
 )
 
@@ -31,7 +31,7 @@ type AT struct {
 }
 
 // New creates an AT smart card channel.
-func New(device string) (apdu.SmartCardChannel, error) {
+func New(device string) (driver.SmartCardChannel, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 	reader, err := uiccat.Open(ctx, device, defaultBaudRate, uiccat.WithoutInit())
