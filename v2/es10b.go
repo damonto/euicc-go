@@ -125,9 +125,19 @@ func (r *LoadBoundProfilePackageResponse) Valid() error {
 	if result == nil {
 		return nil
 	}
+	var commandID BPPCommandID
+	if err := result.First(bertlv.ContextSpecific.Primitive(0)).
+		UnmarshalValue(primitive.UnmarshalInt(&commandID)); err != nil {
+		return err
+	}
+	var reason BPPErrorReason
+	if err := result.First(bertlv.ContextSpecific.Primitive(1)).
+		UnmarshalValue(primitive.UnmarshalInt(&reason)); err != nil {
+		return err
+	}
 	return &LoadBoundProfilePackageError{
-		BPPCommandID: result.First(bertlv.ContextSpecific.Primitive(0)).Value[0],
-		ErrorReason:  result.First(bertlv.ContextSpecific.Primitive(1)).Value[0],
+		BPPCommandID: commandID,
+		ErrorReason:  reason,
 	}
 }
 
@@ -173,15 +183,22 @@ func (r *GetEuiccChallengeResponse) Valid() error {
 // Version 1 is used for ES10b.EUICCInfo1 and version 2 is used for ES10b.EUICCInfo2.
 //
 // See https://aka.pw/sgp22/v2.5#page=187 (Section 5.7.8, ES10b.GetEUICCInfo)
+type EuiccInfoVersion int
+
+const (
+	EuiccInfoVersion1 EuiccInfoVersion = 1
+	EuiccInfoVersion2 EuiccInfoVersion = 2
+)
+
 type GetEuiccInfoRequest struct {
-	Version int
+	Version EuiccInfoVersion
 }
 
 func (r *GetEuiccInfoRequest) MarshalBERTLV() (*bertlv.TLV, error) {
 	switch r.Version {
-	case 1:
+	case EuiccInfoVersion1:
 		return bertlv.NewChildren(bertlv.ContextSpecific.Constructed(32)), nil
-	case 2:
+	case EuiccInfoVersion2:
 		return bertlv.NewChildren(bertlv.ContextSpecific.Constructed(34)), nil
 	}
 	return nil, errors.New("unsupported version")
@@ -192,7 +209,7 @@ func (r *GetEuiccInfoRequest) CardResponse() *GetEuiccInfoResponse {
 }
 
 type GetEuiccInfoResponse struct {
-	Version  int
+	Version  EuiccInfoVersion
 	Response *bertlv.TLV
 }
 
@@ -341,7 +358,7 @@ func (r *NotificationSentRequest) MarshalBERTLV() (*bertlv.TLV, error) {
 }
 
 type NotificationSentResponse struct {
-	DeleteNotificationStatus int8
+	DeleteNotificationStatus DeleteNotificationStatus
 }
 
 func (r *NotificationSentResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
@@ -354,10 +371,12 @@ func (r *NotificationSentResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 
 func (r *NotificationSentResponse) Valid() error {
 	switch r.DeleteNotificationStatus {
-	case 0:
+	case DeleteNotificationStatusOK:
 		return nil
-	case 1:
+	case DeleteNotificationStatusNothingToDelete:
 		return ErrNothingToDelete
+	case DeleteNotificationStatusUndefinedError:
+		return ErrUndefined
 	}
 	return ErrUndefined
 }

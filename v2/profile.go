@@ -3,6 +3,7 @@ package sgp22
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 
 	"github.com/damonto/euicc-go/bertlv"
 	"github.com/damonto/euicc-go/bertlv/primitive"
@@ -26,27 +27,31 @@ func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 		return ErrUnexpectedTag
 	}
 	*p = ProfileInfo{
-		ICCID:               tlv.First(bertlv.Application.Primitive(26)).Value,
-		ServiceProviderName: string(tlv.First(bertlv.ContextSpecific.Primitive(17)).Value),
-		ProfileName:         string(tlv.First(bertlv.ContextSpecific.Primitive(18)).Value),
-		ProfileClass:        ProfileClassProvisioning,
+		ProfileClass: ProfileClassProvisioning,
 	}
-	if profileClass := tlv.First(bertlv.ContextSpecific.Primitive(21)); profileClass != nil {
-		p.ProfileClass = ProfileClass(profileClass.Value[0])
+	if err := optional(tlv, TagICCID, &p.ICCID, ICCID(nil)); err != nil {
+		return err
 	}
-	if id := tlv.First(bertlv.Application.Primitive(15)); id != nil {
-		p.ISDPAID = id.Value
+	if err := optional(tlv, TagISDPAID, &p.ISDPAID, ISDPAID(nil)); err != nil {
+		return err
 	}
-	if nickname := tlv.First(bertlv.ContextSpecific.Primitive(16)); nickname != nil {
-		p.ProfileNickname = string(nickname.Value)
+	if err := optional(tlv, TagProfileState, &p.ProfileState, ProfileDisabled); err != nil {
+		return err
 	}
-	if icon := tlv.First(bertlv.ContextSpecific.Primitive(20)); icon != nil {
-		p.Icon = icon.Value
+	if err := optional(tlv, TagNickname, &p.ProfileNickname, ""); err != nil {
+		return err
 	}
-	if tlv.Tag.If(bertlv.Private, bertlv.Constructed, 3) {
-		if err := tlv.First(bertlv.ContextSpecific.Primitive(112)).UnmarshalValue(primitive.UnmarshalInt(&p.ProfileState)); err != nil {
-			return err
-		}
+	if err := optional(tlv, TagServiceProviderName, &p.ServiceProviderName, ""); err != nil {
+		return err
+	}
+	if err := optional(tlv, TagProfileName, &p.ProfileName, ""); err != nil {
+		return err
+	}
+	if err := optional(tlv, TagProfileIcon, &p.Icon, ProfileIcon(nil)); err != nil {
+		return err
+	}
+	if err := optional(tlv, TagProfileClass, &p.ProfileClass, ProfileClassProvisioning); err != nil {
+		return err
 	}
 	if notification := tlv.First(bertlv.ContextSpecific.Constructed(22)); notification != nil {
 		if err := p.NotificationConfigurationInfo.UnmarshalBERTLV(notification); err != nil {
@@ -57,6 +62,35 @@ func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 		if err := p.ProfileOwner.UnmarshalBERTLV(owner); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func optional[T any](tlv *bertlv.TLV, tag bertlv.Tag, dst *T, def T) error {
+	*dst = def
+	field := tlv.First(tag)
+	if field == nil {
+		return nil
+	}
+	switch v := any(dst).(type) {
+	case *string:
+		*v = string(field.Value)
+	case *[]byte:
+		*v = field.Value
+	case *ICCID:
+		*v = ICCID(field.Value)
+	case *ISDPAID:
+		*v = ISDPAID(field.Value)
+	case *ProfileIcon:
+		*v = ProfileIcon(field.Value)
+	case *ProfileState:
+		return field.UnmarshalValue(primitive.UnmarshalInt(v))
+	case *ProfileClass:
+		return field.UnmarshalValue(primitive.UnmarshalInt(v))
+	case *NotificationEvent:
+		return field.UnmarshalValue(v)
+	default:
+		return errors.New("unsupported optional field")
 	}
 	return nil
 }
@@ -98,7 +132,7 @@ type OperatorId struct {
 }
 
 func (id *OperatorId) MCC() string {
-	if len(id.PLMN) == 0 {
+	if len(id.PLMN) < 2 {
 		return ""
 	}
 	return string([]byte{
@@ -109,7 +143,7 @@ func (id *OperatorId) MCC() string {
 }
 
 func (id *OperatorId) MNC() string {
-	if len(id.PLMN) < 2 {
+	if len(id.PLMN) < 3 {
 		return ""
 	}
 	mnc := []byte{'0' + id.PLMN[2]&0x0f, '0' + id.PLMN[2]>>4}

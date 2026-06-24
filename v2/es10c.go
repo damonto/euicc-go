@@ -52,12 +52,12 @@ func (r *ProfileInfoListRequest) uniqueTags(tags []bertlv.Tag) []bertlv.Tag {
 }
 
 type ProfileInfoListResponse struct {
-	ProfileList []*ProfileInfo
-	error       *bertlv.TLV
+	ProfileList          []*ProfileInfo
+	ProfileInfoListError *bertlv.TLV
 }
 
 func (r *ProfileInfoListResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
-	if r.error = tlv.First(bertlv.ContextSpecific.Primitive(1)); r.error != nil {
+	if r.ProfileInfoListError = tlv.First(bertlv.ContextSpecific.Primitive(1)); r.ProfileInfoListError != nil {
 		return r.Valid()
 	}
 	tlv = tlv.First(bertlv.ContextSpecific.Constructed(0))
@@ -75,12 +75,18 @@ func (r *ProfileInfoListResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 }
 
 func (r *ProfileInfoListResponse) Valid() error {
-	if r.error == nil {
+	if r.ProfileInfoListError == nil {
 		return nil
 	}
-	switch r.error.Value[0] {
-	case 1:
-		return errors.New("incorrect input values")
+	var errorCode ProfileInfoListErrorCode
+	if err := r.ProfileInfoListError.UnmarshalValue(primitive.UnmarshalInt(&errorCode)); err != nil {
+		return err
+	}
+	switch errorCode {
+	case ProfileInfoListErrorIncorrectInputValues:
+		return ErrIncorrectInputValues
+	case ProfileInfoListErrorUndefinedError:
+		return ErrUndefined
 	}
 	return ErrUndefined
 }
@@ -94,7 +100,7 @@ type (
 		Identifier *bertlv.TLV
 		Refresh    bool
 	}
-	EnableProfileResponse  struct{ Result int8 }
+	EnableProfileResponse  struct{ Result ProfileOperationResult }
 	DisableProfileRequest  EnableProfileRequest
 	DisableProfileResponse EnableProfileResponse
 	DeleteProfileRequest   EnableProfileRequest
@@ -130,7 +136,7 @@ func (r *ProfileOperationRequest) CardResponse() *ProfileOperationResponse {
 
 type ProfileOperationResponse struct {
 	Operation ProfileOperation
-	Result    int8
+	Result    ProfileOperationResult
 }
 
 func (r *ProfileOperationRequest) MarshalBERTLV() (*bertlv.TLV, error) {
@@ -165,21 +171,21 @@ func (r *ProfileOperationResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 
 func (r *ProfileOperationResponse) Valid() error {
 	switch r.Result {
-	case 0:
+	case ProfileOperationResultOK:
 		return nil
-	case 1:
-		return errors.New("iccid or aid not found")
-	case 2:
+	case ProfileOperationResultICCIDOrAIDNotFound,
+		ProfileOperationResultProfileNotInDisabledState,
+		ProfileOperationResultDisallowedByPolicy,
+		ProfileOperationResultUndefinedError:
+		return &ProfileOperationError{Operation: r.Operation, Result: r.Result}
+	case ProfileOperationResultWrongProfileReenabling:
 		if r.Operation == EnableProfile {
-			return errors.New("profile not in disabled state")
+			return &ProfileOperationError{Operation: r.Operation, Result: r.Result}
 		}
-		return errors.New("profile not in enabled state")
-	case 3:
-		return errors.New("disallowed by policy")
-	case 4:
-		return errors.New("wrong profile re-enabling")
-	case 5:
-		return ErrCatBusy
+	case ProfileOperationResultCATBusy:
+		if r.Operation == EnableProfile || r.Operation == DisableProfile {
+			return &ProfileOperationError{Operation: r.Operation, Result: r.Result}
+		}
 	}
 	return ErrUndefined
 }
@@ -217,7 +223,7 @@ func (r *EuiccMemoryResetRequest) MarshalBERTLV() (*bertlv.TLV, error) {
 }
 
 type EuiccMemoryResetResponse struct {
-	Result int8
+	Result EuiccMemoryResetResult
 }
 
 func (r *EuiccMemoryResetResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
@@ -230,12 +236,14 @@ func (r *EuiccMemoryResetResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 
 func (r *EuiccMemoryResetResponse) Valid() error {
 	switch r.Result {
-	case 0:
+	case EuiccMemoryResetResultOK:
 		return nil
-	case 1:
+	case EuiccMemoryResetResultNothingToDelete:
 		return ErrNothingToDelete
-	case 5:
+	case EuiccMemoryResetResultCATBusy:
 		return ErrCatBusy
+	case EuiccMemoryResetResultUndefinedError:
+		return ErrUndefined
 	}
 	return ErrUndefined
 }
@@ -318,7 +326,7 @@ func (r *SetNicknameRequest) MarshalBERTLV() (*bertlv.TLV, error) {
 }
 
 type SetNicknameResponse struct {
-	Result int8
+	Result SetNicknameResult
 }
 
 func (r *SetNicknameResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
@@ -331,10 +339,12 @@ func (r *SetNicknameResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 
 func (r *SetNicknameResponse) Valid() error {
 	switch r.Result {
-	case 0:
+	case SetNicknameResultOK:
 		return nil
-	case 1:
+	case SetNicknameResultICCIDNotFound:
 		return ErrICCIDNotFound
+	case SetNicknameResultUndefinedError:
+		return ErrUndefined
 	}
 	return ErrUndefined
 }

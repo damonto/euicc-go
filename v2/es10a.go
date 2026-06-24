@@ -75,7 +75,7 @@ func (r *SetDefaultDPAddressRequest) MarshalBERTLV() (*bertlv.TLV, error) {
 }
 
 type SetDefaultDPAddressResponse struct {
-	Result int8
+	Result SetDefaultDPAddressResult
 }
 
 func (r *SetDefaultDPAddressResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
@@ -87,7 +87,7 @@ func (r *SetDefaultDPAddressResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 }
 
 func (r *SetDefaultDPAddressResponse) Valid() error {
-	if r == nil || r.Result == 0 {
+	if r == nil || r.Result == SetDefaultDPAddressResultOK {
 		return nil
 	}
 	return ErrUndefined

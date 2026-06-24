@@ -4,6 +4,7 @@ import (
 	"net/url"
 
 	"github.com/damonto/euicc-go/bertlv"
+	"github.com/damonto/euicc-go/bertlv/primitive"
 )
 
 // region Section 5.6.1, ES9+.HandleNotification
@@ -114,6 +115,40 @@ func (r *ES9AuthenticateClientRequest) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 }
 
 func (r *ES9AuthenticateClientRequest) Valid() error {
+	if r.Response == nil {
+		return ErrUnexpectedTag
+	}
+	if r.Response.First(bertlv.ContextSpecific.Constructed(0)) != nil {
+		return nil
+	}
+	errorTLV := r.Response.First(bertlv.ContextSpecific.Constructed(1))
+	if errorTLV == nil {
+		return ErrUnexpectedTag
+	}
+	var authenticateResponseError AuthenticateResponseError
+	if err := authenticateResponseError.UnmarshalBERTLV(errorTLV); err != nil {
+		return err
+	}
+	return &authenticateResponseError
+}
+
+func (e *AuthenticateResponseError) UnmarshalBERTLV(tlv *bertlv.TLV) error {
+	if !tlv.Tag.If(bertlv.ContextSpecific, bertlv.Constructed, 1) {
+		return ErrUnexpectedTag
+	}
+	transactionTLV := tlv.First(bertlv.ContextSpecific.Primitive(0))
+	errorCodeTLV := tlv.First(bertlv.ContextSpecific.Primitive(1))
+	if transactionTLV == nil || errorCodeTLV == nil {
+		return ErrUnexpectedTag
+	}
+	var errorCode AuthenticateErrorCode
+	if err := errorCodeTLV.UnmarshalValue(primitive.UnmarshalInt(&errorCode)); err != nil {
+		return err
+	}
+	*e = AuthenticateResponseError{
+		TransactionID: transactionTLV.Value,
+		ErrorCode:     errorCode,
+	}
 	return nil
 }
 
