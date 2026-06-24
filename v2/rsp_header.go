@@ -15,6 +15,24 @@ func (h Header) Error() error {
 	return h.ExecutionStatus.StatusCodeData
 }
 
+// HeaderExecutionStatus returns the execution status of an ES9+ response,
+// synthesising a failed status when the header is missing. An SM-DP+ that
+// replies with an empty or invalid body leaves Header (and thus
+// ExecutionStatus) nil; callers dereference the returned status on the failure
+// path, so returning nil here would panic. Always return a non-nil status with
+// a non-nil StatusCodeData instead.
+func HeaderExecutionStatus(h *Header) *ExecutionStatus {
+	if h == nil || h.ExecutionStatus == nil {
+		return &ExecutionStatus{
+			Status: "Failed",
+			StatusCodeData: &StatusCodeData{
+				Message: "SM-DP+ returned an empty or invalid response (missing functionExecutionStatus)",
+			},
+		}
+	}
+	return h.ExecutionStatus
+}
+
 type ExecutionStatus struct {
 	Status         string          `json:"status,omitempty"`
 	StatusCodeData *StatusCodeData `json:"statusCodeData,omitempty"`

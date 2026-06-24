@@ -21,14 +21,24 @@ type ProfileInfo struct {
 	NotificationConfigurationInfo NotificationConfigurationInfo
 }
 
+// firstValue returns the value of the first child carrying tag, or nil when the
+// (optional) tag is absent. Many real-world profiles omit optional fields such
+// as serviceProviderName; callers must not dereference a nil *TLV.
+func firstValue(tlv *bertlv.TLV, tag bertlv.Tag) []byte {
+	if child := tlv.First(tag); child != nil {
+		return child.Value
+	}
+	return nil
+}
+
 func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 	if !tlv.Tag.If(bertlv.Private, bertlv.Constructed, 3) && !tlv.Tag.If(bertlv.ContextSpecific, bertlv.Constructed, 37) {
 		return ErrUnexpectedTag
 	}
 	*p = ProfileInfo{
-		ICCID:               tlv.First(bertlv.Application.Primitive(26)).Value,
-		ServiceProviderName: string(tlv.First(bertlv.ContextSpecific.Primitive(17)).Value),
-		ProfileName:         string(tlv.First(bertlv.ContextSpecific.Primitive(18)).Value),
+		ICCID:               firstValue(tlv, bertlv.Application.Primitive(26)),
+		ServiceProviderName: string(firstValue(tlv, bertlv.ContextSpecific.Primitive(17))),
+		ProfileName:         string(firstValue(tlv, bertlv.ContextSpecific.Primitive(18))),
 		ProfileClass:        ProfileClassProvisioning,
 	}
 	if profileClass := tlv.First(bertlv.ContextSpecific.Primitive(21)); profileClass != nil {
@@ -44,8 +54,10 @@ func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 		p.Icon = icon.Value
 	}
 	if tlv.Tag.If(bertlv.Private, bertlv.Constructed, 3) {
-		if err := tlv.First(bertlv.ContextSpecific.Primitive(112)).UnmarshalValue(primitive.UnmarshalInt(&p.ProfileState)); err != nil {
-			return err
+		if state := tlv.First(bertlv.ContextSpecific.Primitive(112)); state != nil {
+			if err := state.UnmarshalValue(primitive.UnmarshalInt(&p.ProfileState)); err != nil {
+				return err
+			}
 		}
 	}
 	if notification := tlv.First(bertlv.ContextSpecific.Constructed(22)); notification != nil {

@@ -19,7 +19,7 @@ type ES11AuthenticateClientResponse struct {
 }
 
 func (r *ES11AuthenticateClientResponse) FunctionExecutionStatus() *ExecutionStatus {
-	return r.Header.ExecutionStatus
+	return HeaderExecutionStatus(r.Header)
 }
 
 type EventEntry struct {

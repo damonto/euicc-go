@@ -1,6 +1,8 @@
 package sgp22
 
 import (
+	"errors"
+	"fmt"
 	"net/url"
 
 	"github.com/damonto/euicc-go/bertlv"
@@ -32,7 +34,7 @@ type ES9InitiateAuthenticationResponse struct {
 }
 
 func (r *ES9InitiateAuthenticationResponse) FunctionExecutionStatus() *ExecutionStatus {
-	return r.Header.ExecutionStatus
+	return HeaderExecutionStatus(r.Header)
 }
 
 func (r *ES9InitiateAuthenticationResponse) CardRequest() *AuthenticateServerRequest {
@@ -81,7 +83,7 @@ type ES9BoundProfilePackageResponse struct {
 }
 
 func (r *ES9BoundProfilePackageResponse) FunctionExecutionStatus() *ExecutionStatus {
-	return r.Header.ExecutionStatus
+	return HeaderExecutionStatus(r.Header)
 }
 
 func (r *ES9BoundProfilePackageResponse) CardRequest() *LoadBoundProfilePackageRequest {
@@ -114,7 +116,50 @@ func (r *ES9AuthenticateClientRequest) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 }
 
 func (r *ES9AuthenticateClientRequest) Valid() error {
+	if r.Response == nil {
+		return errors.New("eUICC did not return AuthenticateServer response")
+	}
+	// AuthenticateServerResponse ::= [56] CHOICE {
+	//   authenticateResponseOk    [0],
+	//   authenticateResponseError [1] { transactionId, authenticateErrorCode }
+	// }
+	//The error branch indicates that the eUICC rejected the server authentication of SM-DP+; at this time, the error response should not be forwarded to SM-DP+, but should crash directly.
+	if errBranch := r.Response.First(bertlv.ContextSpecific.Constructed(1)); errBranch != nil {
+		code := -1
+		if codeTLV := errBranch.First(bertlv.Universal.Primitive(2)); codeTLV != nil {
+			code = 0
+			for _, b := range codeTLV.Value {
+				code = code<<8 | int(b)
+			}
+		}
+		return fmt.Errorf("eUICC rejected SM-DP+ server authentication (authenticateResponseError, errorCode=%d: %s)", code, authenticateErrorCodeString(code))
+	}
 	return nil
+}
+
+// authenticateErrorCodeString maps an ES10b.AuthenticateServer error code to
+// its SGP.22 name. See AuthenticateErrorCode in SGP.22 §5.7.13.
+func authenticateErrorCodeString(code int) string {
+	switch code {
+	case 1:
+		return "invalidCertificate"
+	case 2:
+		return "invalidSignature"
+	case 3:
+		return "unsupportedCurve"
+	case 4:
+		return "noSessionContext"
+	case 5:
+		return "invalidOID"
+	case 6:
+		return "euiccChallengeMismatch"
+	case 7:
+		return "ciPKUnknown"
+	case 127:
+		return "undefinedError"
+	default:
+		return "unknown"
+	}
 }
 
 type ES9AuthenticateClientResponse struct {
@@ -127,7 +172,7 @@ type ES9AuthenticateClientResponse struct {
 }
 
 func (r *ES9AuthenticateClientResponse) FunctionExecutionStatus() *ExecutionStatus {
-	return r.Header.ExecutionStatus
+	return HeaderExecutionStatus(r.Header)
 }
 
 func (r *ES9AuthenticateClientResponse) CardRequest() *PrepareDownloadRequest {
@@ -207,7 +252,7 @@ type ES9CancelSessionResponse struct {
 }
 
 func (r *ES9CancelSessionResponse) FunctionExecutionStatus() *ExecutionStatus {
-	return r.Header.ExecutionStatus
+	return HeaderExecutionStatus(r.Header)
 }
 
 // endregion
