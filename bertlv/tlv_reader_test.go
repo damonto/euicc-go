@@ -26,6 +26,21 @@ func TestTLV_ReadFrom(t *testing.T) {
 	}
 }
 
+func TestTLV_ReadFromRejectsChildPastConstructedLength(t *testing.T) {
+	var tlv TLV
+	_, err := tlv.ReadFrom(bytes.NewReader([]byte{0xa0, 0x02, 0x80, 0x03, 0xff, 0xee, 0xdd}))
+
+	assert.Error(t, err)
+}
+
+func TestTLV_UnmarshalBinaryRejectsTrailingData(t *testing.T) {
+	var tlv TLV
+
+	err := tlv.UnmarshalBinary([]byte{0x80, 0x01, 0xff, 0x00})
+
+	assert.EqualError(t, err, "trailing data after TLV: 1 bytes")
+}
+
 func TestTLV_FilterInvalidChildren(t *testing.T) {
 	tlv := NewChildren(
 		Constructed.ContextSpecific(0),

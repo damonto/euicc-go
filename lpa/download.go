@@ -238,7 +238,7 @@ func (c *Client) authenticateClient(ac *ActivationCode) (*sgp22.ES9AuthenticateC
 
 func (c *Client) confirmationCodeRequired(tlv *bertlv.TLV) bool {
 	var required bool
-	tlv.First(bertlv.Universal.Primitive(1)).UnmarshalValue(primitive.UnmarshalBool(&required))
+	_ = tlv.First(bertlv.Universal.Primitive(1)).UnmarshalValue(primitive.UnmarshalBool(&required))
 	return required
 }
 

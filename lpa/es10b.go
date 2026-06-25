@@ -65,17 +65,11 @@ func (c *Client) PrepareDownload(address *url.URL, request *sgp22.PrepareDownloa
 // See https://aka.pw/sgp22/v2.5#page=191 (Section 5.7.9, ES10b.ListNotification)
 func (c *Client) ListNotification(filters ...sgp22.NotificationEvent) ([]*sgp22.NotificationMetadata, error) {
 	var request sgp22.ListNotificationRequest
-	request.Filter = make(map[sgp22.NotificationEvent]bool)
-	if len(filters) == 0 {
-		filters = []sgp22.NotificationEvent{
-			sgp22.NotificationEventInstall,
-			sgp22.NotificationEventEnable,
-			sgp22.NotificationEventDisable,
-			sgp22.NotificationEventDelete,
+	if len(filters) > 0 {
+		request.Filter = make(map[sgp22.NotificationEvent]bool, len(filters))
+		for _, event := range filters {
+			request.Filter[event] = true
 		}
-	}
-	for _, event := range filters {
-		request.Filter[event] = true
 	}
 	response, err := sgp22.InvokeAPDU(c.APDU, &request)
 	if err != nil {
@@ -92,6 +86,7 @@ func (c *Client) ListNotification(filters ...sgp22.NotificationEvent) ([]*sgp22.
 func (c *Client) RetrieveNotificationList(searchCriteria any) ([]*sgp22.PendingNotification, error) {
 	var request sgp22.RetrieveNotificationsListRequest
 	switch v := searchCriteria.(type) {
+	case nil:
 	case sgp22.SequenceNumber:
 		request.SearchCriteria, _ = bertlv.MarshalValue(bertlv.ContextSpecific.Primitive(0), &v)
 	case sgp22.NotificationEvent:

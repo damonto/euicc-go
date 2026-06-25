@@ -37,9 +37,7 @@ func (r *EuiccConfiguredAddressesResponse) UnmarshalBERTLV(tlv *bertlv.TLV) erro
 	if child = tlv.First(bertlv.ContextSpecific.Primitive(0)); child != nil {
 		response.DefaultSMDPAddress = string(child.Value)
 	}
-	if child = tlv.First(bertlv.ContextSpecific.Primitive(1)); child != nil {
-		response.RootSMDSAddress = string(child.Value)
-	}
+	response.RootSMDSAddress = string(tlv.First(bertlv.ContextSpecific.Primitive(1)).Value)
 	*r = response
 	return nil
 }

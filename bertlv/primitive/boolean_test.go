@@ -11,8 +11,8 @@ func TestBoolean(t *testing.T) {
 		Variants [][]byte
 	}
 	fixtures := []*Fixture{
-		{false, [][]byte{{0x00}, {0x01}}},
-		{true, [][]byte{{0xff}}},
+		{false, [][]byte{{0x00}}},
+		{true, [][]byte{{0xff}, {0x01}}},
 	}
 	var err error
 	var output []byte
@@ -26,4 +26,11 @@ func TestBoolean(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, fixture.Variants[0], output)
 	}
+}
+
+func TestBooleanRejectsInvalidLength(t *testing.T) {
+	var parsed bool
+
+	assert.Error(t, UnmarshalBool(&parsed).UnmarshalBinary(nil))
+	assert.Error(t, UnmarshalBool(&parsed).UnmarshalBinary([]byte{0x00, 0x00}))
 }

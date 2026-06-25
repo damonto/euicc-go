@@ -16,10 +16,14 @@ type ProfileInfo struct {
 	ProfileNickname               string
 	ServiceProviderName           string
 	ProfileName                   string
+	IconType                      ProfileIconType
 	Icon                          ProfileIcon
 	ProfileClass                  ProfileClass
 	ProfileOwner                  OperatorId
 	NotificationConfigurationInfo NotificationConfigurationInfo
+	SMDPProprietaryData           *bertlv.TLV
+	ProfilePolicyRules            []bool
+	ServiceSpecificData           *bertlv.TLV
 }
 
 func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) error {
@@ -47,6 +51,9 @@ func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 	if err := optional(tlv, TagProfileName, &p.ProfileName, ""); err != nil {
 		return err
 	}
+	if err := optional(tlv, TagProfileIconType, &p.IconType, ProfileIconTypeJPG); err != nil {
+		return err
+	}
 	if err := optional(tlv, TagProfileIcon, &p.Icon, ProfileIcon(nil)); err != nil {
 		return err
 	}
@@ -63,6 +70,11 @@ func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 			return err
 		}
 	}
+	p.SMDPProprietaryData = tlv.First(TagSMDPProprietaryData)
+	if err := optional(tlv, TagProfilePolicyRules, &p.ProfilePolicyRules, nil); err != nil {
+		return err
+	}
+	p.ServiceSpecificData = tlv.First(TagServiceSpecificData)
 	return nil
 }
 
@@ -83,12 +95,16 @@ func optional[T any](tlv *bertlv.TLV, tag bertlv.Tag, dst *T, def T) error {
 		*v = ISDPAID(field.Value)
 	case *ProfileIcon:
 		*v = ProfileIcon(field.Value)
+	case *ProfileIconType:
+		return field.UnmarshalValue(primitive.UnmarshalInt(v))
 	case *ProfileState:
 		return field.UnmarshalValue(primitive.UnmarshalInt(v))
 	case *ProfileClass:
 		return field.UnmarshalValue(primitive.UnmarshalInt(v))
 	case *NotificationEvent:
 		return field.UnmarshalValue(v)
+	case *[]bool:
+		return field.UnmarshalValue(primitive.UnmarshalBitString(v))
 	default:
 		return errors.New("unsupported optional field")
 	}
@@ -126,6 +142,13 @@ func (p ProfileIcon) FileType() string {
 	}
 	return ""
 }
+
+type ProfileIconType int8
+
+const (
+	ProfileIconTypeJPG ProfileIconType = 0
+	ProfileIconTypePNG ProfileIconType = 1
+)
 
 type OperatorId struct {
 	PLMN, GID1, GID2 []byte
@@ -183,9 +206,18 @@ func (n *NotificationConfigurationInfo) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 	configs := make(NotificationConfigurationInfo, 0, len(tlv.Children))
 	for _, child := range tlv.Children {
 		c := NotificationConfiguration{
-			Address: string(child.First(bertlv.ContextSpecific.Primitive(1)).Value),
+			Address: string(child.First(bertlv.Universal.Primitive(12)).Value),
 		}
-		c.ProfileManagementOperation.UnmarshalBinary(child.First(bertlv.ContextSpecific.Primitive(0)).Value)
+		var bits []bool
+		if err := child.First(bertlv.Universal.Primitive(3)).UnmarshalValue(primitive.UnmarshalBitString(&bits)); err != nil {
+			return err
+		}
+		for index, bit := range bits {
+			if bit {
+				c.ProfileManagementOperation = NotificationEvent(index)
+				break
+			}
+		}
 		configs = append(configs, &c)
 	}
 	*n = configs

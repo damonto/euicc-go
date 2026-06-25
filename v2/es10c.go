@@ -57,6 +57,9 @@ type ProfileInfoListResponse struct {
 }
 
 func (r *ProfileInfoListResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
+	if !tlv.Tag.If(bertlv.ContextSpecific, bertlv.Constructed, 45) {
+		return ErrUnexpectedTag
+	}
 	if r.ProfileInfoListError = tlv.First(bertlv.ContextSpecific.Primitive(1)); r.ProfileInfoListError != nil {
 		return r.Valid()
 	}
@@ -148,7 +151,6 @@ func (r *ProfileOperationRequest) MarshalBERTLV() (*bertlv.TLV, error) {
 				yield(r.Identifier)
 				return
 			}
-			// Refresh flag is optional for EnableProfile and DisableProfile.
 			if !yield(bertlv.NewChildren(bertlv.ContextSpecific.Constructed(0), r.Identifier)) {
 				return
 			}
@@ -211,7 +213,7 @@ func (r *EuiccMemoryResetRequest) MarshalBERTLV() (*bertlv.TLV, error) {
 	request := bertlv.NewChildren(
 		bertlv.ContextSpecific.Constructed(52),
 		mustMarshalValue(bertlv.MarshalValue(
-			bertlv.Application.Primitive(2),
+			bertlv.ContextSpecific.Primitive(2),
 			primitive.MarshalBitString([]bool{
 				r.DeleteOperationalProfiles,
 				r.DeleteFieldLoadedTestProfiles,
@@ -277,6 +279,9 @@ type GetEuiccDataResponse struct {
 }
 
 func (r *GetEuiccDataResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
+	if !tlv.Tag.If(bertlv.ContextSpecific, bertlv.Constructed, 62) {
+		return ErrUnexpectedTag
+	}
 	if tlv = tlv.First(bertlv.Application.Primitive(26)); tlv == nil {
 		return errors.New("no eid found")
 	}

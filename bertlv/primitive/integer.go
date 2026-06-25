@@ -2,6 +2,7 @@ package primitive
 
 import (
 	"encoding"
+	"errors"
 	"fmt"
 	"unsafe"
 )
@@ -14,20 +15,17 @@ func UnmarshalInt[Int signedInt](value *Int) encoding.BinaryUnmarshaler {
 	size := int(unsafe.Sizeof(*value))
 	return Unmarshaler(func(data []byte) error {
 		if len(data) == 0 {
-			return nil
+			return errors.New("invalid integer length")
 		} else if len(data) > size {
 			return fmt.Errorf("the value is too large, expected at most %d bytes, got %d", size, len(data))
 		}
+		if len(data) > 1 &&
+			((data[0] == 0x00 && data[1]&0x80 == 0x00) ||
+				(data[0] == 0xff && data[1]&0x80 == 0x80)) {
+			return errors.New("non-minimal integer encoding")
+		}
 		var n Int
 		var index int
-		if data[0] == 0x00 || data[0] == 0xff {
-			for index = range len(data) - 1 {
-				if data[index] != data[0] || data[index+1]>>7 != data[0]>>7 {
-					break
-				}
-			}
-			data = data[index:]
-		}
 		if data[0] > 0x7f {
 			n = -1
 		}

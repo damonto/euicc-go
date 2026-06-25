@@ -162,6 +162,14 @@ type ES9AuthenticateClientResponse struct {
 }
 
 func (r *ES9AuthenticateClientResponse) FunctionExecutionStatus() *ExecutionStatus {
+	if r.Header == nil || r.Header.ExecutionStatus == nil {
+		return &ExecutionStatus{
+			Status: "Failed",
+			StatusCodeData: &StatusCodeData{
+				Message: "missing function execution status",
+			},
+		}
+	}
 	return r.Header.ExecutionStatus
 }
 

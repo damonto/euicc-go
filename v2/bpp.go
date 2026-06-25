@@ -16,6 +16,9 @@ func SegmentedBoundProfilePackage(bpp *bertlv.TLV) ([][]byte, error) {
 	marshalHeader := func(tlv *bertlv.TLV) []byte {
 		var n int
 		for _, child := range tlv.Children {
+			if child == nil {
+				continue
+			}
 			n += child.Len()
 		}
 		var buf bytes.Buffer
@@ -34,6 +37,25 @@ func SegmentedBoundProfilePackage(bpp *bertlv.TLV) ([][]byte, error) {
 		}
 		return buf.Bytes()
 	}
+	appendSegmentedSequence := func(segments [][]byte, sequence *bertlv.TLV) [][]byte {
+		header := marshalHeader(sequence)
+		headerWritten := false
+		for _, child := range sequence.Children {
+			if child == nil {
+				continue
+			}
+			if !headerWritten {
+				segments = append(segments, slices.Concat(header, child.Bytes()))
+				headerWritten = true
+				continue
+			}
+			segments = append(segments, child.Bytes())
+		}
+		if !headerWritten {
+			segments = append(segments, header)
+		}
+		return segments
+	}
 	var (
 		initialiseSecureChannelRequest = bpp.First(bertlv.Constructed.ContextSpecific(35))
 		firstSequenceOf87              = bpp.First(bertlv.Constructed.ContextSpecific(0))
@@ -49,17 +71,19 @@ func SegmentedBoundProfilePackage(bpp *bertlv.TLV) ([][]byte, error) {
 		// initialiseSecureChannelRequest TLV
 		initialiseSecureChannelRequest.Bytes(),
 	))
-	// Tag and length fields of the first firstSequenceOf87 TLV plus the first '87' TLV
-	segments = append(segments, firstSequenceOf87.Bytes())
+	// Tag and length fields of the firstSequenceOf87 TLV plus the first '87' TLV,
+	// followed by the remaining '87' TLVs.
+	segments = appendSegmentedSequence(segments, firstSequenceOf87)
 	// Tag and length fields of the sequenceOf88 TLV
 	segments = append(segments, marshalHeader(sequenceOf88))
 	// Each of the '88' TLVs
 	for _, child := range sequenceOf88.Children {
 		segments = append(segments, child.Bytes())
 	}
-	// Tag and length fields of the firstSequenceOf87 TLV plus the first '87' TLV
+	// Tag and length fields of the secondSequenceOf87 TLV plus the first '87' TLV,
+	// followed by the remaining '87' TLVs.
 	if secondSequenceOf87 != nil {
-		segments = append(segments, secondSequenceOf87.Bytes())
+		segments = appendSegmentedSequence(segments, secondSequenceOf87)
 	}
 	// Tag and length fields of the sequenceOf86 TLV
 	segments = append(segments, marshalHeader(sequenceOf86))

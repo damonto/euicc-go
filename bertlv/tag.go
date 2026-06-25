@@ -2,6 +2,7 @@ package bertlv
 
 import (
 	"crypto/subtle"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -14,15 +15,20 @@ func NewTag(class Class, form Form, value uint64) Tag {
 		return Tag{mask | byte(value)}
 	}
 	tag := Tag{mask | 0x1f}
-	for value > 0 {
-		b := byte(value & 0x7f)
+	var encoded [10]byte
+	index := len(encoded)
+	for {
+		index--
+		encoded[index] = byte(value & 0x7f)
 		value >>= 7
-		if len(tag) > 1 || value > 0 {
-			b |= 0x80
+		if value == 0 {
+			break
 		}
-		tag = append(tag, b)
 	}
-	return tag
+	for i := index; i < len(encoded)-1; i++ {
+		encoded[i] |= 0x80
+	}
+	return append(tag, encoded[index:]...)
 }
 
 func (t *Tag) ReadFrom(r io.Reader) (int64, error) {
@@ -35,15 +41,23 @@ func (t *Tag) ReadFrom(r io.Reader) (int64, error) {
 		*t = tag[0:1]
 		return 1, nil
 	}
-	for n = 1; ; n++ {
+	for n = 1; n < int64(len(tag)); n++ {
 		if _, err := io.ReadAtLeast(r, tag[n:n+1], 1); err != nil {
 			return n, fmt.Errorf("tag encoding with more than %d bytes\n%w", n+1, err)
 		}
+		if n == 1 && tag[n]&0x7f == 0 {
+			return n + 1, errors.New("invalid high-tag-number encoding")
+		}
 		if tag[n]>>7 == 0b0 {
-			*t = tag[0 : n+1]
+			parsed := Tag(tag[0 : n+1])
+			if parsed.Value() < 0x1f {
+				return n + 1, errors.New("invalid high-tag-number encoding")
+			}
+			*t = parsed
 			return n + 1, nil
 		}
 	}
+	return n, errors.New("tag encoding is too large")
 }
 
 func (t *Tag) String() string {

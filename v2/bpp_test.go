@@ -42,11 +42,45 @@ func TestSegmentedBoundProfilePackage(t *testing.T) {
 	}
 }
 
+func TestSegmentedBoundProfilePackageSplitsSequenceOf87(t *testing.T) {
+	bpp := bertlv.NewChildren(
+		bertlv.ContextSpecific.Constructed(54),
+		bertlv.NewChildren(bertlv.ContextSpecific.Constructed(35)),
+		bertlv.NewChildren(
+			bertlv.ContextSpecific.Constructed(0),
+			bertlv.NewValue(bertlv.ContextSpecific.Primitive(7), []byte{0x01}),
+			bertlv.NewValue(bertlv.ContextSpecific.Primitive(7), []byte{0x02}),
+		),
+		bertlv.NewChildren(
+			bertlv.ContextSpecific.Constructed(1),
+			bertlv.NewValue(bertlv.ContextSpecific.Primitive(8), []byte{0x03}),
+		),
+		bertlv.NewChildren(
+			bertlv.ContextSpecific.Constructed(3),
+			bertlv.NewValue(bertlv.ContextSpecific.Primitive(6), []byte{0x04}),
+		),
+	)
+
+	segments, err := SegmentedBoundProfilePackage(bpp)
+
+	assert.NoError(t, err)
+	assert.Equal(t, [][]byte{
+		{0xbf, 0x36, 0x15, 0xbf, 0x23, 0x00},
+		{0xa0, 0x06, 0x87, 0x01, 0x01},
+		{0x87, 0x01, 0x02},
+		{0xa1, 0x03},
+		{0x88, 0x01, 0x03},
+		{0xa3, 0x03},
+		{0x86, 0x01, 0x04},
+	}, segments)
+}
+
 func LoadBoundProfilePackage(name string) (*bertlv.TLV, error) {
 	fp, err := os.Open(filepath.Join("fixtures", name))
 	if err != nil {
 		return nil, err
 	}
+	defer fp.Close()
 	bpp := new(bertlv.TLV)
 	_, err = bpp.ReadFrom(base64.NewDecoder(base64.StdEncoding, fp))
 	return bpp, err
@@ -57,6 +91,7 @@ func LoadSegmentedBoundProfilePackage(name string) ([][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer fp.Close()
 	scanner := bufio.NewScanner(fp)
 	scanner.Split(bufio.ScanLines)
 	var block []byte
@@ -73,6 +108,9 @@ func LoadSegmentedBoundProfilePackage(name string) ([][]byte, error) {
 			return nil, fmt.Errorf("line %d: %w", line+1, err)
 		}
 		sbpp = append(sbpp, block)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
 	}
 	return sbpp, nil
 }

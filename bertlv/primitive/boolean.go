@@ -1,10 +1,16 @@
 package primitive
 
-import "encoding"
+import (
+	"encoding"
+	"errors"
+)
 
 func UnmarshalBool(value *bool) encoding.BinaryUnmarshaler {
 	return Unmarshaler(func(data []byte) error {
-		*value = len(data) == 1 && data[0] == 0xff
+		if len(data) != 1 {
+			return errors.New("invalid boolean length")
+		}
+		*value = data[0] != 0x00
 		return nil
 	})
 }

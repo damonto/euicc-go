@@ -20,12 +20,16 @@ func (tlv *TLV) ReadFrom(r io.Reader) (int64, error) {
 		return n, fmt.Errorf("tag %02X: invalid length encoding\n%w", t.Tag, err)
 	}
 	if t.Tag.Constructed() {
-		var _n int64
+		limited := &io.LimitedReader{R: r, N: int64(length)}
 		var child *TLV
-		for index := uint32(0); index < length; index += uint32(_n) {
+		for limited.N > 0 {
+			remaining := limited.N
 			child = new(TLV)
-			if _n, err = child.ReadFrom(r); err != nil {
+			if _, err = child.ReadFrom(limited); err != nil {
 				return n, fmt.Errorf("tag %02X: invalid child object\n%w", t.Tag, err)
+			}
+			if limited.N == remaining {
+				return n, fmt.Errorf("tag %02X: invalid child object\nno bytes consumed", t.Tag)
 			}
 			t.Children = append(t.Children, child)
 		}
@@ -53,8 +57,14 @@ func (tlv *TLV) UnmarshalText(text []byte) error {
 }
 
 func (tlv *TLV) UnmarshalBinary(data []byte) error {
-	_, err := tlv.ReadFrom(bytes.NewReader(data))
-	return err
+	reader := bytes.NewReader(data)
+	if _, err := tlv.ReadFrom(reader); err != nil {
+		return err
+	}
+	if reader.Len() != 0 {
+		return fmt.Errorf("trailing data after TLV: %d bytes", reader.Len())
+	}
+	return nil
 }
 
 func (tlv *TLV) UnmarshalBERTLV(cloned *TLV) error {

@@ -14,6 +14,7 @@ func TestNewTag(t *testing.T) {
 		0x1e: {0xbe},
 		0x1f: {0xbf, 0x1f},
 		0x7f: {0xbf, 0x7f},
+		0x80: {0xbf, 0x81, 0x00},
 	}
 	for value, expected := range fixtures {
 		assert.Equal(t, expected, NewTag(ContextSpecific, Constructed, value))
@@ -100,8 +101,9 @@ func TestTag_UnmarshalBinary_Error(t *testing.T) {
 	fixtures := []*Fixture{
 		{Tag{}, "tag encoding with less than one byte\nEOF"},
 		{Tag{0xbf}, "tag encoding with more than 2 bytes\nEOF"},
-		{Tag{0xbf, 0x80}, "tag encoding with more than 3 bytes\nEOF"},
-		{Tag{0xbf, 0x80, 0x80}, "tag encoding with more than 4 bytes\nEOF"},
+		{Tag{0xbf, 0x1e}, "invalid high-tag-number encoding"},
+		{Tag{0xbf, 0x80}, "invalid high-tag-number encoding"},
+		{Tag{0xbf, 0x80, 0x80}, "invalid high-tag-number encoding"},
 	}
 	var err error
 	var tag = Tag{}

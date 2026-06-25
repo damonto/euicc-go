@@ -114,8 +114,13 @@ func (r *LoadBoundProfilePackageResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error
 }
 
 func (r *LoadBoundProfilePackageResponse) ISDPAID() ISDPAID {
+	if r.FinalResult == nil {
+		return nil
+	}
 	if successResult := r.FinalResult.First(bertlv.ContextSpecific.Constructed(0)); successResult != nil {
-		return successResult.First(bertlv.Application.Primitive(15)).Value
+		if aid := successResult.First(bertlv.Application.Primitive(15)); aid != nil {
+			return aid.Value
+		}
 	}
 	return nil
 }
@@ -244,27 +249,35 @@ func (r *ListNotificationRequest) CardResponse() *ListNotificationResponse {
 }
 
 func (r *ListNotificationRequest) MarshalBERTLV() (*bertlv.TLV, error) {
-	bits := []bool{
-		r.Filter[NotificationEventInstall],
-		r.Filter[NotificationEventEnable],
-		r.Filter[NotificationEventDisable],
-		r.Filter[NotificationEventDelete],
-	}
-	request := bertlv.NewChildren(
-		bertlv.ContextSpecific.Constructed(40),
-		mustMarshalValue(bertlv.MarshalValue(
+	request := bertlv.NewChildrenIter(bertlv.ContextSpecific.Constructed(40), func(yield func(*bertlv.TLV) bool) {
+		if len(r.Filter) == 0 {
+			return
+		}
+		yield(mustMarshalValue(bertlv.MarshalValue(
 			bertlv.ContextSpecific.Primitive(1),
-			primitive.MarshalBitString(bits),
-		)),
-	)
+			primitive.MarshalBitString([]bool{
+				r.Filter[NotificationEventInstall],
+				r.Filter[NotificationEventEnable],
+				r.Filter[NotificationEventDisable],
+				r.Filter[NotificationEventDelete],
+			}),
+		)))
+	})
 	return request, nil
 }
 
 type ListNotificationResponse struct {
-	NotificationList []*NotificationMetadata
+	NotificationList       []*NotificationMetadata
+	NotificationsListError *bertlv.TLV
 }
 
 func (r *ListNotificationResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
+	if !tlv.Tag.If(bertlv.ContextSpecific, bertlv.Constructed, 40) {
+		return ErrUnexpectedTag
+	}
+	if r.NotificationsListError = tlv.First(bertlv.ContextSpecific.Primitive(1)); r.NotificationsListError != nil {
+		return r.Valid()
+	}
 	tlv = tlv.First(bertlv.ContextSpecific.Constructed(0))
 	notifications := make([]*NotificationMetadata, 0, len(tlv.Children))
 	var notification *NotificationMetadata
@@ -280,7 +293,10 @@ func (r *ListNotificationResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 }
 
 func (r *ListNotificationResponse) Valid() error {
-	return nil
+	if r.NotificationsListError == nil {
+		return nil
+	}
+	return ErrUndefined
 }
 
 // endregion
@@ -308,13 +324,18 @@ func (r *RetrieveNotificationsListRequest) MarshalBERTLV() (*bertlv.TLV, error) 
 }
 
 type RetrieveNotificationsListResponse struct {
-	NotificationList []*PendingNotification
+	NotificationList       []*PendingNotification
+	NotificationsListError *bertlv.TLV
 }
 
 func (r *RetrieveNotificationsListResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 	if !tlv.Tag.If(bertlv.ContextSpecific, bertlv.Constructed, 43) {
 		return ErrUnexpectedTag
 	}
+	if r.NotificationsListError = tlv.First(bertlv.ContextSpecific.Primitive(1)); r.NotificationsListError != nil {
+		return r.Valid()
+	}
+	tlv = tlv.First(bertlv.ContextSpecific.Constructed(0))
 	var notifications []*PendingNotification
 	for _, child := range tlv.Children {
 		notification := new(PendingNotification)
@@ -328,7 +349,7 @@ func (r *RetrieveNotificationsListResponse) UnmarshalBERTLV(tlv *bertlv.TLV) err
 }
 
 func (r *RetrieveNotificationsListResponse) Valid() error {
-	if len(r.NotificationList) > 0 {
+	if r.NotificationsListError == nil {
 		return nil
 	}
 	return ErrUndefined
@@ -403,6 +424,12 @@ func (r *AuthenticateServerRequest) CardResponse() *ES9AuthenticateClientRequest
 }
 
 func (r *AuthenticateServerRequest) MarshalBERTLV() (*bertlv.TLV, error) {
+	if len(r.IMEI) < 4 {
+		return nil, errors.New("IMEI is required")
+	}
+	if len(r.IMEI) != 4 && len(r.IMEI) != 8 {
+		return nil, errors.New("IMEI must be 4 or 8 bytes")
+	}
 	deviceInfo := bertlv.NewChildrenIter(bertlv.ContextSpecific.Constructed(1), func(yield func(*bertlv.TLV) bool) {
 		if !yield(bertlv.NewValue(bertlv.ContextSpecific.Primitive(0), r.IMEI[:4])) {
 			return
@@ -410,7 +437,9 @@ func (r *AuthenticateServerRequest) MarshalBERTLV() (*bertlv.TLV, error) {
 		if !yield(bertlv.NewChildren(bertlv.ContextSpecific.Constructed(1))) {
 			return
 		}
-		yield(bertlv.NewValue(bertlv.ContextSpecific.Primitive(2), r.IMEI))
+		if len(r.IMEI) == 8 {
+			yield(bertlv.NewValue(bertlv.ContextSpecific.Primitive(2), r.IMEI))
+		}
 	})
 	ctxParams1 := bertlv.NewChildrenIter(bertlv.ContextSpecific.Constructed(0), func(yield func(*bertlv.TLV) bool) {
 		if !yield(bertlv.NewValue(bertlv.ContextSpecific.Primitive(0), r.MatchingID)) {

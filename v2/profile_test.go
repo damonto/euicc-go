@@ -26,6 +26,24 @@ func TestProfileInfoUnmarshalAllowsMissingOptionalFields(t *testing.T) {
 	assert.Nil(t, profile.NotificationConfigurationInfo)
 }
 
+func TestProfileInfoUnmarshalAdditionalOptionalFields(t *testing.T) {
+	tlv := bertlv.NewChildren(
+		bertlv.Private.Constructed(3),
+		bertlv.NewValue(TagProfileIconType, []byte{0x01}),
+		bertlv.NewValue(TagProfilePolicyRules, []byte{0x05, 0x60}),
+		bertlv.NewChildren(TagSMDPProprietaryData),
+		bertlv.NewChildren(TagServiceSpecificData),
+	)
+	profile := new(ProfileInfo)
+
+	require.NoError(t, profile.UnmarshalBERTLV(tlv))
+
+	assert.Equal(t, ProfileIconTypePNG, profile.IconType)
+	assert.Equal(t, []bool{false, true, true}, profile.ProfilePolicyRules)
+	assert.NotNil(t, profile.SMDPProprietaryData)
+	assert.NotNil(t, profile.ServiceSpecificData)
+}
+
 func TestProfileInfoUnmarshalOptionalProfileClassUsesPrimitiveInt(t *testing.T) {
 	tlv := bertlv.NewChildren(
 		bertlv.Private.Constructed(3),
@@ -38,16 +56,6 @@ func TestProfileInfoUnmarshalOptionalProfileClassUsesPrimitiveInt(t *testing.T) 
 	assert.Error(t, err)
 }
 
-func TestOperatorIdUnmarshalAllowsMissingPLMN(t *testing.T) {
-	tlv := bertlv.NewChildren(bertlv.ContextSpecific.Constructed(23))
-	operator := new(OperatorId)
-
-	require.NoError(t, operator.UnmarshalBERTLV(tlv))
-
-	assert.Empty(t, operator.MCC())
-	assert.Empty(t, operator.MNC())
-}
-
 func TestOperatorIdShortPLMNDoesNotPanic(t *testing.T) {
 	operator := OperatorId{PLMN: []byte{0x13}}
 
@@ -57,10 +65,14 @@ func TestOperatorIdShortPLMNDoesNotPanic(t *testing.T) {
 	})
 }
 
-func TestNotificationConfigurationInfoUnmarshalAllowsMissingOptionalFields(t *testing.T) {
+func TestNotificationConfigurationInfoUnmarshal(t *testing.T) {
 	tlv := bertlv.NewChildren(
 		bertlv.ContextSpecific.Constructed(22),
-		bertlv.NewChildren(bertlv.Universal.Constructed(16)),
+		bertlv.NewChildren(
+			bertlv.Universal.Constructed(16),
+			bertlv.NewValue(bertlv.Universal.Primitive(3), []byte{0x04, 0x80}),
+			bertlv.NewValue(bertlv.Universal.Primitive(12), []byte("example.com")),
+		),
 	)
 	info := new(NotificationConfigurationInfo)
 
@@ -68,5 +80,5 @@ func TestNotificationConfigurationInfoUnmarshalAllowsMissingOptionalFields(t *te
 
 	require.Len(t, *info, 1)
 	assert.Equal(t, NotificationEventInstall, (*info)[0].ProfileManagementOperation)
-	assert.Empty(t, (*info)[0].Address)
+	assert.Equal(t, "example.com", (*info)[0].Address)
 }

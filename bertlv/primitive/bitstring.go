@@ -19,6 +19,9 @@ func (bits BitString) String() string {
 
 func UnmarshalBitString(bits *[]bool) encoding.BinaryUnmarshaler {
 	return Unmarshaler(func(data []byte) error {
+		if len(data) == 0 {
+			return errors.New("missing unused bits octet")
+		}
 		paddingBits := int(data[0])
 		if paddingBits > 7 ||
 			len(data) == 1 && paddingBits > 0 ||
@@ -41,8 +44,8 @@ func UnmarshalBitString(bits *[]bool) encoding.BinaryUnmarshaler {
 
 func MarshalBitString(bits []bool) encoding.BinaryMarshaler {
 	return Marshaler(func() ([]byte, error) {
-		data := make([]byte, len(bits)/8+2)
-		paddingBits := 8 - len(bits)%8
+		data := make([]byte, (len(bits)+7)/8+1)
+		paddingBits := (8 - len(bits)%8) % 8
 		data[0] = byte(paddingBits)
 
 		var x byte
