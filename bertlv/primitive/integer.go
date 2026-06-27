@@ -16,13 +16,19 @@ func UnmarshalInt[Int signedInt](value *Int) encoding.BinaryUnmarshaler {
 	return Unmarshaler(func(data []byte) error {
 		if len(data) == 0 {
 			return errors.New("invalid integer length")
-		} else if len(data) > size {
-			return fmt.Errorf("the value is too large, expected at most %d bytes, got %d", size, len(data))
 		}
-		if len(data) > 1 &&
-			((data[0] == 0x00 && data[1]&0x80 == 0x00) ||
-				(data[0] == 0xff && data[1]&0x80 == 0x80)) {
-			return errors.New("non-minimal integer encoding")
+		if data[0] == 0x00 || data[0] == 0xff {
+			sign := data[0]
+			start := 0
+			for start < len(data)-1 &&
+				data[start] == sign &&
+				data[start+1]>>7 == sign>>7 {
+				start++
+			}
+			data = data[start:]
+		}
+		if len(data) > size {
+			return fmt.Errorf("the value is too large, expected at most %d bytes, got %d", size, len(data))
 		}
 		var n Int
 		var index int
