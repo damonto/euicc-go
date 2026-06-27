@@ -24,6 +24,7 @@ func TestProfileInfoUnmarshalAllowsMissingOptionalFields(t *testing.T) {
 	assert.Equal(t, ProfileClassProvisioning, profile.ProfileClass)
 	assert.Nil(t, profile.ProfileOwner.PLMN)
 	assert.Nil(t, profile.NotificationConfigurationInfo)
+	assert.Equal(t, ProfilePolicyRules{}, profile.ProfilePolicyRules)
 }
 
 func TestProfileInfoUnmarshalAdditionalOptionalFields(t *testing.T) {
@@ -39,7 +40,10 @@ func TestProfileInfoUnmarshalAdditionalOptionalFields(t *testing.T) {
 	require.NoError(t, profile.UnmarshalBERTLV(tlv))
 
 	assert.Equal(t, ProfileIconTypePNG, profile.IconType)
-	assert.Equal(t, []bool{false, true, true}, profile.ProfilePolicyRules)
+	assert.Equal(t, ProfilePolicyRules{
+		DisablingNotAllowed: true,
+		DeletionNotAllowed:  true,
+	}, profile.ProfilePolicyRules)
 	assert.NotNil(t, profile.SMDPProprietaryData)
 	assert.NotNil(t, profile.ServiceSpecificData)
 }

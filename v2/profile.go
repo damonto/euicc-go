@@ -22,7 +22,7 @@ type ProfileInfo struct {
 	ProfileOwner                  OperatorId
 	NotificationConfigurationInfo NotificationConfigurationInfo
 	SMDPProprietaryData           *bertlv.TLV
-	ProfilePolicyRules            []bool
+	ProfilePolicyRules            ProfilePolicyRules
 	ServiceSpecificData           *bertlv.TLV
 }
 
@@ -71,7 +71,7 @@ func (p *ProfileInfo) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 		}
 	}
 	p.SMDPProprietaryData = tlv.First(TagSMDPProprietaryData)
-	if err := optional(tlv, TagProfilePolicyRules, &p.ProfilePolicyRules, nil); err != nil {
+	if err := optional(tlv, TagProfilePolicyRules, &p.ProfilePolicyRules, ProfilePolicyRules{}); err != nil {
 		return err
 	}
 	p.ServiceSpecificData = tlv.First(TagServiceSpecificData)
@@ -102,6 +102,8 @@ func optional[T any](tlv *bertlv.TLV, tag bertlv.Tag, dst *T, def T) error {
 	case *ProfileClass:
 		return field.UnmarshalValue(primitive.UnmarshalInt(v))
 	case *NotificationEvent:
+		return field.UnmarshalValue(v)
+	case *ProfilePolicyRules:
 		return field.UnmarshalValue(v)
 	case *[]bool:
 		return field.UnmarshalValue(primitive.UnmarshalBitString(v))
@@ -221,5 +223,30 @@ func (n *NotificationConfigurationInfo) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 		configs = append(configs, &c)
 	}
 	*n = configs
+	return nil
+}
+
+type ProfilePolicyRules struct {
+	UpdateControl       bool
+	DisablingNotAllowed bool
+	DeletionNotAllowed  bool
+}
+
+func (p *ProfilePolicyRules) UnmarshalBinary(data []byte) error {
+	var bits []bool
+	if err := primitive.UnmarshalBitString(&bits).UnmarshalBinary(data); err != nil {
+		return err
+	}
+
+	*p = ProfilePolicyRules{}
+	if len(bits) > 0 {
+		p.UpdateControl = bits[0]
+	}
+	if len(bits) > 1 {
+		p.DisablingNotAllowed = bits[1]
+	}
+	if len(bits) > 2 {
+		p.DeletionNotAllowed = bits[2]
+	}
 	return nil
 }
