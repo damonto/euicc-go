@@ -27,6 +27,25 @@ func TestProfileInfoUnmarshalAllowsMissingOptionalFields(t *testing.T) {
 	assert.Equal(t, ProfilePolicyRules{}, profile.ProfilePolicyRules)
 }
 
+func TestProfileInfoUnmarshalAuthenticateClientProfileMetadata(t *testing.T) {
+	var tlv bertlv.TLV
+	require.NoError(t, tlv.UnmarshalText([]byte("vyWBjVoKmFgyJCBCSCZpZJEGQ01MSU5LkgdDTUlfR0RTthowGIACBHCBEmNvbnN1bWVyLnJzcC53b3JsZLcdgANU9CGBCv////////////+CCv////////////+/djLiMOEiwSA6yVumdHCV8I0+WJoSqtB4vuLOqh4/PnGVvchLJYeB2OMK2wgAAAAAAAAAAQ==")))
+	profile := new(ProfileInfo)
+
+	require.NoError(t, profile.UnmarshalBERTLV(&tlv))
+
+	assert.Equal(t, "89852342022484629646", profile.ICCID.String())
+	assert.Equal(t, "CMI_GDS", profile.ProfileName)
+	assert.Equal(t, "CMLINK", profile.ServiceProviderName)
+	require.Len(t, profile.NotificationConfigurationInfo, 1)
+	assert.Equal(t, []NotificationEvent{
+		NotificationEventEnable,
+		NotificationEventDisable,
+		NotificationEventDelete,
+	}, profile.NotificationConfigurationInfo[0].ProfileManagementOperations)
+	assert.Equal(t, "consumer.rsp.world", profile.NotificationConfigurationInfo[0].Address)
+}
+
 func TestProfileInfoUnmarshalAdditionalOptionalFields(t *testing.T) {
 	tlv := bertlv.NewChildren(
 		bertlv.Private.Constructed(3),
@@ -48,16 +67,16 @@ func TestProfileInfoUnmarshalAdditionalOptionalFields(t *testing.T) {
 	assert.NotNil(t, profile.ServiceSpecificData)
 }
 
-func TestProfileInfoUnmarshalOptionalProfileClassUsesPrimitiveInt(t *testing.T) {
+func TestProfileInfoUnmarshalOptionalProfileClassAllowsSignExtendedInt(t *testing.T) {
 	tlv := bertlv.NewChildren(
 		bertlv.Private.Constructed(3),
 		bertlv.NewValue(TagProfileClass, []byte{0x00, 0x01}),
 	)
 	profile := new(ProfileInfo)
 
-	err := profile.UnmarshalBERTLV(tlv)
+	require.NoError(t, profile.UnmarshalBERTLV(tlv))
 
-	assert.Error(t, err)
+	assert.Equal(t, ProfileClassProvisioning, profile.ProfileClass)
 }
 
 func TestOperatorIdShortPLMNDoesNotPanic(t *testing.T) {
@@ -74,8 +93,8 @@ func TestNotificationConfigurationInfoUnmarshal(t *testing.T) {
 		bertlv.ContextSpecific.Constructed(22),
 		bertlv.NewChildren(
 			bertlv.Universal.Constructed(16),
-			bertlv.NewValue(bertlv.Universal.Primitive(3), []byte{0x04, 0x80}),
-			bertlv.NewValue(bertlv.Universal.Primitive(12), []byte("example.com")),
+			bertlv.NewValue(bertlv.ContextSpecific.Primitive(0), []byte{0x04, 0x80}),
+			bertlv.NewValue(bertlv.ContextSpecific.Primitive(1), []byte("example.com")),
 		),
 	)
 	info := new(NotificationConfigurationInfo)
@@ -83,6 +102,19 @@ func TestNotificationConfigurationInfoUnmarshal(t *testing.T) {
 	require.NoError(t, info.UnmarshalBERTLV(tlv))
 
 	require.Len(t, *info, 1)
-	assert.Equal(t, NotificationEventInstall, (*info)[0].ProfileManagementOperation)
+	assert.Equal(t, []NotificationEvent{NotificationEventInstall}, (*info)[0].ProfileManagementOperations)
 	assert.Equal(t, "example.com", (*info)[0].Address)
+}
+
+func TestNotificationConfigurationInfoUnmarshalMissingFieldDoesNotPanic(t *testing.T) {
+	tlv := bertlv.NewChildren(
+		bertlv.ContextSpecific.Constructed(22),
+		bertlv.NewChildren(
+			bertlv.Universal.Constructed(16),
+			bertlv.NewValue(bertlv.ContextSpecific.Primitive(0), []byte{0x04, 0x80}),
+		),
+	)
+	info := new(NotificationConfigurationInfo)
+
+	require.ErrorIs(t, info.UnmarshalBERTLV(tlv), ErrUnexpectedTag)
 }

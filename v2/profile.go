@@ -195,8 +195,8 @@ func (id *OperatorId) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 }
 
 type NotificationConfiguration struct {
-	ProfileManagementOperation NotificationEvent
-	Address                    string
+	ProfileManagementOperations []NotificationEvent
+	Address                     string
 }
 
 type NotificationConfigurationInfo []*NotificationConfiguration
@@ -207,23 +207,48 @@ func (n *NotificationConfigurationInfo) UnmarshalBERTLV(tlv *bertlv.TLV) error {
 	}
 	configs := make(NotificationConfigurationInfo, 0, len(tlv.Children))
 	for _, child := range tlv.Children {
-		c := NotificationConfiguration{
-			Address: string(child.First(bertlv.Universal.Primitive(12)).Value),
+		if child == nil || !child.Tag.If(bertlv.Universal, bertlv.Constructed, 16) {
+			return ErrUnexpectedTag
 		}
-		var bits []bool
-		if err := child.First(bertlv.Universal.Primitive(3)).UnmarshalValue(primitive.UnmarshalBitString(&bits)); err != nil {
+		operation := child.First(bertlv.ContextSpecific.Primitive(0))
+		address := child.First(bertlv.ContextSpecific.Primitive(1))
+		if operation == nil || address == nil {
+			return ErrUnexpectedTag
+		}
+		c := NotificationConfiguration{
+			Address: string(address.Value),
+		}
+		events, err := notificationEvents(operation.Value)
+		if err != nil {
 			return err
 		}
-		for index, bit := range bits {
-			if bit {
-				c.ProfileManagementOperation = NotificationEvent(index)
-				break
-			}
-		}
+		c.ProfileManagementOperations = events
 		configs = append(configs, &c)
 	}
 	*n = configs
 	return nil
+}
+
+func notificationEvents(data []byte) ([]NotificationEvent, error) {
+	var bits []bool
+	if err := primitive.UnmarshalBitString(&bits).UnmarshalBinary(data); err != nil {
+		return nil, err
+	}
+	events := make([]NotificationEvent, 0, len(bits))
+	for index, bit := range bits {
+		if !bit {
+			continue
+		}
+		event := NotificationEvent(index)
+		if event > NotificationEventDelete {
+			return nil, errors.New("invalid notification event")
+		}
+		events = append(events, event)
+	}
+	if len(events) == 0 {
+		return nil, errors.New("notification event has no bits set")
+	}
+	return events, nil
 }
 
 type ProfilePolicyRules struct {
