@@ -32,9 +32,7 @@ type AT struct {
 
 // New creates an AT smart card channel.
 func New(device string) (driver.SmartCardChannel, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-	reader, err := uiccat.Open(ctx, device, defaultBaudRate, uiccat.WithoutInit())
+	reader, err := uiccat.Open(device, defaultBaudRate)
 	if err != nil {
 		return nil, fmt.Errorf("open serial port %s: %w", device, err)
 	}
