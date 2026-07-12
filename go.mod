@@ -3,7 +3,7 @@ module github.com/damonto/euicc-go
 go 1.26.3
 
 require (
-	github.com/damonto/uicc-go v0.0.0-20260629073618-7ddada6bb13e
+	github.com/damonto/wwan-go v0.0.0-20260712111944-804e974bca78
 	github.com/stretchr/testify v1.11.1
 )
 

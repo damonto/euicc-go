@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/damonto/euicc-go/driver"
-	uiccmbim "github.com/damonto/uicc-go/mbim"
+	wwanmbim "github.com/damonto/wwan-go/mbim"
 )
 
 type reader interface {
@@ -21,10 +21,10 @@ type reader interface {
 
 const defaultTimeout = 30 * time.Second
 
-type mbimOpener func(context.Context, ...uiccmbim.Option) (reader, error)
+type mbimOpener func(context.Context, ...wwanmbim.Option) (reader, error)
 
-var openReader mbimOpener = func(ctx context.Context, opts ...uiccmbim.Option) (reader, error) {
-	return uiccmbim.Open(ctx, opts...)
+var openReader mbimOpener = func(ctx context.Context, opts ...wwanmbim.Option) (reader, error) {
+	return wwanmbim.Open(ctx, opts...)
 }
 
 // MBIM implements driver.SmartCardChannel over an MBIM proxy connection.
@@ -58,7 +58,7 @@ func (m *MBIM) Connect() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
-	reader, err := openReader(ctx, uiccmbim.WithProxy(m.device), uiccmbim.WithSlot(int(m.slot)))
+	reader, err := openReader(ctx, wwanmbim.WithProxy(m.device), wwanmbim.WithSlot(int(m.slot)))
 	if err != nil {
 		return err
 	}

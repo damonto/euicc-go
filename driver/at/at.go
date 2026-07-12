@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/damonto/euicc-go/driver"
-	uiccat "github.com/damonto/uicc-go/at"
+	wwanat "github.com/damonto/wwan-go/at"
 )
 
 const (
@@ -32,7 +32,7 @@ type AT struct {
 
 // New creates an AT smart card channel.
 func New(device string) (driver.SmartCardChannel, error) {
-	reader, err := uiccat.Open(device, defaultBaudRate)
+	reader, err := wwanat.Open(device, defaultBaudRate)
 	if err != nil {
 		return nil, fmt.Errorf("open serial port %s: %w", device, err)
 	}

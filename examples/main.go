@@ -6,7 +6,8 @@ import (
 	"log/slog"
 	"net/url"
 
-	"github.com/damonto/euicc-go/driver/ccid"
+	"github.com/damonto/euicc-go/bertlv"
+	"github.com/damonto/euicc-go/driver/qcom"
 	"github.com/damonto/euicc-go/lpa"
 	sgp22 "github.com/damonto/euicc-go/v2"
 )
@@ -18,30 +19,30 @@ func main() {
 	// if err != nil {
 	// 	panic(err)
 	// }
-	// ch, err := qcom.NewQMI("/dev/cdc-wdm0", 1)
+	ch, err := qcom.NewQMI("/dev/cdc-wdm0", 1)
 	// ch, err := qcom.NewQRTR(1)
-	// if err != nil {
-	// 	panic(err)
-	// }
+	if err != nil {
+		panic(err)
+	}
 	// ch, err := at.New("/dev/ttyUSB7")
 	// if err != nil {
 	// 	panic(err)
 	// }
-	ch, err := ccid.New()
-	if err != nil {
-		panic(err)
-	}
-	reader, err := ch.ListReaders()
-	if err != nil {
-		panic(err)
-	}
-	if len(reader) == 0 {
-		panic("No readers found")
-	}
-	fmt.Printf("Using reader: %s\n", reader[0])
-	if err := ch.SetReader(reader[0]); err != nil {
-		panic(err)
-	}
+	// ch, err := ccid.New()
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// reader, err := ch.ListReaders()
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// if len(reader) == 0 {
+	// 	panic("No readers found")
+	// }
+	// fmt.Printf("Using reader: %s\n", reader[0])
+	// if err := ch.SetReader(reader[0]); err != nil {
+	// 	panic(err)
+	// }
 
 	client, err := lpa.New(&lpa.Options{
 		Channel: ch,
@@ -58,7 +59,7 @@ func main() {
 
 	testListProfiles(client)
 
-	testDiscovery(client)
+	// testDiscovery(client)
 }
 
 func testEID(client *lpa.Client) {
@@ -96,12 +97,15 @@ func testDownload(client *lpa.Client) {
 }
 
 func testListProfiles(client *lpa.Client) {
-	profiles, err := client.ListProfile(nil, nil)
+	profiles, err := client.ListProfile(nil, []bertlv.Tag{sgp22.TagNotificationConfigurationInfo})
 	if err != nil {
 		panic(err)
 	}
 	for _, profile := range profiles {
-		fmt.Printf("Profile: %s, ICCID: %s\n", profile.ProfileName, profile.ICCID)
+		// fmt.Printf("Profile: %s, ICCID: %s\n", profile.ProfileName, profile.ICCID)
+		for _, n := range profile.NotificationConfigurationInfo {
+			fmt.Printf("Address: %s, Operations %+v \n", n.Address, n.ProfileManagementOperations)
+		}
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	uiccmbim "github.com/damonto/uicc-go/mbim"
+	wwanmbim "github.com/damonto/wwan-go/mbim"
 )
 
 type fakeMBIMReader struct {
@@ -43,7 +43,7 @@ func TestConnectOpensReaderLazily(t *testing.T) {
 
 	called := false
 	fake := &fakeMBIMReader{}
-	openReader = func(_ context.Context, _ ...uiccmbim.Option) (reader, error) {
+	openReader = func(_ context.Context, _ ...wwanmbim.Option) (reader, error) {
 		called = true
 		return fake, nil
 	}
@@ -68,7 +68,7 @@ func TestConnectReturnsOpenError(t *testing.T) {
 	defer func() { openReader = oldOpenReader }()
 
 	openErr := errors.New("open")
-	openReader = func(_ context.Context, _ ...uiccmbim.Option) (reader, error) {
+	openReader = func(_ context.Context, _ ...wwanmbim.Option) (reader, error) {
 		return nil, openErr
 	}
 

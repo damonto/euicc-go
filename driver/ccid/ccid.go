@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/damonto/euicc-go/driver"
-	uiccccid "github.com/damonto/uicc-go/ccid"
+	wwanccid "github.com/damonto/wwan-go/ccid"
 )
 
 const (
@@ -29,7 +29,7 @@ type readerLister func(context.Context) ([]string, error)
 
 var (
 	openReader  readerOpener = openUICCReader
-	listReaders readerLister = uiccccid.ListReaders
+	listReaders readerLister = wwanccid.ListReaders
 )
 
 // CCID is a PC/SC smart card channel.
@@ -59,7 +59,7 @@ func NewWithReader(reader string) (*CCIDReader, error) {
 }
 
 func openUICCReader(ctx context.Context, reader string) (transmitter, error) {
-	return uiccccid.Open(ctx, reader)
+	return wwanccid.Open(ctx, reader)
 }
 
 func (c *CCIDReader) ListReaders() ([]string, error) {

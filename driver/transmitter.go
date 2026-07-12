@@ -10,7 +10,7 @@ import (
 
 	"github.com/damonto/euicc-go/bertlv"
 	sgp22 "github.com/damonto/euicc-go/v2"
-	uiccapdu "github.com/damonto/uicc-go/apdu"
+	wwanapdu "github.com/damonto/wwan-go/apdu"
 )
 
 type SmartCardChannel interface {
@@ -101,8 +101,8 @@ func (t *cardTransmitter) Read(p []byte) (n int, err error) {
 func (t *cardTransmitter) Write(command []byte) (int, error) {
 	var n int
 	t.response = new(bytes.Buffer)
-	request := uiccapdu.Request{CLA: 0x80, INS: 0xE2}
-	var response uiccapdu.Response
+	request := wwanapdu.Request{CLA: 0x80, INS: 0xE2}
+	var response wwanapdu.Response
 	var err error
 	chunks := byte(len(command) / t.MSS)
 	for request.Data = range slices.Chunk(command, t.MSS) {
@@ -125,7 +125,7 @@ func (t *cardTransmitter) Write(command []byte) (int, error) {
 	return n, err
 }
 
-func (t *cardTransmitter) transmit(request *uiccapdu.Request) (uiccapdu.Response, error) {
+func (t *cardTransmitter) transmit(request *wwanapdu.Request) (wwanapdu.Response, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.setChannelToCLA(request, t.logicalChannel)
@@ -137,14 +137,14 @@ func (t *cardTransmitter) transmit(request *uiccapdu.Request) (uiccapdu.Response
 	if err != nil {
 		return nil, err
 	}
-	response := uiccapdu.Response(b)
+	response := wwanapdu.Response(b)
 	if !response.OK() && !response.HasMore() {
 		err = fmt.Errorf("returned an unexpected response with status %04X", response.SW())
 	}
 	return response, err
 }
 
-func (t *cardTransmitter) setChannelToCLA(request *uiccapdu.Request, channel byte) {
+func (t *cardTransmitter) setChannelToCLA(request *wwanapdu.Request, channel byte) {
 	if channel < 4 {
 		request.CLA = (request.CLA & 0x9C) | channel
 	} else if channel < 20 {
@@ -154,8 +154,8 @@ func (t *cardTransmitter) setChannelToCLA(request *uiccapdu.Request, channel byt
 
 func (t *cardTransmitter) readCommandResponse(w io.Writer, le byte) error {
 	var err error
-	var request uiccapdu.Request
-	var response uiccapdu.Response
+	var request wwanapdu.Request
+	var response wwanapdu.Response
 	request.CLA = 0x80
 	request.INS = 0xC0
 	request.Le = &le
