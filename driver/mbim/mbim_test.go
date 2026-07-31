@@ -37,6 +37,39 @@ func TestNewRejectsInvalidSlot(t *testing.T) {
 	}
 }
 
+func TestNewWithClientUsesConnectedClient(t *testing.T) {
+	tests := []struct {
+		name    string
+		client  *wwanmbim.Client
+		wantErr bool
+	}{
+		{name: "nil client", wantErr: true},
+		{name: "connected client", client: new(wwanmbim.Client)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			channel, err := NewWithClient(tt.client)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("NewWithClient() error = %v, wantErr %t", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				return
+			}
+			got, ok := channel.(*MBIM)
+			if !ok {
+				t.Fatalf("NewWithClient() type = %T, want *MBIM", channel)
+			}
+			if got.reader != tt.client {
+				t.Fatal("NewWithClient() did not retain the injected MBIM client")
+			}
+			if err := channel.Connect(); err != nil {
+				t.Fatalf("Connect() error = %v", err)
+			}
+		})
+	}
+}
+
 func TestConnectOpensReaderLazily(t *testing.T) {
 	oldOpenReader := openReader
 	defer func() { openReader = oldOpenReader }()

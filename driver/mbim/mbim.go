@@ -27,7 +27,7 @@ var openReader mbimOpener = func(ctx context.Context, opts ...wwanmbim.Option) (
 	return wwanmbim.Open(ctx, opts...)
 }
 
-// MBIM implements driver.SmartCardChannel over an MBIM proxy connection.
+// MBIM implements driver.SmartCardChannel over an MBIM connection.
 type MBIM struct {
 	mu      sync.Mutex
 	device  string
@@ -37,12 +37,21 @@ type MBIM struct {
 	closed  bool
 }
 
-// New creates a new MBIM proxy channel to the specified device.
+// New creates an MBIM channel whose access method is resolved by Connect.
 func New(device string, slot uint8) (driver.SmartCardChannel, error) {
 	if slot == 0 {
 		return nil, fmt.Errorf("slot must be >= 1")
 	}
 	return &MBIM{device: device, slot: slot}, nil
+}
+
+// NewWithClient creates a channel backed by an already connected MBIM client.
+// The channel takes ownership of client and closes it on Disconnect.
+func NewWithClient(client *wwanmbim.Client) (driver.SmartCardChannel, error) {
+	if client == nil {
+		return nil, errors.New("mbim client is nil")
+	}
+	return &MBIM{reader: client}, nil
 }
 
 // Connect establishes the MBIM session and opens the device.
@@ -58,7 +67,7 @@ func (m *MBIM) Connect() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
-	reader, err := openReader(ctx, wwanmbim.WithProxy(m.device), wwanmbim.WithSlot(int(m.slot)))
+	reader, err := openReader(ctx, wwanmbim.WithAutoDetect(m.device), wwanmbim.WithSlot(int(m.slot)))
 	if err != nil {
 		return err
 	}
