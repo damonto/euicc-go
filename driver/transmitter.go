@@ -2,41 +2,54 @@ package driver
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"slices"
-	"sync"
 
 	"github.com/damonto/euicc-go/bertlv"
 	sgp22 "github.com/damonto/euicc-go/v2"
 	wwanapdu "github.com/damonto/wwan-go/apdu"
 )
 
+const (
+	maxLogicalChannel  = 19
+	maxMSS             = 254
+	maxStoreDataBlocks = 256
+)
+
+// SmartCardChannel provides serialized access to a smart card. It is not safe
+// for concurrent use; callers must serialize all operations, including
+// Disconnect.
 type SmartCardChannel interface {
 	Connect() error
 	Disconnect() error
-	OpenLogicalChannel(AID []byte) (byte, error)
+	OpenLogicalChannel(aid []byte) (byte, error)
 	Transmit(command []byte) ([]byte, error)
 	CloseLogicalChannel(channel byte) error
 }
 
+// Transmitter exchanges BER-TLV commands with an eUICC. It is not safe for
+// concurrent use; callers must serialize Transmit, TransmitRaw, and Close.
 type Transmitter interface {
 	sgp22.Transmitter
 	Close() error
 }
 
 type transmitter struct {
-	card   io.ReadWriteCloser
-	logger *slog.Logger
+	card *cardTransmitter
 }
 
-func NewTransmitter(logger *slog.Logger, channel SmartCardChannel, AID []byte, MSS int) (Transmitter, error) {
-	t, err := newCardTransmitter(channel, AID, MSS)
+// NewTransmitter connects to channel and opens a logical channel for AID.
+// The transmitter takes ownership of channel and disconnects it on failure or
+// when Close is called. Logger must not be nil.
+func NewTransmitter(logger *slog.Logger, channel SmartCardChannel, aid []byte, mss int) (Transmitter, error) {
+	t, err := newCardTransmitter(logger, channel, aid, mss)
 	if err != nil {
 		return nil, err
 	}
-	return &transmitter{card: t, logger: logger}, nil
+	return &transmitter{card: t}, nil
 }
 
 func (t *transmitter) Transmit(request bertlv.Marshaler, response bertlv.Unmarshaler) error {
@@ -56,16 +69,7 @@ func (t *transmitter) Transmit(request bertlv.Marshaler, response bertlv.Unmarsh
 }
 
 func (t *transmitter) TransmitRaw(command []byte) ([]byte, error) {
-	t.logger.Debug("[APDU] sending", "command", fmt.Sprintf("%X", command))
-	if _, err := t.card.Write(command); err != nil {
-		return nil, err
-	}
-	bs, err := io.ReadAll(t.card)
-	if err != nil {
-		return nil, err
-	}
-	t.logger.Debug("[APDU] received", "response", fmt.Sprintf("%X", bs))
-	return bs, err
+	return t.card.exchange(command)
 }
 
 func (t *transmitter) Close() error {
@@ -73,67 +77,124 @@ func (t *transmitter) Close() error {
 }
 
 type cardTransmitter struct {
-	MSS            int
-	mu             sync.Mutex
+	mss            int
 	channel        SmartCardChannel
 	logicalChannel byte
-	response       *bytes.Buffer
+	logger         *slog.Logger
 }
 
-func newCardTransmitter(channel SmartCardChannel, AID []byte, MSS int) (io.ReadWriteCloser, error) {
-	var err error
-	if err = channel.Connect(); err != nil {
-		return nil, err
+func newCardTransmitter(logger *slog.Logger, channel SmartCardChannel, aid []byte, mss int) (*cardTransmitter, error) {
+	if channel == nil {
+		return nil, errors.New("smart card channel is nil")
 	}
-	var transmitter cardTransmitter
-	transmitter.channel = channel
-	if transmitter.logicalChannel, err = channel.OpenLogicalChannel(AID); err != nil {
-		return nil, err
+	if mss < 1 || mss > maxMSS {
+		return nil, fmt.Errorf("MSS must be between 1 and %d: got %d", maxMSS, mss)
 	}
-	transmitter.MSS = MSS
-	return &transmitter, nil
+	if err := channel.Connect(); err != nil {
+		return nil, errors.Join(
+			fmt.Errorf("connect smart card channel: %w", err),
+			disconnectChannel(channel),
+		)
+	}
+
+	logicalChannel, err := channel.OpenLogicalChannel(aid)
+	if err != nil {
+		return nil, errors.Join(
+			fmt.Errorf("open logical channel: %w", err),
+			closeChannel(channel, logicalChannel),
+			disconnectChannel(channel),
+		)
+	}
+	if logicalChannel == 0 || logicalChannel > maxLogicalChannel {
+		return nil, errors.Join(
+			fmt.Errorf("logical channel %d is outside 1..%d", logicalChannel, maxLogicalChannel),
+			closeChannel(channel, logicalChannel),
+			disconnectChannel(channel),
+		)
+	}
+
+	return &cardTransmitter{
+		mss:            mss,
+		channel:        channel,
+		logicalChannel: logicalChannel,
+		logger:         logger,
+	}, nil
 }
 
-func (t *cardTransmitter) Read(p []byte) (n int, err error) {
-	return t.response.Read(p)
+func closeChannel(channel SmartCardChannel, logicalChannel byte) error {
+	if logicalChannel == 0 {
+		return nil
+	}
+	if err := channel.CloseLogicalChannel(logicalChannel); err != nil {
+		return fmt.Errorf("close logical channel %d: %w", logicalChannel, err)
+	}
+	return nil
 }
 
-func (t *cardTransmitter) Write(command []byte) (int, error) {
-	var n int
-	t.response = new(bytes.Buffer)
+func disconnectChannel(channel SmartCardChannel) error {
+	if err := channel.Disconnect(); err != nil {
+		return fmt.Errorf("disconnect smart card channel: %w", err)
+	}
+	return nil
+}
+
+func (t *cardTransmitter) exchange(command []byte) ([]byte, error) {
+	var responseData bytes.Buffer
 	request := wwanapdu.Request{CLA: 0x80, INS: 0xE2}
 	var response wwanapdu.Response
 	var err error
-	chunks := byte(len(command) / t.MSS)
-	for request.Data = range slices.Chunk(command, t.MSS) {
-		if request.P1 = 0x11; request.P2 == chunks {
+	blockCount := 0
+	if len(command) > 0 {
+		blockCount = 1 + (len(command)-1)/t.mss
+	}
+	if blockCount > maxStoreDataBlocks {
+		return nil, fmt.Errorf("command requires %d STORE DATA blocks; maximum is %d", blockCount, maxStoreDataBlocks)
+	}
+	block := 0
+	for data := range slices.Chunk(command, t.mss) {
+		request.Data = data
+		request.P1 = 0x11
+		request.P2 = byte(block)
+		if block == blockCount-1 {
 			request.P1 = 0x91
 		}
-		if response, err = t.transmit(&request); err != nil {
+		if response, err = t.transmitAPDU(&request); err != nil {
 			break
 		}
-		request.P2++
-		n += len(request.Data)
+		block++
 		if !response.HasMore() {
-			t.response.Write(response.Data())
+			responseData.Write(response.Data())
 			continue
 		}
-		if err = t.readCommandResponse(t.response, response.SW2()); err != nil {
+		if err = t.readCommandResponse(&responseData, response.SW2()); err != nil {
 			break
 		}
 	}
-	return n, err
+	if err != nil {
+		return nil, err
+	}
+	return responseData.Bytes(), nil
 }
 
-func (t *cardTransmitter) transmit(request *wwanapdu.Request) (wwanapdu.Response, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
+func (t *cardTransmitter) transmitAPDU(request *wwanapdu.Request) (wwanapdu.Response, error) {
 	t.setChannelToCLA(request, t.logicalChannel)
 	command, err := request.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
+	ctx := context.Background()
+	debug := t.logger.Enabled(ctx, slog.LevelDebug)
+	if debug {
+		t.logger.DebugContext(ctx, "[APDU] sending", "command", fmt.Sprintf("%X", command))
+	}
 	b, err := t.channel.Transmit(command)
+	if debug {
+		if err != nil {
+			t.logger.DebugContext(ctx, "[APDU] received", "response", fmt.Sprintf("%X", b), "error", err)
+		} else {
+			t.logger.DebugContext(ctx, "[APDU] received", "response", fmt.Sprintf("%X", b))
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +213,7 @@ func (t *cardTransmitter) setChannelToCLA(request *wwanapdu.Request, channel byt
 	}
 }
 
-func (t *cardTransmitter) readCommandResponse(w io.Writer, le byte) error {
+func (t *cardTransmitter) readCommandResponse(responseData *bytes.Buffer, le byte) error {
 	var err error
 	var request wwanapdu.Request
 	var response wwanapdu.Response
@@ -160,12 +221,10 @@ func (t *cardTransmitter) readCommandResponse(w io.Writer, le byte) error {
 	request.INS = 0xC0
 	request.Le = &le
 	for {
-		if response, err = t.transmit(&request); err != nil {
+		if response, err = t.transmitAPDU(&request); err != nil {
 			return err
 		}
-		if _, err = w.Write(response.Data()); err != nil {
-			return err
-		}
+		responseData.Write(response.Data())
 		if !response.HasMore() {
 			break
 		}
@@ -175,8 +234,8 @@ func (t *cardTransmitter) readCommandResponse(w io.Writer, le byte) error {
 }
 
 func (t *cardTransmitter) Close() error {
-	if err := t.channel.CloseLogicalChannel(t.logicalChannel); err != nil {
-		return err
-	}
-	return t.channel.Disconnect()
+	return errors.Join(
+		closeChannel(t.channel, t.logicalChannel),
+		disconnectChannel(t.channel),
+	)
 }

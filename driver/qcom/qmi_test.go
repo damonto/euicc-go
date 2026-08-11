@@ -22,31 +22,58 @@ func (f *fakeQMITransport) Close() error {
 }
 
 type fakeUIMReader struct {
-	closed bool
+	openChannel   uint8
+	closedChannel []uint8
+	closed        bool
 }
 
 func (f *fakeUIMReader) ActivateSlot(context.Context) error { return nil }
 func (f *fakeUIMReader) OpenLogicalChannel(context.Context, []byte) (uint8, error) {
-	return 1, nil
+	return f.openChannel, nil
 }
 func (f *fakeUIMReader) SendAPDU(context.Context, uint8, []byte) ([]byte, error) {
 	return []byte{0x90, 0x00}, nil
 }
-func (f *fakeUIMReader) CloseLogicalChannel(context.Context, uint8) error { return nil }
+func (f *fakeUIMReader) CloseLogicalChannel(_ context.Context, channel uint8) error {
+	f.closedChannel = append(f.closedChannel, channel)
+	return nil
+}
 func (f *fakeUIMReader) Close() error {
 	f.closed = true
 	return nil
 }
 
-func TestDisconnectClosesReader(t *testing.T) {
+func TestDisconnectClosesLogicalChannelAndReader(t *testing.T) {
 	reader := &fakeUIMReader{}
-	q := &QMI{channel: newChannel(reader)}
+	qcomChannel := newChannel(reader)
+	qcomChannel.channel = 2
+	q := &QMI{channel: qcomChannel}
 
 	if err := q.Disconnect(); err != nil {
 		t.Fatalf("Disconnect() error = %v", err)
 	}
+	if len(reader.closedChannel) != 1 || reader.closedChannel[0] != 2 {
+		t.Fatalf("Disconnect() closed channels = %v, want [2]", reader.closedChannel)
+	}
 	if !reader.closed {
 		t.Fatal("Disconnect() did not close reader")
+	}
+}
+
+func TestOpenLogicalChannelRejectsInvalidChannel(t *testing.T) {
+	for _, logicalChannel := range []uint8{0, 20} {
+		reader := &fakeUIMReader{openChannel: logicalChannel}
+		channel := newChannel(reader)
+
+		if _, err := channel.OpenLogicalChannel(nil); err == nil {
+			t.Fatalf("OpenLogicalChannel() error = nil for channel %d", logicalChannel)
+		}
+		if logicalChannel == 0 && len(reader.closedChannel) != 0 {
+			t.Fatal("OpenLogicalChannel() tried to close channel 0")
+		}
+		if logicalChannel != 0 && (len(reader.closedChannel) != 1 || reader.closedChannel[0] != logicalChannel) {
+			t.Fatalf("OpenLogicalChannel() cleanup = %v, want [%d]", reader.closedChannel, logicalChannel)
+		}
 	}
 }
 

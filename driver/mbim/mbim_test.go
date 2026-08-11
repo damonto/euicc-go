@@ -3,17 +3,17 @@ package mbim
 import (
 	"bytes"
 	"context"
-	"errors"
 	"testing"
 
 	wwanmbim "github.com/damonto/wwan-go/mbim"
 )
 
 type fakeMBIMReader struct {
-	openChannel uint32
-	response    []byte
-	status      uint32
-	closed      bool
+	openChannel   uint32
+	response      []byte
+	status        uint32
+	closedChannel []uint32
+	closed        bool
 }
 
 func (f *fakeMBIMReader) OpenChannel(context.Context, []byte) (uint32, error) {
@@ -24,7 +24,10 @@ func (f *fakeMBIMReader) TransmitAPDU(context.Context, uint32, []byte) ([]byte, 
 	return append([]byte(nil), f.response...), f.status, nil
 }
 
-func (f *fakeMBIMReader) CloseChannel(context.Context, uint32) error { return nil }
+func (f *fakeMBIMReader) CloseChannel(_ context.Context, channel uint32) error {
+	f.closedChannel = append(f.closedChannel, channel)
+	return nil
+}
 
 func (f *fakeMBIMReader) Close() error {
 	f.closed = true
@@ -70,50 +73,6 @@ func TestNewWithClientUsesConnectedClient(t *testing.T) {
 	}
 }
 
-func TestConnectOpensReaderLazily(t *testing.T) {
-	oldOpenReader := openReader
-	defer func() { openReader = oldOpenReader }()
-
-	called := false
-	fake := &fakeMBIMReader{}
-	openReader = func(_ context.Context, _ ...wwanmbim.Option) (reader, error) {
-		called = true
-		return fake, nil
-	}
-
-	ch, err := New("/dev/cdc-wdm1", 1)
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-	if called {
-		t.Fatal("New() called opener before Connect()")
-	}
-	if err := ch.Connect(); err != nil {
-		t.Fatalf("Connect() error = %v", err)
-	}
-	if !called {
-		t.Fatal("Connect() did not call opener")
-	}
-}
-
-func TestConnectReturnsOpenError(t *testing.T) {
-	oldOpenReader := openReader
-	defer func() { openReader = oldOpenReader }()
-
-	openErr := errors.New("open")
-	openReader = func(_ context.Context, _ ...wwanmbim.Option) (reader, error) {
-		return nil, openErr
-	}
-
-	ch, err := New("/dev/cdc-wdm1", 1)
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-	if err := ch.Connect(); !errors.Is(err, openErr) {
-		t.Fatalf("Connect() error = %v, want open error", err)
-	}
-}
-
 func TestTransmitAppendsAPDUStatusWord(t *testing.T) {
 	fake := &fakeMBIMReader{
 		openChannel: 3,
@@ -135,12 +94,32 @@ func TestTransmitAppendsAPDUStatusWord(t *testing.T) {
 	}
 }
 
-func TestDisconnectClosesReader(t *testing.T) {
+func TestOpenLogicalChannelRejectsInvalidChannel(t *testing.T) {
+	for _, logicalChannel := range []uint32{0, 20, 256} {
+		fake := &fakeMBIMReader{openChannel: logicalChannel}
+		m := &MBIM{reader: fake}
+
+		if _, err := m.OpenLogicalChannel(nil); err == nil {
+			t.Fatalf("OpenLogicalChannel() error = nil for channel %d", logicalChannel)
+		}
+		if logicalChannel == 0 && len(fake.closedChannel) != 0 {
+			t.Fatal("OpenLogicalChannel() tried to close channel 0")
+		}
+		if logicalChannel != 0 && (len(fake.closedChannel) != 1 || fake.closedChannel[0] != logicalChannel) {
+			t.Fatalf("OpenLogicalChannel() cleanup = %v, want [%d]", fake.closedChannel, logicalChannel)
+		}
+	}
+}
+
+func TestDisconnectClosesLogicalChannelAndReader(t *testing.T) {
 	fake := &fakeMBIMReader{}
-	m := &MBIM{reader: fake}
+	m := &MBIM{reader: fake, channel: 3}
 
 	if err := m.Disconnect(); err != nil {
 		t.Fatalf("Disconnect() error = %v", err)
+	}
+	if len(fake.closedChannel) != 1 || fake.closedChannel[0] != 3 {
+		t.Fatalf("Disconnect() closed channels = %v, want [3]", fake.closedChannel)
 	}
 	if !fake.closed {
 		t.Fatal("Disconnect() did not close reader")

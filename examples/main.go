@@ -28,10 +28,7 @@ func main() {
 	// if err != nil {
 	// 	panic(err)
 	// }
-	// ch, err := ccid.New()
-	// if err != nil {
-	// 	panic(err)
-	// }
+	// ch := ccid.New()
 	// reader, err := ch.ListReaders()
 	// if err != nil {
 	// 	panic(err)

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -13,48 +15,77 @@ import (
 	"github.com/damonto/euicc-go/http/rootci"
 )
 
+// LoggingRoundTripper logs complete HTTP request and response bodies at debug
+// level. It preserves the concurrency guarantees of the underlying transport.
 type LoggingRoundTripper struct {
-	transport *http.Transport
+	transport http.RoundTripper
 	logger    *slog.Logger
 }
 
-func NewLoggingRoundTripper(rootci *x509.CertPool, logger *slog.Logger) *LoggingRoundTripper {
+// NewLoggingRoundTripper returns a transport that trusts rootCAs and logs raw
+// HTTP bodies when debug logging is enabled. Logger must not be nil.
+func NewLoggingRoundTripper(rootCAs *x509.CertPool, logger *slog.Logger) *LoggingRoundTripper {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{RootCAs: rootCAs}
 	return &LoggingRoundTripper{
-		logger: logger,
-		transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs: rootci,
-			},
-		},
+		logger:    logger,
+		transport: transport,
 	}
 }
 
+// RoundTrip implements http.RoundTripper.
 func (l *LoggingRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
-	body, err := io.ReadAll(request.Body)
-	if err != nil {
-		return nil, err
-	}
-	request.Body.Close()
-
+	transportRequest := request.Clone(request.Context())
 	// workaround: Orange PL notification address contains space in the host.
-	request.URL.Host = strings.ReplaceAll(request.URL.Host, " ", "")
-	request.Body = io.NopCloser(bytes.NewBuffer(body))
-	l.logger.Debug("[HTTP] sending request to", "url", request.URL.String(), "body", string(body))
+	transportRequest.URL.Host = strings.ReplaceAll(transportRequest.URL.Host, " ", "")
 
-	response, err := l.transport.RoundTrip(request)
+	debug := l.logger.Enabled(request.Context(), slog.LevelDebug)
+	if debug {
+		body, err := readAndClose(request.Body)
+		if err != nil {
+			return nil, fmt.Errorf("read HTTP request body: %w", err)
+		}
+		if request.Body != nil {
+			transportRequest.Body = io.NopCloser(bytes.NewReader(body))
+		}
+		l.logger.DebugContext(request.Context(), "[HTTP] sending request to", "url", transportRequest.URL.String(), "body", string(body))
+	}
+
+	response, err := l.transport.RoundTrip(transportRequest)
 	if err != nil {
 		return nil, err
 	}
-	rb, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
+	if !debug {
+		return response, nil
 	}
-	response.Body.Close()
-	response.Body = io.NopCloser(bytes.NewBuffer(rb))
-	l.logger.Debug("[HTTP] received response from", "url", request.URL.String(), "body", string(rb))
+
+	rb, err := readAndClose(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read HTTP response body: %w", err)
+	}
+	response.Body = io.NopCloser(bytes.NewReader(rb))
+	l.logger.DebugContext(request.Context(), "[HTTP] received response from", "url", transportRequest.URL.String(), "body", string(rb))
 	return response, nil
 }
 
+func readAndClose(body io.ReadCloser) ([]byte, error) {
+	if body == nil {
+		return nil, nil
+	}
+	data, err := io.ReadAll(body)
+	return data, errors.Join(err, body.Close())
+}
+
+// CloseIdleConnections closes idle connections held by the underlying
+// transport.
+func (l *LoggingRoundTripper) CloseIdleConnections() {
+	if transport, ok := l.transport.(interface{ CloseIdleConnections() }); ok {
+		transport.CloseIdleConnections()
+	}
+}
+
+// NewHTTPClient creates an HTTP client configured with the trusted eSIM root
+// certificates and raw debug logging. Logger must not be nil.
 func NewHTTPClient(logger *slog.Logger, timeout time.Duration) *http.Client {
 	return &http.Client{
 		Timeout: timeout,

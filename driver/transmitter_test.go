@@ -13,6 +13,10 @@ type fakeSmartCardChannel struct {
 	logicalChannel byte
 	responses      [][]byte
 	requests       [][]byte
+	connectErr     error
+	openErr        error
+	closeErr       error
+	disconnectErr  error
 	connected      bool
 	disconnected   bool
 	openedAID      []byte
@@ -21,17 +25,17 @@ type fakeSmartCardChannel struct {
 
 func (f *fakeSmartCardChannel) Connect() error {
 	f.connected = true
-	return nil
+	return f.connectErr
 }
 
 func (f *fakeSmartCardChannel) Disconnect() error {
 	f.disconnected = true
-	return nil
+	return f.disconnectErr
 }
 
 func (f *fakeSmartCardChannel) OpenLogicalChannel(AID []byte) (byte, error) {
 	f.openedAID = append([]byte(nil), AID...)
-	return f.logicalChannel, nil
+	return f.logicalChannel, f.openErr
 }
 
 func (f *fakeSmartCardChannel) Transmit(command []byte) ([]byte, error) {
@@ -46,7 +50,7 @@ func (f *fakeSmartCardChannel) Transmit(command []byte) ([]byte, error) {
 
 func (f *fakeSmartCardChannel) CloseLogicalChannel(channel byte) error {
 	f.closedChannel = channel
-	return nil
+	return f.closeErr
 }
 
 func discardLogger() *slog.Logger {
@@ -76,6 +80,74 @@ func TestNewTransmitterConnectsAndClosesChannel(t *testing.T) {
 	}
 	if !channel.disconnected {
 		t.Fatal("Close() did not disconnect channel")
+	}
+}
+
+func TestNewTransmitterValidatesBeforeConnecting(t *testing.T) {
+	if _, err := NewTransmitter(discardLogger(), nil, nil, 254); err == nil {
+		t.Fatal("NewTransmitter() error = nil for nil channel")
+	}
+
+	for _, MSS := range []int{-1, 0, 255} {
+		channel := &fakeSmartCardChannel{logicalChannel: 1}
+		if _, err := NewTransmitter(discardLogger(), channel, nil, MSS); err == nil {
+			t.Fatalf("NewTransmitter() error = nil for MSS %d", MSS)
+		}
+		if channel.connected {
+			t.Fatalf("NewTransmitter() connected channel for invalid MSS %d", MSS)
+		}
+	}
+}
+
+func TestNewTransmitterCleansUpFailedInitialization(t *testing.T) {
+	connectErr := errors.New("connect")
+	channel := &fakeSmartCardChannel{connectErr: connectErr}
+	if _, err := NewTransmitter(discardLogger(), channel, nil, 254); !errors.Is(err, connectErr) {
+		t.Fatalf("NewTransmitter() error = %v, want connect error", err)
+	}
+	if !channel.disconnected {
+		t.Fatal("NewTransmitter() did not disconnect after Connect failure")
+	}
+
+	openErr := errors.New("open")
+	channel = &fakeSmartCardChannel{logicalChannel: 3, openErr: openErr}
+	if _, err := NewTransmitter(discardLogger(), channel, nil, 254); !errors.Is(err, openErr) {
+		t.Fatalf("NewTransmitter() error = %v, want open error", err)
+	}
+	if channel.closedChannel != 3 || !channel.disconnected {
+		t.Fatalf("NewTransmitter() cleanup = close %d, disconnect %t; want close 3 and disconnect", channel.closedChannel, channel.disconnected)
+	}
+}
+
+func TestNewTransmitterRejectsInvalidLogicalChannelAndDisconnects(t *testing.T) {
+	channel := &fakeSmartCardChannel{logicalChannel: 20}
+	_, err := NewTransmitter(discardLogger(), channel, nil, 254)
+	if err == nil || !strings.Contains(err.Error(), "outside 1..19") {
+		t.Fatalf("NewTransmitter() error = %v, want invalid logical channel", err)
+	}
+	if channel.closedChannel != 20 || !channel.disconnected {
+		t.Fatalf("NewTransmitter() cleanup = close %d, disconnect %t; want close 20 and disconnect", channel.closedChannel, channel.disconnected)
+	}
+}
+
+func TestTransmitterCloseAlwaysDisconnects(t *testing.T) {
+	closeErr := errors.New("close")
+	disconnectErr := errors.New("disconnect")
+	channel := &fakeSmartCardChannel{
+		logicalChannel: 2,
+		closeErr:       closeErr,
+		disconnectErr:  disconnectErr,
+	}
+	tx, err := NewTransmitter(discardLogger(), channel, nil, 254)
+	if err != nil {
+		t.Fatalf("NewTransmitter() error = %v", err)
+	}
+	err = tx.Close()
+	if !errors.Is(err, closeErr) || !errors.Is(err, disconnectErr) {
+		t.Fatalf("Close() error = %v, want close and disconnect errors", err)
+	}
+	if !channel.disconnected {
+		t.Fatal("Close() did not disconnect after logical channel close failure")
 	}
 }
 
@@ -110,6 +182,78 @@ func TestTransmitterSplitsStoreDataAPDUByMSS(t *testing.T) {
 	for i := range want {
 		if !bytes.Equal(channel.requests[i], want[i]) {
 			t.Fatalf("request %d = % X, want % X", i, channel.requests[i], want[i])
+		}
+	}
+}
+
+func TestTransmitterMarksFinalBlockWhenCommandIsExactMultipleOfMSS(t *testing.T) {
+	channel := &fakeSmartCardChannel{
+		logicalChannel: 1,
+		responses:      [][]byte{{0x90, 0x00}, {0x90, 0x00}},
+	}
+	tx, err := NewTransmitter(discardLogger(), channel, nil, 3)
+	if err != nil {
+		t.Fatalf("NewTransmitter() error = %v", err)
+	}
+
+	if _, err := tx.TransmitRaw([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}); err != nil {
+		t.Fatalf("TransmitRaw() error = %v", err)
+	}
+	want := [][]byte{
+		{0x81, 0xE2, 0x11, 0x00, 0x03, 0x01, 0x02, 0x03},
+		{0x81, 0xE2, 0x91, 0x01, 0x03, 0x04, 0x05, 0x06},
+	}
+	if len(channel.requests) != len(want) {
+		t.Fatalf("Transmit() request count = %d, want %d", len(channel.requests), len(want))
+	}
+	for i := range want {
+		if !bytes.Equal(channel.requests[i], want[i]) {
+			t.Fatalf("request %d = % X, want % X", i, channel.requests[i], want[i])
+		}
+	}
+}
+
+func TestTransmitterRejectsMoreThan256StoreDataBlocks(t *testing.T) {
+	channel := &fakeSmartCardChannel{logicalChannel: 1}
+	tx, err := NewTransmitter(discardLogger(), channel, nil, 1)
+	if err != nil {
+		t.Fatalf("NewTransmitter() error = %v", err)
+	}
+
+	_, err = tx.TransmitRaw(make([]byte, maxStoreDataBlocks+1))
+	if err == nil || !strings.Contains(err.Error(), "maximum is 256") {
+		t.Fatalf("TransmitRaw() error = %v, want block count error", err)
+	}
+	if len(channel.requests) != 0 {
+		t.Fatalf("TransmitRaw() sent %d requests before rejecting block count", len(channel.requests))
+	}
+}
+
+func TestTransmitterLogsRawAPDUBodiesAtDebugLevel(t *testing.T) {
+	var logs bytes.Buffer
+	channel := &fakeSmartCardChannel{
+		logicalChannel: 1,
+		responses: [][]byte{
+			{0x61, 0x02},
+			{0xBE, 0xEF, 0x90, 0x00},
+		},
+	}
+	tx, err := NewTransmitter(debugLogger(&logs), channel, nil, 254)
+	if err != nil {
+		t.Fatalf("NewTransmitter() error = %v", err)
+	}
+	if _, err := tx.TransmitRaw([]byte{0xDE, 0xAD}); err != nil {
+		t.Fatalf("TransmitRaw() error = %v", err)
+	}
+	output := logs.String()
+	for _, raw := range []string{
+		"command=81E2910002DEAD",
+		"response=6102",
+		"command=81C0000002",
+		"response=BEEF9000",
+	} {
+		if !strings.Contains(output, raw) {
+			t.Fatalf("debug logs do not contain %q: %s", raw, output)
 		}
 	}
 }
@@ -150,11 +294,12 @@ func TestTransmitterReadsCommandResponseWhenStatusHasMore(t *testing.T) {
 }
 
 func TestTransmitterReturnsErrorForUnexpectedStatus(t *testing.T) {
+	var logs bytes.Buffer
 	channel := &fakeSmartCardChannel{
 		logicalChannel: 1,
 		responses:      [][]byte{{0x6A, 0x82}},
 	}
-	tx, err := NewTransmitter(discardLogger(), channel, []byte{0xA0}, 254)
+	tx, err := NewTransmitter(debugLogger(&logs), channel, []byte{0xA0}, 254)
 	if err != nil {
 		t.Fatalf("NewTransmitter() error = %v", err)
 	}
@@ -165,5 +310,8 @@ func TestTransmitterReturnsErrorForUnexpectedStatus(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "6A82") {
 		t.Fatalf("TransmitRaw() error = %q, want status 6A82", err.Error())
+	}
+	if output := logs.String(); !strings.Contains(output, "response=6A82") {
+		t.Fatalf("debug logs do not contain raw error response: %s", output)
 	}
 }

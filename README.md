@@ -33,6 +33,7 @@ end-user CLI.
 | `lpa` | High-level Local Profile Assistant client. This is the main package most callers should use. |
 | `v2` | SGP.22 v2.x APDU / HTTP message types, identifiers, profile types, notification types, and errors. |
 | `driver` | Shared smart-card channel and APDU transmitter interfaces. |
+| `driver/iso7816` | ISO 7816 logical-channel adapter for raw APDU transports. |
 | `driver/ccid` | CCID / PCSC reader channel. |
 | `driver/at` | AT-command modem channel over a serial device. |
 | `driver/mbim` | MBIM proxy modem channel. |
@@ -71,11 +72,7 @@ import (
 )
 
 func main() {
-	ch, err := ccid.New()
-	if err != nil {
-		panic(err)
-	}
-
+	ch := ccid.New()
 	readers, err := ch.ListReaders()
 	if err != nil {
 		panic(err)
@@ -121,9 +118,13 @@ go run .
 All high-level LPA operations use a `driver.SmartCardChannel`. Select the
 driver that matches how the eUICC is exposed on your system.
 
+Smart-card channels and LPA clients are intentionally not safe for concurrent
+use. Serialize every operation on a channel or client, including `Close` and
+`Disconnect`.
+
 ```go
 // CCID / PCSC reader.
-ch, err := ccid.NewWithReader("reader name")
+ch := ccid.NewWithReader("reader name")
 
 // AT modem serial port.
 ch, err := at.New("/dev/ttyUSB7")

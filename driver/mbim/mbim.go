@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/damonto/euicc-go/driver"
@@ -19,17 +18,14 @@ type reader interface {
 	Close() error
 }
 
-const defaultTimeout = 30 * time.Second
+const (
+	defaultTimeout    = 30 * time.Second
+	maxLogicalChannel = 19
+)
 
-type mbimOpener func(context.Context, ...wwanmbim.Option) (reader, error)
-
-var openReader mbimOpener = func(ctx context.Context, opts ...wwanmbim.Option) (reader, error) {
-	return wwanmbim.Open(ctx, opts...)
-}
-
-// MBIM implements driver.SmartCardChannel over an MBIM connection.
+// MBIM implements driver.SmartCardChannel over an MBIM connection. It is not
+// safe for concurrent use.
 type MBIM struct {
-	mu      sync.Mutex
 	device  string
 	slot    uint8
 	reader  reader
@@ -56,9 +52,6 @@ func NewWithClient(client *wwanmbim.Client) (driver.SmartCardChannel, error) {
 
 // Connect establishes the MBIM session and opens the device.
 func (m *MBIM) Connect() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	if m.closed {
 		return errors.New("mbim reader is closed")
 	}
@@ -67,27 +60,34 @@ func (m *MBIM) Connect() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
-	reader, err := openReader(ctx, wwanmbim.WithAutoDetect(m.device), wwanmbim.WithSlot(int(m.slot)))
+	reader, err := wwanmbim.Open(ctx, wwanmbim.WithAutoDetect(m.device), wwanmbim.WithSlot(int(m.slot)))
 	if err != nil {
-		return err
+		return fmt.Errorf("open MBIM reader: %w", err)
 	}
 	m.reader = reader
 	return nil
 }
 
 // OpenLogicalChannel opens a logical channel for the specified Application ID.
-func (m *MBIM) OpenLogicalChannel(AID []byte) (byte, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
+func (m *MBIM) OpenLogicalChannel(aid []byte) (byte, error) {
 	if err := m.ensureOpen(); err != nil {
 		return 0, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
-	channel, err := m.reader.OpenChannel(ctx, AID)
+	channel, err := m.reader.OpenChannel(ctx, aid)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("open MBIM logical channel: %w", err)
+	}
+	if channel == 0 || channel > maxLogicalChannel {
+		var cleanupErr error
+		if channel != 0 {
+			cleanupErr = m.closeLogicalChannel(channel)
+		}
+		return 0, errors.Join(
+			fmt.Errorf("MBIM returned invalid logical channel %d", channel),
+			cleanupErr,
+		)
 	}
 	m.channel = channel
 	return byte(channel), nil
@@ -95,9 +95,6 @@ func (m *MBIM) OpenLogicalChannel(AID []byte) (byte, error) {
 
 // Transmit implements driver.SmartCardChannel.
 func (m *MBIM) Transmit(command []byte) ([]byte, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	if err := m.ensureOpen(); err != nil {
 		return nil, err
 	}
@@ -105,25 +102,29 @@ func (m *MBIM) Transmit(command []byte) ([]byte, error) {
 	defer cancel()
 	response, status, err := m.reader.TransmitAPDU(ctx, m.channel, command)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("transmit MBIM APDU: %w", err)
 	}
 	return append(response, uiccStatusWord(status)...), nil
 }
 
 // CloseLogicalChannel closes the specified logical channel.
 func (m *MBIM) CloseLogicalChannel(channel byte) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	if err := m.ensureOpen(); err != nil {
 		return err
 	}
+	if channel == 0 || channel > maxLogicalChannel {
+		return fmt.Errorf("invalid logical channel %d", channel)
+	}
+	return m.closeLogicalChannel(uint32(channel))
+}
+
+func (m *MBIM) closeLogicalChannel(channel uint32) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
-	if err := m.reader.CloseChannel(ctx, uint32(channel)); err != nil {
-		return err
+	if err := m.reader.CloseChannel(ctx, channel); err != nil {
+		return fmt.Errorf("close MBIM logical channel %d: %w", channel, err)
 	}
-	if m.channel == uint32(channel) {
+	if m.channel == channel {
 		m.channel = 0
 	}
 	return nil
@@ -131,17 +132,22 @@ func (m *MBIM) CloseLogicalChannel(channel byte) error {
 
 // Disconnect closes the MBIM connection and releases resources.
 func (m *MBIM) Disconnect() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	if m.closed {
 		return nil
 	}
+	var channelErr error
+	if m.reader != nil && m.channel != 0 {
+		channelErr = m.closeLogicalChannel(m.channel)
+	}
 	m.closed = true
 	if m.reader == nil {
-		return nil
+		return channelErr
 	}
-	return m.reader.Close()
+	closeErr := m.reader.Close()
+	if closeErr != nil {
+		closeErr = fmt.Errorf("close MBIM reader: %w", closeErr)
+	}
+	return errors.Join(channelErr, closeErr)
 }
 
 func (m *MBIM) ensureOpen() error {

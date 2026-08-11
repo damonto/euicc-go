@@ -3,13 +3,15 @@ package qcom
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/damonto/euicc-go/driver"
 	"github.com/damonto/wwan-go/qcom"
 	wwanqmi "github.com/damonto/wwan-go/qcom/qmi"
 )
 
-// QMI implements driver.SmartCardChannel over a QMI connection.
+// QMI implements driver.SmartCardChannel over a QMI connection. It is not safe
+// for concurrent use.
 type QMI struct {
 	*channel
 }
@@ -24,12 +26,15 @@ func NewQMI(device string, slot uint8) (driver.SmartCardChannel, error) {
 	defer cancel()
 	transport, err := wwanqmi.Open(ctx, wwanqmi.WithAutoDetect(device))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open QMI transport: %w", err)
 	}
 	reader, err := qcom.NewClient(transport, qcom.WithSlot(slot))
 	if err != nil {
-		_ = transport.Close()
-		return nil, err
+		closeErr := transport.Close()
+		if closeErr != nil {
+			closeErr = fmt.Errorf("close QMI transport: %w", closeErr)
+		}
+		return nil, errors.Join(fmt.Errorf("create QMI client: %w", err), closeErr)
 	}
 	return NewQMIWithClient(reader)
 }
