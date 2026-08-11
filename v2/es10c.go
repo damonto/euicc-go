@@ -2,6 +2,7 @@ package sgp22
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"unicode/utf8"
 
@@ -143,24 +144,24 @@ type ProfileOperationResponse struct {
 }
 
 func (r *ProfileOperationRequest) MarshalBERTLV() (*bertlv.TLV, error) {
-	request := bertlv.NewChildrenIter(
-		bertlv.ContextSpecific.Constructed(uint64(r.Operation)),
-		func(yield func(*bertlv.TLV) bool) {
-			// DeleteProfile does not require the refresh flag.
-			if r.Operation == DeleteProfile {
-				yield(r.Identifier)
-				return
-			}
-			if !yield(bertlv.NewChildren(bertlv.ContextSpecific.Constructed(0), r.Identifier)) {
-				return
-			}
-			yield(mustMarshalValue(bertlv.MarshalValue(
-				bertlv.ContextSpecific.Primitive(1),
-				primitive.MarshalBool(r.Refresh),
-			)))
-		},
+	if r.Operation == DeleteProfile {
+		return bertlv.NewChildren(
+			bertlv.ContextSpecific.Constructed(uint64(r.Operation)),
+			r.Identifier,
+		), nil
+	}
+	refresh, err := bertlv.MarshalValue(
+		bertlv.ContextSpecific.Primitive(1),
+		primitive.MarshalBool(r.Refresh),
 	)
-	return request, nil
+	if err != nil {
+		return nil, fmt.Errorf("marshal refresh flag: %w", err)
+	}
+	return bertlv.NewChildren(
+		bertlv.ContextSpecific.Constructed(uint64(r.Operation)),
+		bertlv.NewChildren(bertlv.ContextSpecific.Constructed(0), r.Identifier),
+		refresh,
+	), nil
 }
 
 func (r *ProfileOperationResponse) UnmarshalBERTLV(tlv *bertlv.TLV) error {
@@ -210,16 +211,20 @@ func (r *EuiccMemoryResetRequest) CardResponse() *EuiccMemoryResetResponse {
 }
 
 func (r *EuiccMemoryResetRequest) MarshalBERTLV() (*bertlv.TLV, error) {
+	resetOptions, err := bertlv.MarshalValue(
+		bertlv.ContextSpecific.Primitive(2),
+		primitive.MarshalBitString([]bool{
+			r.DeleteOperationalProfiles,
+			r.DeleteFieldLoadedTestProfiles,
+			r.ResetDefaultSMDPAddress,
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("marshal reset options: %w", err)
+	}
 	request := bertlv.NewChildren(
 		bertlv.ContextSpecific.Constructed(52),
-		mustMarshalValue(bertlv.MarshalValue(
-			bertlv.ContextSpecific.Primitive(2),
-			primitive.MarshalBitString([]bool{
-				r.DeleteOperationalProfiles,
-				r.DeleteFieldLoadedTestProfiles,
-				r.ResetDefaultSMDPAddress,
-			}),
-		)),
+		resetOptions,
 	)
 	return request, nil
 }
@@ -311,9 +316,10 @@ func (r *SetNicknameRequest) CardResponse() *SetNicknameResponse {
 
 func (r *SetNicknameRequest) Valid() error {
 	if !utf8.Valid(r.Nickname) {
-		return errors.New("the nickname invalid utf-8 string")
-	} else if len(r.Nickname) > 64 {
-		return errors.New("the nickname too long")
+		return errors.New("nickname is not valid UTF-8")
+	}
+	if len(r.Nickname) > 64 {
+		return errors.New("nickname is too long")
 	}
 	return nil
 }

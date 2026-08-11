@@ -3,7 +3,7 @@ package bertlv
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
+	"reflect"
 	"testing"
 )
 
@@ -22,7 +22,9 @@ func TestTLV_ReadFrom(t *testing.T) {
 	var tlv TLV
 	for _, fixture := range fixtures {
 		_, err = tlv.ReadFrom(bytes.NewReader(fixture.TLV))
-		assert.EqualError(t, err, fixture.Error)
+		if err == nil || err.Error() != fixture.Error {
+			t.Errorf("TLV.ReadFrom(% X) error = %v, want %q", fixture.TLV, err, fixture.Error)
+		}
 	}
 }
 
@@ -30,7 +32,9 @@ func TestTLV_ReadFromRejectsChildPastConstructedLength(t *testing.T) {
 	var tlv TLV
 	_, err := tlv.ReadFrom(bytes.NewReader([]byte{0xa0, 0x02, 0x80, 0x03, 0xff, 0xee, 0xdd}))
 
-	assert.Error(t, err)
+	if err == nil {
+		t.Error("TLV.ReadFrom() error = nil for child past constructed length")
+	}
 }
 
 func TestTLV_UnmarshalBinaryRejectsTrailingData(t *testing.T) {
@@ -38,7 +42,9 @@ func TestTLV_UnmarshalBinaryRejectsTrailingData(t *testing.T) {
 
 	err := tlv.UnmarshalBinary([]byte{0x80, 0x01, 0xff, 0x00})
 
-	assert.EqualError(t, err, "trailing data after TLV: 1 bytes")
+	if want := "trailing data after TLV: 1 bytes"; err == nil || err.Error() != want {
+		t.Errorf("TLV.UnmarshalBinary() error = %v, want %q", err, want)
+	}
 }
 
 func TestTLV_FilterInvalidChildren(t *testing.T) {
@@ -47,22 +53,42 @@ func TestTLV_FilterInvalidChildren(t *testing.T) {
 		NewValue(Primitive.ContextSpecific(1), []byte{0x01}),
 		nil,
 	)
-	assert.Equal(t, []byte{0xa0, 0x03, 0x81, 0x01, 0x01}, tlv.Bytes())
-	assert.NoError(t, tlv.UnmarshalBinary(tlv.Bytes()))
-	assert.Len(t, tlv.Children, 1)
+	encoded, err := tlv.Bytes()
+	if err != nil {
+		t.Fatalf("TLV.Bytes() error = %v", err)
+	}
+	if want := []byte{0xa0, 0x03, 0x81, 0x01, 0x01}; !bytes.Equal(encoded, want) {
+		t.Errorf("TLV.Bytes() = % X, want % X", encoded, want)
+	}
+	if err := tlv.UnmarshalBinary(encoded); err != nil {
+		t.Fatalf("TLV.UnmarshalBinary() error = %v", err)
+	}
+	if got := len(tlv.Children); got != 1 {
+		t.Errorf("len(TLV.Children) = %d, want 1", got)
+	}
 }
 
 func TestTLV_UnmarshalJSONWithNewline(t *testing.T) {
 	var tlv TLV
-	assert.NoError(t, json.Unmarshal([]byte(`"gA\nH/"`), &tlv))
-	assert.Equal(t, []byte{0xff}, tlv.Value)
+	if err := json.Unmarshal([]byte(`"gA\nH/"`), &tlv); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if want := []byte{0xff}; !bytes.Equal(tlv.Value, want) {
+		t.Errorf("TLV.Value = % X, want % X", tlv.Value, want)
+	}
 }
 
 func TestTLV_UnmarshalJSONWithoutPadding(t *testing.T) {
 	var tlv TLV
-	assert.NoError(t, json.Unmarshal([]byte(`"gAL/7g"`), &tlv))
-	assert.Equal(t, Primitive.ContextSpecific(0), tlv.Tag)
-	assert.Equal(t, []byte{0xff, 0xee}, tlv.Value)
+	if err := json.Unmarshal([]byte(`"gAL/7g"`), &tlv); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if want := Primitive.ContextSpecific(0); !bytes.Equal(tlv.Tag, want) {
+		t.Errorf("TLV.Tag = % X, want % X", tlv.Tag, want)
+	}
+	if want := []byte{0xff, 0xee}; !bytes.Equal(tlv.Value, want) {
+		t.Errorf("TLV.Value = % X, want % X", tlv.Value, want)
+	}
 }
 
 func TestTLV_UnmarshalBERTLV(t *testing.T) {
@@ -71,7 +97,21 @@ func TestTLV_UnmarshalBERTLV(t *testing.T) {
 		NewValue(Primitive.Application(1), []byte{0x01}),
 	)
 	var cloned TLV
-	assert.NoError(t, cloned.UnmarshalBERTLV(original))
-	assert.Equal(t, original, &cloned)
-	assert.Equal(t, original.Bytes(), cloned.Bytes())
+	if err := cloned.UnmarshalBERTLV(original); err != nil {
+		t.Fatalf("TLV.UnmarshalBERTLV() error = %v", err)
+	}
+	if !reflect.DeepEqual(&cloned, original) {
+		t.Errorf("TLV.UnmarshalBERTLV() = %#v, want %#v", &cloned, original)
+	}
+	originalBytes, err := original.Bytes()
+	if err != nil {
+		t.Fatalf("original.Bytes() error = %v", err)
+	}
+	clonedBytes, err := cloned.Bytes()
+	if err != nil {
+		t.Fatalf("cloned.Bytes() error = %v", err)
+	}
+	if !bytes.Equal(clonedBytes, originalBytes) {
+		t.Errorf("cloned.Bytes() = % X, want % X", clonedBytes, originalBytes)
+	}
 }

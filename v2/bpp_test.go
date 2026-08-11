@@ -2,16 +2,18 @@ package sgp22
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/damonto/euicc-go/bertlv"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestSegmentedBoundProfilePackage(t *testing.T) {
@@ -28,15 +30,25 @@ func TestSegmentedBoundProfilePackage(t *testing.T) {
 	}
 	for _, fixture := range fixtures {
 		t.Run(fixture.Name, func(t *testing.T) {
-			bpp, err := LoadBoundProfilePackage(fixture.BPP)
-			assert.NoError(t, err)
-			expectedSegments, err := LoadSegmentedBoundProfilePackage(fixture.SBPP)
-			assert.NoError(t, err)
+			bpp, err := loadBoundProfilePackage(fixture.BPP)
+			if err != nil {
+				t.Fatalf("loadBoundProfilePackage(%q) error = %v", fixture.BPP, err)
+			}
+			expectedSegments, err := loadSegmentedBoundProfilePackage(fixture.SBPP)
+			if err != nil {
+				t.Fatalf("loadSegmentedBoundProfilePackage(%q) error = %v", fixture.SBPP, err)
+			}
 			segments, err := SegmentedBoundProfilePackage(bpp)
-			assert.NoError(t, err)
-			var index int
-			for index = 0; index < len(segments); index++ {
-				assert.Equal(t, expectedSegments[index], segments[index], index)
+			if err != nil {
+				t.Fatalf("SegmentedBoundProfilePackage() error = %v", err)
+			}
+			if len(segments) != len(expectedSegments) {
+				t.Fatalf("segment count = %d, want %d", len(segments), len(expectedSegments))
+			}
+			for index := range segments {
+				if !bytes.Equal(segments[index], expectedSegments[index]) {
+					t.Errorf("segment %d = % X, want % X", index, segments[index], expectedSegments[index])
+				}
 			}
 		})
 	}
@@ -63,8 +75,10 @@ func TestSegmentedBoundProfilePackageSplitsSequenceOf87(t *testing.T) {
 
 	segments, err := SegmentedBoundProfilePackage(bpp)
 
-	assert.NoError(t, err)
-	assert.Equal(t, [][]byte{
+	if err != nil {
+		t.Fatalf("SegmentedBoundProfilePackage() error = %v", err)
+	}
+	want := [][]byte{
 		{0xbf, 0x36, 0x15, 0xbf, 0x23, 0x00},
 		{0xa0, 0x06, 0x87, 0x01, 0x01},
 		{0x87, 0x01, 0x02},
@@ -72,32 +86,38 @@ func TestSegmentedBoundProfilePackageSplitsSequenceOf87(t *testing.T) {
 		{0x88, 0x01, 0x03},
 		{0xa3, 0x03},
 		{0x86, 0x01, 0x04},
-	}, segments)
+	}
+	if !reflect.DeepEqual(segments, want) {
+		t.Errorf("SegmentedBoundProfilePackage() = % X, want % X", segments, want)
+	}
 }
 
-func LoadBoundProfilePackage(name string) (*bertlv.TLV, error) {
+func loadBoundProfilePackage(name string) (bpp *bertlv.TLV, err error) {
 	fp, err := os.Open(filepath.Join("fixtures", name))
 	if err != nil {
 		return nil, err
 	}
-	defer fp.Close()
-	bpp := new(bertlv.TLV)
+	defer func() {
+		err = errors.Join(err, fp.Close())
+	}()
+	bpp = new(bertlv.TLV)
 	_, err = bpp.ReadFrom(base64.NewDecoder(base64.StdEncoding, fp))
 	return bpp, err
 }
 
-func LoadSegmentedBoundProfilePackage(name string) ([][]byte, error) {
+func loadSegmentedBoundProfilePackage(name string) (sbpp [][]byte, err error) {
 	fp, err := os.Open(filepath.Join("fixtures", name))
 	if err != nil {
 		return nil, err
 	}
-	defer fp.Close()
+	defer func() {
+		err = errors.Join(err, fp.Close())
+	}()
 	scanner := bufio.NewScanner(fp)
 	scanner.Split(bufio.ScanLines)
 	var block []byte
 	var line int
 	var text string
-	var sbpp [][]byte
 	for scanner.Scan() {
 		line++
 		text = scanner.Text()

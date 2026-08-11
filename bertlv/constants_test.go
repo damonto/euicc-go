@@ -1,7 +1,7 @@
 package bertlv
 
 import (
-	"github.com/stretchr/testify/assert"
+	"bytes"
 	"testing"
 )
 
@@ -22,7 +22,11 @@ func TestConstants(t *testing.T) {
 		{Tag{0xe0}, Private.Constructed, Constructed.Private},
 	}
 	for _, fixture := range fixtures {
-		assert.Equal(t, fixture.Tag, fixture.Class(0))
-		assert.Equal(t, fixture.Tag, fixture.Form(0))
+		if got := fixture.Class(0); !bytes.Equal(got, fixture.Tag) {
+			t.Errorf("Class(0) = % X, want % X", got, fixture.Tag)
+		}
+		if got := fixture.Form(0); !bytes.Equal(got, fixture.Tag) {
+			t.Errorf("Form(0) = % X, want % X", got, fixture.Tag)
+		}
 	}
 }

@@ -2,6 +2,7 @@ package lpa
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 
 	"github.com/damonto/euicc-go/bertlv"
@@ -85,14 +86,18 @@ func (c *Client) ListNotification(filters ...sgp22.NotificationEvent) ([]*sgp22.
 // - [sgp22.NotificationEvent]: The event type of the notification.
 func (c *Client) RetrieveNotificationList(searchCriteria any) ([]*sgp22.PendingNotification, error) {
 	var request sgp22.RetrieveNotificationsListRequest
+	var err error
 	switch v := searchCriteria.(type) {
 	case nil:
 	case sgp22.SequenceNumber:
-		request.SearchCriteria, _ = bertlv.MarshalValue(bertlv.ContextSpecific.Primitive(0), &v)
+		request.SearchCriteria, err = bertlv.MarshalValue(bertlv.ContextSpecific.Primitive(0), &v)
 	case sgp22.NotificationEvent:
-		request.SearchCriteria, _ = bertlv.MarshalValue(bertlv.ContextSpecific.Primitive(1), &v)
+		request.SearchCriteria, err = bertlv.MarshalValue(bertlv.ContextSpecific.Primitive(1), &v)
 	default:
 		return nil, errors.New("searchCriteria must be of type sgp22.SequenceNumber or sgp22.NotificationEvent")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("marshal notification search criteria: %w", err)
 	}
 	response, err := sgp22.InvokeAPDU(c.APDU, &request)
 	if err != nil {

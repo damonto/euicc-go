@@ -3,6 +3,7 @@ package sgp22
 import (
 	"crypto/sha256"
 	"errors"
+	"fmt"
 
 	"github.com/damonto/euicc-go/bertlv"
 	"github.com/damonto/euicc-go/bertlv/primitive"
@@ -28,7 +29,10 @@ func (r *PrepareDownloadRequest) CardResponse() *ES9BoundProfilePackageRequest {
 }
 
 func (r *PrepareDownloadRequest) MarshalBERTLV() (*bertlv.TLV, error) {
-	hashedConfirmationCode := r.HashedConfirmationCode()
+	hashedConfirmationCode, err := r.HashedConfirmationCode()
+	if err != nil {
+		return nil, err
+	}
 	if hashedConfirmationCode != nil && len(r.ConfirmationCode) == 0 {
 		return nil, errors.New("confirmation code is required")
 	}
@@ -49,27 +53,29 @@ func (r *PrepareDownloadRequest) MarshalBERTLV() (*bertlv.TLV, error) {
 	return request, nil
 }
 
-func (r *PrepareDownloadRequest) HashedConfirmationCode() []byte {
-	if !r.NeedConfirmationCode() {
-		return nil
+func (r *PrepareDownloadRequest) HashedConfirmationCode() ([]byte, error) {
+	required, err := r.NeedConfirmationCode()
+	if err != nil {
+		return nil, err
 	}
-	hashed := sha256.New()
-	hashed.Write(r.ConfirmationCode)
-	confirmationCode := hashed.Sum(nil)
-	hashed.Reset()
-	hashed.Write(confirmationCode)
-	hashed.Write(r.TransactionID)
-	return hashed.Sum(nil)
+	if !required {
+		return nil, nil
+	}
+	confirmationCode := sha256.Sum256(r.ConfirmationCode)
+	input := make([]byte, 0, len(confirmationCode)+len(r.TransactionID))
+	input = append(input, confirmationCode[:]...)
+	input = append(input, r.TransactionID...)
+	hashed := sha256.Sum256(input)
+	return hashed[:], nil
 }
 
-func (r *PrepareDownloadRequest) NeedConfirmationCode() bool {
-	if r == nil || r.Signed2 == nil {
-		return false
-	}
+func (r *PrepareDownloadRequest) NeedConfirmationCode() (bool, error) {
+	field := r.Signed2.First(bertlv.Universal.Primitive(1))
 	var confirmationCodeRequired bool
-	_ = r.Signed2.First(bertlv.Universal.Primitive(1)).
-		UnmarshalValue(primitive.UnmarshalBool(&confirmationCodeRequired))
-	return confirmationCodeRequired
+	if err := field.UnmarshalValue(primitive.UnmarshalBool(&confirmationCodeRequired)); err != nil {
+		return false, fmt.Errorf("decode confirmation code requirement: %w", err)
+	}
+	return confirmationCodeRequired, nil
 }
 
 // endregion
@@ -86,7 +92,7 @@ type LoadBoundProfilePackageRequest struct {
 }
 
 func (r *LoadBoundProfilePackageRequest) MarshalBERTLV() (*bertlv.TLV, error) {
-	if !r.BoundProfilePackage.Tag.If(bertlv.ContextSpecific, bertlv.Constructed, 54) {
+	if r == nil || r.BoundProfilePackage == nil || !r.BoundProfilePackage.Tag.If(bertlv.ContextSpecific, bertlv.Constructed, 54) {
 		return nil, errors.New("expected a BoundProfilePackage")
 	}
 	return r.BoundProfilePackage, nil
@@ -249,20 +255,23 @@ func (r *ListNotificationRequest) CardResponse() *ListNotificationResponse {
 }
 
 func (r *ListNotificationRequest) MarshalBERTLV() (*bertlv.TLV, error) {
-	request := bertlv.NewChildrenIter(bertlv.ContextSpecific.Constructed(40), func(yield func(*bertlv.TLV) bool) {
-		if len(r.Filter) == 0 {
-			return
-		}
-		yield(mustMarshalValue(bertlv.MarshalValue(
-			bertlv.ContextSpecific.Primitive(1),
-			primitive.MarshalBitString([]bool{
-				r.Filter[NotificationEventInstall],
-				r.Filter[NotificationEventEnable],
-				r.Filter[NotificationEventDisable],
-				r.Filter[NotificationEventDelete],
-			}),
-		)))
-	})
+	request := bertlv.NewChildren(bertlv.ContextSpecific.Constructed(40))
+	if len(r.Filter) == 0 {
+		return request, nil
+	}
+	filter, err := bertlv.MarshalValue(
+		bertlv.ContextSpecific.Primitive(1),
+		primitive.MarshalBitString([]bool{
+			r.Filter[NotificationEventInstall],
+			r.Filter[NotificationEventEnable],
+			r.Filter[NotificationEventDisable],
+			r.Filter[NotificationEventDelete],
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("marshal notification filter: %w", err)
+	}
+	request.Children = append(request.Children, filter)
 	return request, nil
 }
 
@@ -371,9 +380,13 @@ func (r *NotificationSentRequest) CardResponse() *NotificationSentResponse {
 }
 
 func (r *NotificationSentRequest) MarshalBERTLV() (*bertlv.TLV, error) {
+	sequenceNumber, err := bertlv.MarshalValue(bertlv.ContextSpecific.Primitive(0), &r.SequenceNumber)
+	if err != nil {
+		return nil, fmt.Errorf("marshal notification sequence number: %w", err)
+	}
 	request := bertlv.NewChildren(
 		bertlv.ContextSpecific.Constructed(48),
-		mustMarshalValue(bertlv.MarshalValue(bertlv.ContextSpecific.Primitive(0), &r.SequenceNumber)),
+		sequenceNumber,
 	)
 	return request, nil
 }

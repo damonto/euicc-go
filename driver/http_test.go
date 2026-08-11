@@ -30,7 +30,9 @@ func (f *fakeHTTPTransport) RoundTrip(request *http.Request) (*http.Response, er
 			return nil, err
 		}
 		f.requestBody = body
-		_ = request.Body.Close()
+		if err := request.Body.Close(); err != nil {
+			return nil, err
+		}
 	}
 	if f.err != nil {
 		return nil, f.err
@@ -82,7 +84,9 @@ func TestLoggingRoundTripperHandlesNilBodyWithoutMutatingRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RoundTrip() error = %v", err)
 	}
-	_ = response.Body.Close()
+	if err := response.Body.Close(); err != nil {
+		t.Fatalf("response.Body.Close() error = %v", err)
+	}
 	if request.URL.Host != "exa mple.com" {
 		t.Fatalf("RoundTrip() mutated original host to %q", request.URL.Host)
 	}
@@ -116,7 +120,9 @@ func TestLoggingRoundTripperLogsAndRestoresRawBodies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadAll(response.Body) error = %v", err)
 	}
-	_ = response.Body.Close()
+	if err := response.Body.Close(); err != nil {
+		t.Fatalf("response.Body.Close() error = %v", err)
+	}
 	if !requestBody.closed {
 		t.Fatal("RoundTrip() did not close original request body")
 	}

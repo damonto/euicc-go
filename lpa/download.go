@@ -233,13 +233,20 @@ func (c *Client) authenticateClient(ac *ActivationCode) (*sgp22.ES9AuthenticateC
 	if err != nil {
 		return response, nil, false, err
 	}
-	return response, metadata, c.confirmationCodeRequired(response.Signed2), nil
+	confirmationCodeRequired, err := c.confirmationCodeRequired(response.Signed2)
+	if err != nil {
+		return response, nil, false, err
+	}
+	return response, metadata, confirmationCodeRequired, nil
 }
 
-func (c *Client) confirmationCodeRequired(tlv *bertlv.TLV) bool {
+func (c *Client) confirmationCodeRequired(tlv *bertlv.TLV) (bool, error) {
+	field := tlv.First(bertlv.Universal.Primitive(1))
 	var required bool
-	_ = tlv.First(bertlv.Universal.Primitive(1)).UnmarshalValue(primitive.UnmarshalBool(&required))
-	return required
+	if err := field.UnmarshalValue(primitive.UnmarshalBool(&required)); err != nil {
+		return false, fmt.Errorf("decode confirmation code requirement: %w", err)
+	}
+	return required, nil
 }
 
 func (c *Client) profileMetadata(tlv *bertlv.TLV) (*sgp22.ProfileInfo, error) {

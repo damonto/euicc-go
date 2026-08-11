@@ -53,8 +53,12 @@ func InvokeHTTP[I HTTPRequest[O], O HTTPResponse](client HTTPClient, address *ur
 	if err := client.SendRequest(request.URL(address), request, response); err != nil {
 		return response, err
 	}
-	if !response.FunctionExecutionStatus().ExecutedSuccess() {
-		return response, errors.New(response.FunctionExecutionStatus().StatusCodeData.Error())
+	status := response.FunctionExecutionStatus()
+	if status.ExecutedSuccess() {
+		return response, nil
 	}
-	return response, nil
+	if status == nil || status.StatusCodeData == nil {
+		return response, errors.New("missing function execution status")
+	}
+	return response, errors.New(status.StatusCodeData.Error())
 }

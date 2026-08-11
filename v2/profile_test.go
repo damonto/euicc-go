@@ -1,49 +1,64 @@
 package sgp22
 
 import (
+	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/damonto/euicc-go/bertlv"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestProfileInfoUnmarshalAllowsMissingOptionalFields(t *testing.T) {
 	tlv := bertlv.NewChildren(bertlv.Private.Constructed(3))
 	profile := new(ProfileInfo)
 
-	require.NoError(t, profile.UnmarshalBERTLV(tlv))
-
-	assert.Nil(t, profile.ICCID)
-	assert.Nil(t, profile.ISDPAID)
-	assert.Equal(t, ProfileDisabled, profile.ProfileState)
-	assert.Empty(t, profile.ProfileNickname)
-	assert.Empty(t, profile.ServiceProviderName)
-	assert.Empty(t, profile.ProfileName)
-	assert.Nil(t, profile.Icon)
-	assert.Equal(t, ProfileClassProvisioning, profile.ProfileClass)
-	assert.Nil(t, profile.ProfileOwner.PLMN)
-	assert.Nil(t, profile.NotificationConfigurationInfo)
-	assert.Equal(t, ProfilePolicyRules{}, profile.ProfilePolicyRules)
+	if err := profile.UnmarshalBERTLV(tlv); err != nil {
+		t.Fatalf("UnmarshalBERTLV() error = %v", err)
+	}
+	if profile.ICCID != nil || profile.ISDPAID != nil || profile.Icon != nil || profile.ProfileOwner.PLMN != nil || profile.NotificationConfigurationInfo != nil {
+		t.Errorf("optional slice fields were populated: %#v", profile)
+	}
+	if profile.ProfileState != ProfileDisabled || profile.ProfileClass != ProfileClassProvisioning {
+		t.Errorf("profile defaults = state:%v class:%v", profile.ProfileState, profile.ProfileClass)
+	}
+	if profile.ProfileNickname != "" || profile.ServiceProviderName != "" || profile.ProfileName != "" {
+		t.Errorf("optional names were populated: %#v", profile)
+	}
+	if profile.ProfilePolicyRules != (ProfilePolicyRules{}) {
+		t.Errorf("ProfilePolicyRules = %#v, want zero value", profile.ProfilePolicyRules)
+	}
 }
 
 func TestProfileInfoUnmarshalAuthenticateClientProfileMetadata(t *testing.T) {
 	var tlv bertlv.TLV
-	require.NoError(t, tlv.UnmarshalText([]byte("vyWBjVoKmFgyJCBCSCZpZJEGQ01MSU5LkgdDTUlfR0RTthowGIACBHCBEmNvbnN1bWVyLnJzcC53b3JsZLcdgANU9CGBCv////////////+CCv////////////+/djLiMOEiwSA6yVumdHCV8I0+WJoSqtB4vuLOqh4/PnGVvchLJYeB2OMK2wgAAAAAAAAAAQ==")))
+	if err := tlv.UnmarshalText([]byte("vyWBjVoKmFgyJCBCSCZpZJEGQ01MSU5LkgdDTUlfR0RTthowGIACBHCBEmNvbnN1bWVyLnJzcC53b3JsZLcdgANU9CGBCv////////////+CCv////////////+/djLiMOEiwSA6yVumdHCV8I0+WJoSqtB4vuLOqh4/PnGVvchLJYeB2OMK2wgAAAAAAAAAAQ==")); err != nil {
+		t.Fatalf("TLV.UnmarshalText() error = %v", err)
+	}
 	profile := new(ProfileInfo)
 
-	require.NoError(t, profile.UnmarshalBERTLV(&tlv))
-
-	assert.Equal(t, "89852342022484629646", profile.ICCID.String())
-	assert.Equal(t, "CMI_GDS", profile.ProfileName)
-	assert.Equal(t, "CMLINK", profile.ServiceProviderName)
-	require.Len(t, profile.NotificationConfigurationInfo, 1)
-	assert.Equal(t, []NotificationEvent{
+	if err := profile.UnmarshalBERTLV(&tlv); err != nil {
+		t.Fatalf("UnmarshalBERTLV() error = %v", err)
+	}
+	if got, want := profile.ICCID.String(), "89852342022484629646"; got != want {
+		t.Errorf("ICCID = %q, want %q", got, want)
+	}
+	if profile.ProfileName != "CMI_GDS" || profile.ServiceProviderName != "CMLINK" {
+		t.Errorf("profile names = %q, %q", profile.ProfileName, profile.ServiceProviderName)
+	}
+	if len(profile.NotificationConfigurationInfo) != 1 {
+		t.Fatalf("notification configuration count = %d, want 1", len(profile.NotificationConfigurationInfo))
+	}
+	wantEvents := []NotificationEvent{
 		NotificationEventEnable,
 		NotificationEventDisable,
 		NotificationEventDelete,
-	}, profile.NotificationConfigurationInfo[0].ProfileManagementOperations)
-	assert.Equal(t, "consumer.rsp.world", profile.NotificationConfigurationInfo[0].Address)
+	}
+	if got := profile.NotificationConfigurationInfo[0].ProfileManagementOperations; !reflect.DeepEqual(got, wantEvents) {
+		t.Errorf("profile operations = %v, want %v", got, wantEvents)
+	}
+	if got, want := profile.NotificationConfigurationInfo[0].Address, "consumer.rsp.world"; got != want {
+		t.Errorf("notification address = %q, want %q", got, want)
+	}
 }
 
 func TestProfileInfoUnmarshalAdditionalOptionalFields(t *testing.T) {
@@ -56,15 +71,19 @@ func TestProfileInfoUnmarshalAdditionalOptionalFields(t *testing.T) {
 	)
 	profile := new(ProfileInfo)
 
-	require.NoError(t, profile.UnmarshalBERTLV(tlv))
-
-	assert.Equal(t, ProfileIconTypePNG, profile.IconType)
-	assert.Equal(t, ProfilePolicyRules{
+	if err := profile.UnmarshalBERTLV(tlv); err != nil {
+		t.Fatalf("UnmarshalBERTLV() error = %v", err)
+	}
+	wantRules := ProfilePolicyRules{
 		DisablingNotAllowed: true,
 		DeletionNotAllowed:  true,
-	}, profile.ProfilePolicyRules)
-	assert.NotNil(t, profile.SMDPProprietaryData)
-	assert.NotNil(t, profile.ServiceSpecificData)
+	}
+	if profile.IconType != ProfileIconTypePNG || profile.ProfilePolicyRules != wantRules {
+		t.Errorf("optional fields = icon:%v rules:%#v", profile.IconType, profile.ProfilePolicyRules)
+	}
+	if profile.SMDPProprietaryData == nil || profile.ServiceSpecificData == nil {
+		t.Error("optional proprietary data fields are nil")
+	}
 }
 
 func TestProfileInfoUnmarshalOptionalProfileClassAllowsSignExtendedInt(t *testing.T) {
@@ -74,18 +93,23 @@ func TestProfileInfoUnmarshalOptionalProfileClassAllowsSignExtendedInt(t *testin
 	)
 	profile := new(ProfileInfo)
 
-	require.NoError(t, profile.UnmarshalBERTLV(tlv))
-
-	assert.Equal(t, ProfileClassProvisioning, profile.ProfileClass)
+	if err := profile.UnmarshalBERTLV(tlv); err != nil {
+		t.Fatalf("UnmarshalBERTLV() error = %v", err)
+	}
+	if profile.ProfileClass != ProfileClassProvisioning {
+		t.Errorf("ProfileClass = %v, want provisioning", profile.ProfileClass)
+	}
 }
 
 func TestOperatorIdShortPLMNDoesNotPanic(t *testing.T) {
 	operator := OperatorId{PLMN: []byte{0x13}}
 
-	assert.NotPanics(t, func() {
-		assert.Empty(t, operator.MCC())
-		assert.Empty(t, operator.MNC())
-	})
+	if got := operator.MCC(); got != "" {
+		t.Errorf("MCC() = %q, want empty", got)
+	}
+	if got := operator.MNC(); got != "" {
+		t.Errorf("MNC() = %q, want empty", got)
+	}
 }
 
 func TestNotificationConfigurationInfoUnmarshal(t *testing.T) {
@@ -99,11 +123,18 @@ func TestNotificationConfigurationInfoUnmarshal(t *testing.T) {
 	)
 	info := new(NotificationConfigurationInfo)
 
-	require.NoError(t, info.UnmarshalBERTLV(tlv))
-
-	require.Len(t, *info, 1)
-	assert.Equal(t, []NotificationEvent{NotificationEventInstall}, (*info)[0].ProfileManagementOperations)
-	assert.Equal(t, "example.com", (*info)[0].Address)
+	if err := info.UnmarshalBERTLV(tlv); err != nil {
+		t.Fatalf("UnmarshalBERTLV() error = %v", err)
+	}
+	if len(*info) != 1 {
+		t.Fatalf("notification configuration count = %d, want 1", len(*info))
+	}
+	if got, want := (*info)[0].ProfileManagementOperations, []NotificationEvent{NotificationEventInstall}; !reflect.DeepEqual(got, want) {
+		t.Errorf("profile operations = %v, want %v", got, want)
+	}
+	if got, want := (*info)[0].Address, "example.com"; got != want {
+		t.Errorf("address = %q, want %q", got, want)
+	}
 }
 
 func TestNotificationConfigurationInfoUnmarshalMissingFieldDoesNotPanic(t *testing.T) {
@@ -116,5 +147,7 @@ func TestNotificationConfigurationInfoUnmarshalMissingFieldDoesNotPanic(t *testi
 	)
 	info := new(NotificationConfigurationInfo)
 
-	require.ErrorIs(t, info.UnmarshalBERTLV(tlv), ErrUnexpectedTag)
+	if err := info.UnmarshalBERTLV(tlv); !errors.Is(err, ErrUnexpectedTag) {
+		t.Errorf("UnmarshalBERTLV() error = %v, want unexpected tag", err)
+	}
 }

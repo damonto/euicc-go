@@ -59,7 +59,11 @@ func (t *transmitter) Transmit(request bertlv.Marshaler, response bertlv.Unmarsh
 	if err != nil {
 		return err
 	}
-	bs, err := t.TransmitRaw(req.Bytes())
+	bs, err := req.Bytes()
+	if err != nil {
+		return err
+	}
+	bs, err = t.TransmitRaw(bs)
 	if err != nil {
 		return err
 	}
@@ -143,7 +147,6 @@ func (t *cardTransmitter) exchange(command []byte) ([]byte, error) {
 	var responseData bytes.Buffer
 	request := wwanapdu.Request{CLA: 0x80, INS: 0xE2}
 	var response wwanapdu.Response
-	var err error
 	blockCount := 0
 	if len(command) > 0 {
 		blockCount = 1 + (len(command)-1)/t.mss
@@ -159,20 +162,18 @@ func (t *cardTransmitter) exchange(command []byte) ([]byte, error) {
 		if block == blockCount-1 {
 			request.P1 = 0x91
 		}
+		var err error
 		if response, err = t.transmitAPDU(&request); err != nil {
-			break
+			return nil, err
 		}
 		block++
 		if !response.HasMore() {
-			responseData.Write(response.Data())
+			responseData.Write(response.Data()) // bytes.Buffer.Write always returns a nil error.
 			continue
 		}
-		if err = t.readCommandResponse(&responseData, response.SW2()); err != nil {
-			break
+		if err := t.readCommandResponse(&responseData, response.SW2()); err != nil {
+			return nil, err
 		}
-	}
-	if err != nil {
-		return nil, err
 	}
 	return responseData.Bytes(), nil
 }
@@ -225,7 +226,7 @@ func (t *cardTransmitter) readCommandResponse(responseData *bytes.Buffer, le byt
 		if response, err = t.transmitAPDU(&request); err != nil {
 			return err
 		}
-		responseData.Write(response.Data())
+		responseData.Write(response.Data()) // bytes.Buffer.Write always returns a nil error.
 		if !response.HasMore() {
 			break
 		}

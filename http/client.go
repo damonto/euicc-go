@@ -28,7 +28,7 @@ func (c *Client) NewRequest(u *url.URL, request any) (*http.Request, error) {
 	return httpRequest, nil
 }
 
-func (c *Client) SendRequest(u *url.URL, request, response any) error {
+func (c *Client) SendRequest(u *url.URL, request, response any) (err error) {
 	httpRequest, err := c.NewRequest(u, request)
 	if err != nil {
 		return err
@@ -37,7 +37,9 @@ func (c *Client) SendRequest(u *url.URL, request, response any) error {
 	if err != nil {
 		return err
 	}
-	defer httpResponse.Body.Close()
+	defer func() {
+		err = errors.Join(err, httpResponse.Body.Close())
+	}()
 	if httpResponse.StatusCode > 299 {
 		return fmt.Errorf("unexpected status code: %d", httpResponse.StatusCode)
 	}

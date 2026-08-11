@@ -2,8 +2,6 @@ package sgp22
 
 import (
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestLoadBoundProfilePackageError(t *testing.T) {
@@ -12,9 +10,15 @@ func TestLoadBoundProfilePackageError(t *testing.T) {
 		ErrorReason:  BPPErrorReasonPPRNotAllowed,
 	}
 
-	assert.Equal(t, "loadProfileElements", err.CommandID())
-	assert.Equal(t, "pprNotAllowed", err.String())
-	assert.Equal(t, "loadProfileElements,pprNotAllowed", err.Error())
+	if got, want := err.CommandID(), "loadProfileElements"; got != want {
+		t.Errorf("CommandID() = %q, want %q", got, want)
+	}
+	if got, want := err.String(), "pprNotAllowed"; got != want {
+		t.Errorf("String() = %q, want %q", got, want)
+	}
+	if got, want := err.Error(), "loadProfileElements,pprNotAllowed"; got != want {
+		t.Errorf("Error() = %q, want %q", got, want)
+	}
 }
 
 func TestLoadBoundProfilePackageErrorUnknownCommand(t *testing.T) {
@@ -23,6 +27,10 @@ func TestLoadBoundProfilePackageErrorUnknownCommand(t *testing.T) {
 		ErrorReason:  BPPErrorReasonPPRNotAllowed,
 	}
 
-	assert.Equal(t, "unknown(99)", err.CommandID())
-	assert.Equal(t, "unknown(99),pprNotAllowed", err.Error())
+	if got, want := err.CommandID(), "unknown(99)"; got != want {
+		t.Errorf("CommandID() = %q, want %q", got, want)
+	}
+	if got, want := err.Error(), "unknown(99),pprNotAllowed"; got != want {
+		t.Errorf("Error() = %q, want %q", got, want)
+	}
 }

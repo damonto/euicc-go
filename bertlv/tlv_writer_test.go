@@ -1,22 +1,29 @@
 package bertlv
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
+	"reflect"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestTLV_Len(t *testing.T) {
 	var tlv TLV
 	tlv.Tag = Primitive.ContextSpecific(0)
 	tlv.Value = make([]byte, 127)
-	assert.Equal(t, 129, tlv.Len())
+	if got := tlv.Len(); got != 129 {
+		t.Errorf("TLV.Len() = %d, want 129", got)
+	}
 	tlv.Value = make([]byte, 255)
-	assert.Equal(t, 258, tlv.Len())
+	if got := tlv.Len(); got != 258 {
+		t.Errorf("TLV.Len() = %d, want 258", got)
+	}
 	tlv.Value = make([]byte, 256)
-	assert.Equal(t, 260, tlv.Len())
+	if got := tlv.Len(); got != 260 {
+		t.Errorf("TLV.Len() = %d, want 260", got)
+	}
 }
 
 func TestTLV_WriteTo_Error(t *testing.T) {
@@ -29,23 +36,49 @@ func TestTLV_WriteTo_Error(t *testing.T) {
 	var w io.Writer
 	w = &limitWriter{Limited: 0}
 	_, err = tlv.WriteTo(w)
-	assert.ErrorIs(t, err, io.ErrClosedPipe)
+	if !errors.Is(err, io.ErrClosedPipe) {
+		t.Errorf("TLV.WriteTo(limit 0) error = %v, want closed pipe", err)
+	}
 	w = &limitWriter{Limited: 1}
 	_, err = tlv.WriteTo(w)
-	assert.ErrorIs(t, err, io.ErrClosedPipe)
+	if !errors.Is(err, io.ErrClosedPipe) {
+		t.Errorf("TLV.WriteTo(limit 1) error = %v, want closed pipe", err)
+	}
 	w = &limitWriter{Limited: 3}
 	_, err = tlv.WriteTo(w)
-	assert.ErrorIs(t, err, io.ErrClosedPipe)
+	if !errors.Is(err, io.ErrClosedPipe) {
+		t.Errorf("TLV.WriteTo(limit 3) error = %v, want closed pipe", err)
+	}
 }
 
 func TestTLV_MarshalText(t *testing.T) {
 	tlv := NewValue(Primitive.ContextSpecific(0), []byte{0xff})
 	text, err := tlv.MarshalText()
-	assert.NoError(t, err)
-	assert.Equal(t, []byte("gAH/"), text)
+	if err != nil {
+		t.Fatalf("TLV.MarshalText() error = %v", err)
+	}
+	if want := []byte("gAH/"); !bytes.Equal(text, want) {
+		t.Errorf("TLV.MarshalText() = %q, want %q", text, want)
+	}
 	err = tlv.UnmarshalText(text)
-	assert.NoError(t, err)
-	assert.Equal(t, []byte{0xff}, tlv.Value)
+	if err != nil {
+		t.Fatalf("TLV.UnmarshalText() error = %v", err)
+	}
+	if want := []byte{0xff}; !bytes.Equal(tlv.Value, want) {
+		t.Errorf("TLV.Value = % X, want % X", tlv.Value, want)
+	}
+}
+
+func TestTLVMarshalTextFlushesPadding(t *testing.T) {
+	tlv := NewValue(Primitive.ContextSpecific(0), []byte{0xff, 0xee})
+
+	text, err := tlv.MarshalText()
+	if err != nil {
+		t.Fatalf("TLV.MarshalText() error = %v", err)
+	}
+	if got, want := string(text), "gAL/7g=="; got != want {
+		t.Errorf("TLV.MarshalText() = %q, want %q", got, want)
+	}
 }
 
 func TestTLV_MarshalBinary(t *testing.T) {
@@ -54,19 +87,33 @@ func TestTLV_MarshalBinary(t *testing.T) {
 		NewValue(Primitive.Universal(0), []byte{0xff}),
 	)
 	binary, err := tlv.MarshalBinary()
-	assert.NoError(t, err)
-	assert.Equal(t, []byte{0xa0, 0x03, 0x00, 0x01, 0xff}, binary)
+	if err != nil {
+		t.Fatalf("TLV.MarshalBinary() error = %v", err)
+	}
+	if want := []byte{0xa0, 0x03, 0x00, 0x01, 0xff}; !bytes.Equal(binary, want) {
+		t.Errorf("TLV.MarshalBinary() = % X, want % X", binary, want)
+	}
 	err = tlv.UnmarshalBinary(binary)
-	assert.NoError(t, err)
-	assert.Equal(t, []byte{0xff}, tlv.Children[0].Value)
+	if err != nil {
+		t.Fatalf("TLV.UnmarshalBinary() error = %v", err)
+	}
+	if want := []byte{0xff}; !bytes.Equal(tlv.Children[0].Value, want) {
+		t.Errorf("child value = % X, want % X", tlv.Children[0].Value, want)
+	}
 }
 
 func TestTLV_MarshalJSON(t *testing.T) {
 	tlv := NewValue(Primitive.ContextSpecific(0), []byte{0xff})
 	encoded, err := json.Marshal(tlv)
-	assert.NoError(t, err)
-	assert.Equal(t, `"gAH/"`, string(encoded))
-	assert.NoError(t, json.Unmarshal(encoded, &tlv))
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	if got, want := string(encoded), `"gAH/"`; got != want {
+		t.Errorf("json.Marshal() = %q, want %q", got, want)
+	}
+	if err := json.Unmarshal(encoded, &tlv); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
 }
 
 func TestTLV_MarshalBERTLV(t *testing.T) {
@@ -75,9 +122,23 @@ func TestTLV_MarshalBERTLV(t *testing.T) {
 		NewValue(Primitive.Application(1), []byte{0x01}),
 	)
 	cloned, err := original.MarshalBERTLV()
-	assert.NoError(t, err)
-	assert.Equal(t, original, cloned)
-	assert.Equal(t, original.Bytes(), cloned.Bytes())
+	if err != nil {
+		t.Fatalf("TLV.MarshalBERTLV() error = %v", err)
+	}
+	if !reflect.DeepEqual(cloned, original) {
+		t.Errorf("TLV.MarshalBERTLV() = %#v, want %#v", cloned, original)
+	}
+	originalBytes, err := original.Bytes()
+	if err != nil {
+		t.Fatalf("original.Bytes() error = %v", err)
+	}
+	clonedBytes, err := cloned.Bytes()
+	if err != nil {
+		t.Fatalf("cloned.Bytes() error = %v", err)
+	}
+	if !bytes.Equal(clonedBytes, originalBytes) {
+		t.Errorf("cloned.Bytes() = % X, want % X", clonedBytes, originalBytes)
+	}
 }
 
 func TestTLV_Clone(t *testing.T) {
@@ -88,7 +149,17 @@ func TestTLV_Clone(t *testing.T) {
 		NewValue(Primitive.Application(1), []byte{0x01}),
 	)
 	cloned := original.Clone()
-	assert.Equal(t, original.Bytes(), cloned.Bytes())
+	originalBytes, err := original.Bytes()
+	if err != nil {
+		t.Fatalf("original.Bytes() error = %v", err)
+	}
+	clonedBytes, err := cloned.Bytes()
+	if err != nil {
+		t.Fatalf("cloned.Bytes() error = %v", err)
+	}
+	if !bytes.Equal(clonedBytes, originalBytes) {
+		t.Errorf("cloned.Bytes() = % X, want % X", clonedBytes, originalBytes)
+	}
 }
 
 func TestTLV_LargeValue(t *testing.T) {
@@ -97,25 +168,31 @@ func TestTLV_LargeValue(t *testing.T) {
 		NewValue(Primitive.ContextSpecific(0), make([]byte, 0x10000)),
 	)
 	_, err := tlv.WriteTo(io.Discard)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatalf("TLV.WriteTo() error = %v", err)
+	}
 }
 
-func TestTLV_InvalidConstructedTag(t *testing.T) {
+func TestTLVInvalidConstructedTag(t *testing.T) {
 	tlv := NewChildren(
 		Constructed.ContextSpecific(0),
 		NewValue(Primitive.ContextSpecific(1), []byte{0x01}),
 	)
 	tlv.Tag = Primitive.ContextSpecific(0)
-	assert.Panics(t, func() { tlv.Bytes() })
+	if _, err := tlv.Bytes(); err == nil {
+		t.Error("TLV.Bytes() error = nil for primitive tag with children")
+	}
 }
 
-func TestTLV_InvalidValueTag(t *testing.T) {
+func TestTLVInvalidValueTag(t *testing.T) {
 	tlv := NewValue(
 		Primitive.ContextSpecific(0),
 		[]byte{0xff},
 	)
 	tlv.Tag = Constructed.ContextSpecific(0)
-	assert.Panics(t, func() { tlv.Bytes() })
+	if _, err := tlv.Bytes(); err == nil {
+		t.Error("TLV.Bytes() error = nil for constructed tag with value")
+	}
 }
 
 type limitWriter struct {

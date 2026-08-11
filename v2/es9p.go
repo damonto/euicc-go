@@ -33,7 +33,7 @@ type ES9InitiateAuthenticationResponse struct {
 }
 
 func (r *ES9InitiateAuthenticationResponse) FunctionExecutionStatus() *ExecutionStatus {
-	return r.Header.ExecutionStatus
+	return functionExecutionStatus(r.Header)
 }
 
 func (r *ES9InitiateAuthenticationResponse) CardRequest() *AuthenticateServerRequest {
@@ -82,7 +82,7 @@ type ES9BoundProfilePackageResponse struct {
 }
 
 func (r *ES9BoundProfilePackageResponse) FunctionExecutionStatus() *ExecutionStatus {
-	return r.Header.ExecutionStatus
+	return functionExecutionStatus(r.Header)
 }
 
 func (r *ES9BoundProfilePackageResponse) CardRequest() *LoadBoundProfilePackageRequest {
@@ -162,15 +162,7 @@ type ES9AuthenticateClientResponse struct {
 }
 
 func (r *ES9AuthenticateClientResponse) FunctionExecutionStatus() *ExecutionStatus {
-	if r.Header == nil || r.Header.ExecutionStatus == nil {
-		return &ExecutionStatus{
-			Status: "Failed",
-			StatusCodeData: &StatusCodeData{
-				Message: "missing function execution status",
-			},
-		}
-	}
-	return r.Header.ExecutionStatus
+	return functionExecutionStatus(r.Header)
 }
 
 func (r *ES9AuthenticateClientResponse) CardRequest() *PrepareDownloadRequest {
@@ -250,7 +242,7 @@ type ES9CancelSessionResponse struct {
 }
 
 func (r *ES9CancelSessionResponse) FunctionExecutionStatus() *ExecutionStatus {
-	return r.Header.ExecutionStatus
+	return functionExecutionStatus(r.Header)
 }
 
 // endregion

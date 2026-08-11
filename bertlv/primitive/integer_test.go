@@ -1,7 +1,7 @@
 package primitive
 
 import (
-	"github.com/stretchr/testify/assert"
+	"bytes"
 	"math"
 	"testing"
 )
@@ -40,26 +40,50 @@ func TestInteger(t *testing.T) {
 
 func TestIntegerError(t *testing.T) {
 	var value int8
-	assert.Error(t, UnmarshalInt(&value).UnmarshalBinary(nil))
-	assert.NoError(t, UnmarshalInt(&value).UnmarshalBinary([]byte{0x00, 0x7f}))
-	assert.Equal(t, int8(127), value)
-	assert.NoError(t, UnmarshalInt(&value).UnmarshalBinary([]byte{0xff, 0x80}))
-	assert.Equal(t, int8(-128), value)
-	assert.NoError(t, UnmarshalInt(&value).UnmarshalBinary([]byte{0xff, 0xff}))
-	assert.Equal(t, int8(-1), value)
-	assert.Error(t, UnmarshalInt(&value).UnmarshalBinary([]byte{0x00, 0x80}))
-	assert.Error(t, UnmarshalInt(&value).UnmarshalBinary([]byte{0xff, 0x7f}))
+	if err := UnmarshalInt(&value).UnmarshalBinary(nil); err == nil {
+		t.Error("UnmarshalInt(nil) error = nil")
+	}
+	for _, test := range []struct {
+		input []byte
+		want  int8
+	}{
+		{[]byte{0x00, 0x7f}, 127},
+		{[]byte{0xff, 0x80}, -128},
+		{[]byte{0xff, 0xff}, -1},
+	} {
+		if err := UnmarshalInt(&value).UnmarshalBinary(test.input); err != nil {
+			t.Errorf("UnmarshalInt(% X) error = %v", test.input, err)
+		} else if value != test.want {
+			t.Errorf("UnmarshalInt(% X) = %d, want %d", test.input, value, test.want)
+		}
+	}
+	for _, input := range [][]byte{{0x00, 0x80}, {0xff, 0x7f}} {
+		if err := UnmarshalInt(&value).UnmarshalBinary(input); err == nil {
+			t.Errorf("UnmarshalInt(% X) error = nil", input)
+		}
+	}
 }
 
 func testInt[T signedInt](t *testing.T, fixtures map[T][][]byte) {
+	t.Helper()
 	for expected, variants := range fixtures {
 		var value T
 		for _, variant := range variants {
-			assert.NoError(t, UnmarshalInt(&value).UnmarshalBinary(variant))
-			assert.Equal(t, expected, value, "UnmarshalBinary")
+			if err := UnmarshalInt(&value).UnmarshalBinary(variant); err != nil {
+				t.Errorf("UnmarshalInt(% X) error = %v", variant, err)
+				continue
+			}
+			if value != expected {
+				t.Errorf("UnmarshalInt(% X) = %v, want %v", variant, value, expected)
+			}
 		}
 		actual, err := MarshalInt(expected).MarshalBinary()
-		assert.NoError(t, err)
-		assert.Equal(t, variants[0], actual, "MarshalBinary")
+		if err != nil {
+			t.Errorf("MarshalInt(%v) error = %v", expected, err)
+			continue
+		}
+		if want := variants[0]; !bytes.Equal(actual, want) {
+			t.Errorf("MarshalInt(%v) = % X, want % X", expected, actual, want)
+		}
 	}
 }

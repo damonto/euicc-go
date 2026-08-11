@@ -14,16 +14,11 @@ import (
 
 const defaultTimeout = 30 * time.Second
 
-// CCID is a PC/SC smart card channel.
-type CCID interface {
-	driver.SmartCardChannel
-	ListReaders() ([]string, error)
-	SetReader(reader string) error
-}
+var _ driver.SmartCardChannel = (*Reader)(nil)
 
-// CCIDReader is a PC/SC smart card channel. Create one with New or
+// Reader is a PC/SC smart card channel. Create one with New or
 // NewWithReader. It is not safe for concurrent use.
-type CCIDReader struct {
+type Reader struct {
 	reader    string
 	channel   *iso7816.Channel
 	options   []iso7816.Option
@@ -32,20 +27,20 @@ type CCIDReader struct {
 }
 
 // New creates a CCID channel. Options configure its ISO 7816 operations.
-func New(options ...iso7816.Option) *CCIDReader {
+func New(options ...iso7816.Option) *Reader {
 	return NewWithReader("", options...)
 }
 
 // NewWithReader creates a CCID channel with reader preselected. Options
 // configure its ISO 7816 operations.
-func NewWithReader(reader string, options ...iso7816.Option) *CCIDReader {
-	return &CCIDReader{
+func NewWithReader(reader string, options ...iso7816.Option) *Reader {
+	return &Reader{
 		reader:  reader,
 		options: slices.Clone(options),
 	}
 }
 
-func (c *CCIDReader) ListReaders() ([]string, error) {
+func (c *Reader) ListReaders() ([]string, error) {
 	if c.closed {
 		return nil, errors.New("ccid reader is closed")
 	}
@@ -59,7 +54,7 @@ func (c *CCIDReader) ListReaders() ([]string, error) {
 }
 
 // SetReader selects the reader used by Connect.
-func (c *CCIDReader) SetReader(reader string) error {
+func (c *Reader) SetReader(reader string) error {
 	if c.closed {
 		return errors.New("ccid reader is closed")
 	}
@@ -70,7 +65,7 @@ func (c *CCIDReader) SetReader(reader string) error {
 	return nil
 }
 
-func (c *CCIDReader) Connect() error {
+func (c *Reader) Connect() error {
 	if c.closed {
 		return errors.New("ccid reader is closed")
 	}
@@ -96,7 +91,7 @@ func (c *CCIDReader) Connect() error {
 	return nil
 }
 
-func (c *CCIDReader) Disconnect() error {
+func (c *Reader) Disconnect() error {
 	if c.closed {
 		return nil
 	}
@@ -108,7 +103,7 @@ func (c *CCIDReader) Disconnect() error {
 	return c.channel.Disconnect()
 }
 
-func (c *CCIDReader) Transmit(command []byte) ([]byte, error) {
+func (c *Reader) Transmit(command []byte) ([]byte, error) {
 	channel, err := c.smartCardChannel()
 	if err != nil {
 		return nil, err
@@ -116,7 +111,7 @@ func (c *CCIDReader) Transmit(command []byte) ([]byte, error) {
 	return channel.Transmit(command)
 }
 
-func (c *CCIDReader) OpenLogicalChannel(aid []byte) (byte, error) {
+func (c *Reader) OpenLogicalChannel(aid []byte) (byte, error) {
 	channel, err := c.smartCardChannel()
 	if err != nil {
 		return 0, err
@@ -124,7 +119,7 @@ func (c *CCIDReader) OpenLogicalChannel(aid []byte) (byte, error) {
 	return channel.OpenLogicalChannel(aid)
 }
 
-func (c *CCIDReader) CloseLogicalChannel(logicalChannel byte) error {
+func (c *Reader) CloseLogicalChannel(logicalChannel byte) error {
 	channel, err := c.smartCardChannel()
 	if err != nil {
 		return err
@@ -132,7 +127,7 @@ func (c *CCIDReader) CloseLogicalChannel(logicalChannel byte) error {
 	return channel.CloseLogicalChannel(logicalChannel)
 }
 
-func (c *CCIDReader) smartCardChannel() (*iso7816.Channel, error) {
+func (c *Reader) smartCardChannel() (*iso7816.Channel, error) {
 	if c.closed {
 		return nil, errors.New("ccid reader is closed")
 	}

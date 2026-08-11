@@ -5,12 +5,12 @@ import (
 )
 
 func TestSetReaderReturnsStateErrors(t *testing.T) {
-	reader := &CCIDReader{closed: true}
+	reader := &Reader{closed: true}
 	if err := reader.SetReader("reader"); err == nil {
 		t.Fatal("SetReader() error = nil, want closed reader error")
 	}
 
-	reader = &CCIDReader{connected: true}
+	reader = &Reader{connected: true}
 	if err := reader.SetReader("reader"); err == nil {
 		t.Fatal("SetReader() error = nil, want connected reader error")
 	}

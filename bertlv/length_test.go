@@ -3,8 +3,6 @@ package bertlv
 import (
 	"bytes"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestLength(t *testing.T) {
@@ -19,10 +17,24 @@ func TestLength(t *testing.T) {
 		0x10000: {0x83, 0x01, 0x00, 0x00},
 	}
 	for length, expected := range fixtures {
-		assert.Equal(t, expected, marshalLength(length))
+		got, err := marshalLength(length)
+		if err != nil {
+			t.Errorf("marshalLength(%d) error = %v", length, err)
+			continue
+		}
+		if !bytes.Equal(got, expected) {
+			t.Errorf("marshalLength(%d) = % X, want % X", length, got, expected)
+		}
 		value, err := readLength(bytes.NewReader(expected))
-		assert.Equal(t, length, value)
-		assert.NoError(t, err)
+		if err != nil {
+			t.Errorf("readLength(% X) error = %v", expected, err)
+		}
+		if value != length {
+			t.Errorf("readLength(% X) = %d, want %d", expected, value, length)
+		}
+	}
+	if _, err := marshalLength(0x1000000); err == nil {
+		t.Error("marshalLength(0x1000000) error = nil")
 	}
 }
 
@@ -40,6 +52,8 @@ func TestLength_Error(t *testing.T) {
 	var err error
 	for _, fixture := range fixtures {
 		_, err = readLength(bytes.NewReader(fixture.Length))
-		assert.EqualError(t, err, fixture.Error)
+		if err == nil || err.Error() != fixture.Error {
+			t.Errorf("readLength(% X) error = %v, want %q", fixture.Length, err, fixture.Error)
+		}
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/damonto/euicc-go/driver"
@@ -41,12 +42,9 @@ type Options struct {
 }
 
 func (opts *Options) validateAdminProtocolVersion() error {
-	// If the version starts with "v", remove it
-	if opts.AdminProtocolVersion[0] == 'v' {
-		opts.AdminProtocolVersion = opts.AdminProtocolVersion[1:]
-	}
+	opts.AdminProtocolVersion = strings.TrimPrefix(opts.AdminProtocolVersion, "v")
 	// Currently only v2.x.x is supported
-	if opts.AdminProtocolVersion[0] != '2' {
+	if !strings.HasPrefix(opts.AdminProtocolVersion, "2") {
 		return fmt.Errorf("unsupported admin protocol version: %s", opts.AdminProtocolVersion)
 	}
 	return nil
@@ -92,6 +90,9 @@ func (opts *Options) setDefaults() {
 
 // Normalize normalizes the options by setting default values and validating them.
 func (opts *Options) Normalize() error {
+	if opts == nil {
+		return errors.New("options are required")
+	}
 	opts.setDefaults()
 	return opts.validate()
 }
@@ -103,12 +104,16 @@ func New(opts *Options) (*Client, error) {
 	if err := opts.Normalize(); err != nil {
 		return nil, err
 	}
+	httpClient, err := driver.NewHTTPClient(opts.Logger, opts.Timeout)
+	if err != nil {
+		return nil, err
+	}
 	if c.transmitter, err = driver.NewTransmitter(opts.Logger, opts.Channel, opts.AID, opts.MSS); err != nil {
 		return nil, err
 	}
 	c.APDU = c.transmitter
 	c.HTTP = &http.Client{
-		Client:               driver.NewHTTPClient(opts.Logger, opts.Timeout),
+		Client:               httpClient,
 		AdminProtocolVersion: opts.AdminProtocolVersion,
 	}
 	return &c, nil

@@ -3,6 +3,7 @@ package sgp22
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/damonto/euicc-go/bertlv/primitive"
@@ -53,7 +54,10 @@ func binaryCodedDecimalEncode[T ~[]byte](value string) (T, error) {
 	if len(value)%2 != 0 {
 		value += "F"
 	}
-	id, _ := hex.DecodeString(value)
+	id, err := hex.DecodeString(value)
+	if err != nil {
+		return nil, fmt.Errorf("decode binary-coded decimal: %w", err)
+	}
 	for index := range id {
 		id[index] = (id[index]>>4)&0x0F | (id[index]<<4)&0xF0
 	}

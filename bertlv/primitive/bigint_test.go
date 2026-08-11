@@ -1,16 +1,24 @@
 package primitive
 
 import (
-	"github.com/stretchr/testify/assert"
+	"bytes"
 	"math/big"
 	"testing"
 )
 
 func TestBigInt(t *testing.T) {
 	var n big.Int
-	assert.NoError(t, UnmarshalBigInt(&n).UnmarshalBinary([]byte{0x7f}))
-	assert.Equal(t, int64(127), n.Int64())
+	if err := UnmarshalBigInt(&n).UnmarshalBinary([]byte{0x7f}); err != nil {
+		t.Fatalf("UnmarshalBigInt() error = %v", err)
+	}
+	if got := n.Int64(); got != 127 {
+		t.Errorf("UnmarshalBigInt() = %d, want 127", got)
+	}
 	data, err := MarshalBigInt(&n).MarshalBinary()
-	assert.NoError(t, err)
-	assert.Equal(t, []byte{0x7f}, data)
+	if err != nil {
+		t.Fatalf("MarshalBigInt() error = %v", err)
+	}
+	if want := []byte{0x7f}; !bytes.Equal(data, want) {
+		t.Errorf("MarshalBigInt() = % X, want % X", data, want)
+	}
 }

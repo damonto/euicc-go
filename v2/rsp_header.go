@@ -1,6 +1,9 @@
 package sgp22
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 type Header struct {
 	ExecutionStatus *ExecutionStatus `json:"functionExecutionStatus,omitempty"`
@@ -9,10 +12,26 @@ type Header struct {
 }
 
 func (h Header) Error() error {
-	if h.ExecutionStatus.ExecutedSuccess() {
+	status := functionExecutionStatus(&h)
+	if status.ExecutedSuccess() {
 		return nil
 	}
-	return h.ExecutionStatus.StatusCodeData
+	if status.StatusCodeData == nil {
+		return errors.New("missing status code data")
+	}
+	return status.StatusCodeData
+}
+
+func functionExecutionStatus(header *Header) *ExecutionStatus {
+	if header != nil && header.ExecutionStatus != nil {
+		return header.ExecutionStatus
+	}
+	return &ExecutionStatus{
+		Status: "Failed",
+		StatusCodeData: &StatusCodeData{
+			Message: "missing function execution status",
+		},
+	}
 }
 
 type ExecutionStatus struct {

@@ -86,12 +86,13 @@ func (l *LoggingRoundTripper) CloseIdleConnections() {
 
 // NewHTTPClient creates an HTTP client configured with the trusted eSIM root
 // certificates and raw debug logging. Logger must not be nil.
-func NewHTTPClient(logger *slog.Logger, timeout time.Duration) *http.Client {
-	return &http.Client{
-		Timeout: timeout,
-		Transport: NewLoggingRoundTripper(
-			rootci.TrustedRootCAs(),
-			logger,
-		),
+func NewHTTPClient(logger *slog.Logger, timeout time.Duration) (*http.Client, error) {
+	rootCAs, err := rootci.TrustedRootCAs()
+	if err != nil {
+		return nil, fmt.Errorf("load trusted root CAs: %w", err)
 	}
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: NewLoggingRoundTripper(rootCAs, logger),
+	}, nil
 }

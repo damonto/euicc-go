@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/damonto/euicc-go/bertlv"
@@ -15,60 +17,75 @@ import (
 
 func main() {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "euicc example: %v\n", err)
+		os.Exit(1)
+	}
+}
 
+func run() (err error) {
 	// ch, err := mbim.New(mbim.WithProxy("/dev/cdc-wdm0"), mbim.WithSlot(1), mbim.WithTimeout(30*time.Second))
 	// if err != nil {
-	// 	panic(err)
+	// 	return fmt.Errorf("open MBIM channel: %w", err)
 	// }
 	ch, err := qcom.NewQMI(qcom.WithProxy("/dev/cdc-wdm0"), qcom.WithSlot(1), qcom.WithTimeout(30*time.Second))
 	// ch, err := qcom.NewQRTR(qcom.WithSlot(1))
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("open QMI channel: %w", err)
 	}
 	// ch, err := at.New("/dev/ttyUSB7")
 	// if err != nil {
-	// 	panic(err)
+	// 	return fmt.Errorf("open AT channel: %w", err)
 	// }
 	// ch := ccid.New()
 	// reader, err := ch.ListReaders()
 	// if err != nil {
-	// 	panic(err)
+	// 	return fmt.Errorf("list CCID readers: %w", err)
 	// }
 	// if len(reader) == 0 {
-	// 	panic("No readers found")
+	// 	return errors.New("no CCID readers found")
 	// }
 	// fmt.Printf("Using reader: %s\n", reader[0])
 	// if err := ch.SetReader(reader[0]); err != nil {
-	// 	panic(err)
+	// 	return fmt.Errorf("select CCID reader: %w", err)
 	// }
 
 	client, err := lpa.New(&lpa.Options{
 		Channel: ch,
 	})
 	if err != nil {
-		fmt.Printf("Failed to create LPA client: %v\n", err)
-		return
+		return fmt.Errorf("create LPA client: %w", err)
 	}
-	defer client.Close()
+	defer func() {
+		err = errors.Join(err, client.Close())
+	}()
 
-	testEID(client)
+	if err := testEID(client); err != nil {
+		return err
+	}
 
-	// testDownload(client)
+	// if err := testDownload(client); err != nil {
+	// 	return err
+	// }
 
-	testListProfiles(client)
+	if err := testListProfiles(client); err != nil {
+		return err
+	}
 
-	// testDiscovery(client)
+	// return testDiscovery(client)
+	return nil
 }
 
-func testEID(client *lpa.Client) {
+func testEID(client *lpa.Client) error {
 	eid, err := client.EID()
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("read EID: %w", err)
 	}
 	fmt.Printf("EID: %X\n", eid)
+	return nil
 }
 
-func testDownload(client *lpa.Client) {
+func testDownload(client *lpa.Client) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -87,17 +104,18 @@ func testDownload(client *lpa.Client) {
 		OnEnterConfirmationCode: func() string { return "" },
 	})
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("download profile: %w", err)
 	}
 	if installResult != nil {
 		fmt.Println("install Result", installResult.ISDPAID(), installResult.Notification)
 	}
+	return nil
 }
 
-func testListProfiles(client *lpa.Client) {
+func testListProfiles(client *lpa.Client) error {
 	profiles, err := client.ListProfile(nil, []bertlv.Tag{sgp22.TagNotificationConfigurationInfo})
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("list profiles: %w", err)
 	}
 	for _, profile := range profiles {
 		// fmt.Printf("Profile: %s, ICCID: %s\n", profile.ProfileName, profile.ICCID)
@@ -105,70 +123,82 @@ func testListProfiles(client *lpa.Client) {
 			fmt.Printf("Address: %s, Operations %+v \n", n.Address, n.ProfileManagementOperations)
 		}
 	}
+	return nil
 }
 
-func testListNotifications(client *lpa.Client) {
+func testListNotifications(client *lpa.Client) error {
 	notifications, err := client.ListNotification()
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("list notifications: %w", err)
 	}
 	for _, notification := range notifications {
 		fmt.Printf("Sequence: %d, ICCID: %s, Operation: %d\n",
 			notification.SequenceNumber, notification.ICCID, notification.ProfileManagementOperation)
 	}
+	return nil
 }
 
-func testEnableProfile(client *lpa.Client) {
-	id, _ := sgp22.NewICCID("8944476500001224158")
+func testEnableProfile(client *lpa.Client) error {
+	id, err := sgp22.NewICCID("8944476500001224158")
+	if err != nil {
+		return fmt.Errorf("parse ICCID: %w", err)
+	}
 	if err := client.EnableProfile(id, true); err != nil {
-		fmt.Printf("Failed to enable profile: %v\n", err)
-	} else {
-		fmt.Println("Profile enabled successfully")
+		return fmt.Errorf("enable profile: %w", err)
 	}
+	fmt.Println("Profile enabled successfully")
+	return nil
 }
 
-func testDisableProfile(client *lpa.Client) {
-	id, _ := sgp22.NewICCID("8944476500001224158")
+func testDisableProfile(client *lpa.Client) error {
+	id, err := sgp22.NewICCID("8944476500001224158")
+	if err != nil {
+		return fmt.Errorf("parse ICCID: %w", err)
+	}
 	if err := client.DisableProfile(id, true); err != nil {
-		fmt.Printf("Failed to disable profile: %v\n", err)
-	} else {
-		fmt.Println("Profile disabled successfully")
+		return fmt.Errorf("disable profile: %w", err)
 	}
+	fmt.Println("Profile disabled successfully")
+	return nil
 }
 
-func testSendNotification(client *lpa.Client, sequenceNumber sgp22.SequenceNumber) {
+func testSendNotification(client *lpa.Client, sequenceNumber sgp22.SequenceNumber) error {
 	notifications, err := client.RetrieveNotificationList(sequenceNumber)
 	if err != nil {
-		fmt.Printf("Failed to retrieve notifications: %v\n", err)
-		return
+		return fmt.Errorf("retrieve notifications: %w", err)
 	}
 	if len(notifications) == 0 {
 		fmt.Println("No notifications found")
-		return
+		return nil
 	}
 	if err := client.HandleNotification(notifications[0]); err != nil {
-		fmt.Printf("Failed to handle notification: %v\n", err)
-	} else {
-		fmt.Println("Notification handled successfully")
+		return fmt.Errorf("handle notification: %w", err)
 	}
+	fmt.Println("Notification handled successfully")
+	return nil
 }
 
-func testDiscovery(client *lpa.Client) {
+func testDiscovery(client *lpa.Client) error {
 	addresses := []url.URL{
 		{Scheme: "https", Host: "lpa.ds.gsma.com"},
 		{Scheme: "https", Host: "lpa.live.esimdiscovery.com"},
 	}
+	imei, err := sgp22.NewIMEI("356938035643809")
+	if err != nil {
+		return fmt.Errorf("parse IMEI: %w", err)
+	}
 
+	var errs []error
 	for _, address := range addresses {
 		fmt.Printf("Discovering profiles at %s...\n", address.Host)
-		imei, _ := sgp22.NewIMEI("356938035643809") // Example IMEI, replace with actual if needed
 		entries, err := client.Discovery(&address, imei)
 		if err != nil {
-			fmt.Printf("Failed to discover profiles: %v\n", err)
+			errs = append(errs, fmt.Errorf("discover profiles at %s: %w", address.Host, err))
 			continue
 		}
 		for _, entry := range entries {
 			fmt.Printf("Discovered profile: %s, URL: %s\n", entry.EventID, entry.Address)
 		}
 	}
+	return errors.Join(errs...)
 }

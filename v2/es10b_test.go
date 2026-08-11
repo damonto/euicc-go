@@ -1,11 +1,11 @@
 package sgp22
 
 import (
+	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/damonto/euicc-go/bertlv"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestListNotificationResponseErrorChoice(t *testing.T) {
@@ -17,14 +17,24 @@ func TestListNotificationResponseErrorChoice(t *testing.T) {
 
 	err := response.UnmarshalBERTLV(tlv)
 
-	assert.ErrorIs(t, err, ErrUndefined)
+	if !errors.Is(err, ErrUndefined) {
+		t.Errorf("UnmarshalBERTLV() error = %v, want undefined", err)
+	}
 }
 
 func TestListNotificationRequestOmitsEmptyFilter(t *testing.T) {
 	request, err := new(ListNotificationRequest).MarshalBERTLV()
 
-	require.NoError(t, err)
-	assert.Equal(t, []byte{0xbf, 0x28, 0x00}, request.Bytes())
+	if err != nil {
+		t.Fatalf("MarshalBERTLV() error = %v", err)
+	}
+	encoded, err := request.Bytes()
+	if err != nil {
+		t.Fatalf("request.Bytes() error = %v", err)
+	}
+	if want := []byte{0xbf, 0x28, 0x00}; !bytes.Equal(encoded, want) {
+		t.Errorf("request.Bytes() = % X, want % X", encoded, want)
+	}
 }
 
 func TestListNotificationRequestEncodesFilterBits(t *testing.T) {
@@ -35,25 +45,51 @@ func TestListNotificationRequestEncodesFilterBits(t *testing.T) {
 		},
 	}).MarshalBERTLV()
 
-	require.NoError(t, err)
-	assert.Equal(t, []byte{0xbf, 0x28, 0x04, 0x81, 0x02, 0x04, 0x90}, request.Bytes())
+	if err != nil {
+		t.Fatalf("MarshalBERTLV() error = %v", err)
+	}
+	encoded, err := request.Bytes()
+	if err != nil {
+		t.Fatalf("request.Bytes() error = %v", err)
+	}
+	if want := []byte{0xbf, 0x28, 0x04, 0x81, 0x02, 0x04, 0x90}; !bytes.Equal(encoded, want) {
+		t.Errorf("request.Bytes() = % X, want % X", encoded, want)
+	}
 }
 
 func TestRetrieveNotificationsListRequestEncodesSearchCriteria(t *testing.T) {
 	criteria, err := bertlv.MarshalValue(bertlv.ContextSpecific.Primitive(0), SequenceNumber(1))
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("MarshalValue() error = %v", err)
+	}
 
 	request, err := (&RetrieveNotificationsListRequest{SearchCriteria: criteria}).MarshalBERTLV()
 
-	require.NoError(t, err)
-	assert.Equal(t, []byte{0xbf, 0x2b, 0x05, 0xa0, 0x03, 0x80, 0x01, 0x01}, request.Bytes())
+	if err != nil {
+		t.Fatalf("MarshalBERTLV() error = %v", err)
+	}
+	encoded, err := request.Bytes()
+	if err != nil {
+		t.Fatalf("request.Bytes() error = %v", err)
+	}
+	if want := []byte{0xbf, 0x2b, 0x05, 0xa0, 0x03, 0x80, 0x01, 0x01}; !bytes.Equal(encoded, want) {
+		t.Errorf("request.Bytes() = % X, want % X", encoded, want)
+	}
 }
 
 func TestRetrieveNotificationsListRequestOmitsSearchCriteria(t *testing.T) {
 	request, err := new(RetrieveNotificationsListRequest).MarshalBERTLV()
 
-	require.NoError(t, err)
-	assert.Equal(t, []byte{0xbf, 0x2b, 0x00}, request.Bytes())
+	if err != nil {
+		t.Fatalf("MarshalBERTLV() error = %v", err)
+	}
+	encoded, err := request.Bytes()
+	if err != nil {
+		t.Fatalf("request.Bytes() error = %v", err)
+	}
+	if want := []byte{0xbf, 0x2b, 0x00}; !bytes.Equal(encoded, want) {
+		t.Errorf("request.Bytes() = % X, want % X", encoded, want)
+	}
 }
 
 func TestPrepareDownloadRequestNeedConfirmationCodeUsesBooleanTag(t *testing.T) {
@@ -64,7 +100,23 @@ func TestPrepareDownloadRequestNeedConfirmationCodeUsesBooleanTag(t *testing.T) 
 		),
 	}
 
-	assert.True(t, request.NeedConfirmationCode())
+	got, err := request.NeedConfirmationCode()
+	if err != nil {
+		t.Fatalf("NeedConfirmationCode() error = %v", err)
+	}
+	if !got {
+		t.Error("NeedConfirmationCode() = false, want true")
+	}
+}
+
+func TestPrepareDownloadRequestNeedConfirmationCodeRejectsInvalidEncoding(t *testing.T) {
+	request := &PrepareDownloadRequest{Signed2: bertlv.NewChildren(
+		bertlv.ContextSpecific.Constructed(0),
+		bertlv.NewValue(bertlv.Universal.Primitive(1), []byte{0xff, 0x00}),
+	)}
+	if _, err := request.NeedConfirmationCode(); err == nil {
+		t.Error("NeedConfirmationCode() error = nil for invalid boolean encoding")
+	}
 }
 
 func TestPrepareDownloadRequestEncodesHashCcAsOctetString(t *testing.T) {
@@ -81,7 +133,9 @@ func TestPrepareDownloadRequestEncodesHashCcAsOctetString(t *testing.T) {
 	}
 
 	tlv, err := request.MarshalBERTLV()
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("MarshalBERTLV() error = %v", err)
+	}
 
 	expected := []byte{
 		0xbf, 0x21, 0x31,
@@ -89,9 +143,19 @@ func TestPrepareDownloadRequestEncodesHashCcAsOctetString(t *testing.T) {
 		0x5f, 0x37, 0x01, 0x03,
 		0x04, 0x20,
 	}
-	expected = append(expected, request.HashedConfirmationCode()...)
+	hashedConfirmationCode, err := request.HashedConfirmationCode()
+	if err != nil {
+		t.Fatalf("HashedConfirmationCode() error = %v", err)
+	}
+	expected = append(expected, hashedConfirmationCode...)
 	expected = append(expected, 0xa3, 0x00)
-	assert.Equal(t, expected, tlv.Bytes())
+	encoded, err := tlv.Bytes()
+	if err != nil {
+		t.Fatalf("TLV.Bytes() error = %v", err)
+	}
+	if !bytes.Equal(encoded, expected) {
+		t.Errorf("TLV.Bytes() = % X, want % X", encoded, expected)
+	}
 }
 
 func TestRetrieveNotificationsListResponseAllowsEmptyList(t *testing.T) {
@@ -101,10 +165,15 @@ func TestRetrieveNotificationsListResponseAllowsEmptyList(t *testing.T) {
 		bertlv.NewChildren(bertlv.ContextSpecific.Constructed(0)),
 	)
 
-	require.NoError(t, response.UnmarshalBERTLV(tlv))
-
-	assert.Empty(t, response.NotificationList)
-	assert.NoError(t, response.Valid())
+	if err := response.UnmarshalBERTLV(tlv); err != nil {
+		t.Fatalf("UnmarshalBERTLV() error = %v", err)
+	}
+	if len(response.NotificationList) != 0 {
+		t.Errorf("NotificationList = %#v, want empty", response.NotificationList)
+	}
+	if err := response.Valid(); err != nil {
+		t.Errorf("Valid() error = %v", err)
+	}
 }
 
 func TestRetrieveNotificationsListResponseErrorChoice(t *testing.T) {
@@ -116,25 +185,30 @@ func TestRetrieveNotificationsListResponseErrorChoice(t *testing.T) {
 
 	err := response.UnmarshalBERTLV(tlv)
 
-	assert.ErrorIs(t, err, ErrUndefined)
+	if !errors.Is(err, ErrUndefined) {
+		t.Errorf("UnmarshalBERTLV() error = %v, want undefined", err)
+	}
 }
 
 func TestNotificationEventRejectsInvalidBitCount(t *testing.T) {
 	var event NotificationEvent
 
-	assert.Error(t, event.UnmarshalBinary([]byte{0x04, 0x00}))
-	assert.Error(t, event.UnmarshalBinary([]byte{0x04, 0xc0}))
-	assert.Error(t, event.UnmarshalBinary([]byte{0x03, 0x08}))
+	for _, input := range [][]byte{{0x04, 0x00}, {0x04, 0xc0}, {0x03, 0x08}} {
+		if err := event.UnmarshalBinary(input); err == nil {
+			t.Errorf("NotificationEvent.UnmarshalBinary(% X) error = nil", input)
+		}
+	}
 }
 
 func TestNotificationMetadataUsesUTF8StringAddressTag(t *testing.T) {
 	metadata := new(NotificationMetadata)
 
-	require.NoError(t, metadata.UnmarshalBERTLV(notificationMetadataTLV()))
-
-	assert.Equal(t, SequenceNumber(1), metadata.SequenceNumber)
-	assert.Equal(t, NotificationEventInstall, metadata.ProfileManagementOperation)
-	assert.Equal(t, "example.com", metadata.Address)
+	if err := metadata.UnmarshalBERTLV(notificationMetadataTLV()); err != nil {
+		t.Fatalf("UnmarshalBERTLV() error = %v", err)
+	}
+	if metadata.SequenceNumber != 1 || metadata.ProfileManagementOperation != NotificationEventInstall || metadata.Address != "example.com" {
+		t.Errorf("metadata = %#v, want sequence 1, install, example.com", metadata)
+	}
 }
 
 func TestPendingNotificationUnmarshalProfileInstallationResult(t *testing.T) {
@@ -149,10 +223,15 @@ func TestPendingNotificationUnmarshalProfileInstallationResult(t *testing.T) {
 	)
 	notification := new(PendingNotification)
 
-	require.NoError(t, notification.UnmarshalBERTLV(tlv))
-
-	assert.Same(t, tlv, notification.PendingNotification)
-	assert.Equal(t, "example.com", notification.Notification.Address)
+	if err := notification.UnmarshalBERTLV(tlv); err != nil {
+		t.Fatalf("UnmarshalBERTLV() error = %v", err)
+	}
+	if notification.PendingNotification != tlv {
+		t.Errorf("PendingNotification = %p, want %p", notification.PendingNotification, tlv)
+	}
+	if got, want := notification.Notification.Address, "example.com"; got != want {
+		t.Errorf("notification address = %q, want %q", got, want)
+	}
 }
 
 func TestPendingNotificationUnmarshalOtherSignedNotification(t *testing.T) {
@@ -165,10 +244,15 @@ func TestPendingNotificationUnmarshalOtherSignedNotification(t *testing.T) {
 	)
 	notification := new(PendingNotification)
 
-	require.NoError(t, notification.UnmarshalBERTLV(tlv))
-
-	assert.Same(t, tlv, notification.PendingNotification)
-	assert.Equal(t, "example.com", notification.Notification.Address)
+	if err := notification.UnmarshalBERTLV(tlv); err != nil {
+		t.Fatalf("UnmarshalBERTLV() error = %v", err)
+	}
+	if notification.PendingNotification != tlv {
+		t.Errorf("PendingNotification = %p, want %p", notification.PendingNotification, tlv)
+	}
+	if got, want := notification.Notification.Address, "example.com"; got != want {
+		t.Errorf("notification address = %q, want %q", got, want)
+	}
 }
 
 func notificationMetadataTLV() *bertlv.TLV {
@@ -185,5 +269,7 @@ func TestAuthenticateServerRequestRejectsInvalidIMEI(t *testing.T) {
 
 	_, err := request.MarshalBERTLV()
 
-	assert.Error(t, err)
+	if err == nil {
+		t.Error("MarshalBERTLV() error = nil for invalid IMEI")
+	}
 }

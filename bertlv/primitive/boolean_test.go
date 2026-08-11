@@ -1,7 +1,7 @@
 package primitive
 
 import (
-	"github.com/stretchr/testify/assert"
+	"bytes"
 	"testing"
 )
 
@@ -19,18 +19,32 @@ func TestBoolean(t *testing.T) {
 	for _, fixture := range fixtures {
 		for _, variant := range fixture.Variants {
 			var parsed bool
-			assert.NoError(t, UnmarshalBool(&parsed).UnmarshalBinary(variant))
-			assert.Equal(t, fixture.Expected, parsed)
+			if err := UnmarshalBool(&parsed).UnmarshalBinary(variant); err != nil {
+				t.Errorf("UnmarshalBool(% X) error = %v", variant, err)
+				continue
+			}
+			if parsed != fixture.Expected {
+				t.Errorf("UnmarshalBool(% X) = %t, want %t", variant, parsed, fixture.Expected)
+			}
 		}
 		output, err = MarshalBool(fixture.Expected).MarshalBinary()
-		assert.NoError(t, err)
-		assert.Equal(t, fixture.Variants[0], output)
+		if err != nil {
+			t.Errorf("MarshalBool(%t) error = %v", fixture.Expected, err)
+			continue
+		}
+		if want := fixture.Variants[0]; !bytes.Equal(output, want) {
+			t.Errorf("MarshalBool(%t) = % X, want % X", fixture.Expected, output, want)
+		}
 	}
 }
 
 func TestBooleanRejectsInvalidLength(t *testing.T) {
 	var parsed bool
 
-	assert.Error(t, UnmarshalBool(&parsed).UnmarshalBinary(nil))
-	assert.Error(t, UnmarshalBool(&parsed).UnmarshalBinary([]byte{0x00, 0x00}))
+	if err := UnmarshalBool(&parsed).UnmarshalBinary(nil); err == nil {
+		t.Error("UnmarshalBool(nil) error = nil")
+	}
+	if err := UnmarshalBool(&parsed).UnmarshalBinary([]byte{0x00, 0x00}); err == nil {
+		t.Error("UnmarshalBool() error = nil for two-byte input")
+	}
 }

@@ -2,6 +2,7 @@ package lpa
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/damonto/euicc-go/bertlv"
@@ -22,13 +23,18 @@ func (c *Client) ListProfile(searchCriteria any, tags []bertlv.Tag) ([]*sgp22.Pr
 	var request sgp22.ProfileInfoListRequest
 	switch v := searchCriteria.(type) {
 	case nil:
-		break
 	case sgp22.ICCID:
 		request.SearchCriteria = bertlv.NewValue(bertlv.Application.Primitive(26), v)
 	case sgp22.ISDPAID:
 		request.SearchCriteria = bertlv.NewValue(bertlv.Application.Primitive(15), v)
 	case sgp22.ProfileClass:
-		request.SearchCriteria, _ = bertlv.MarshalValue(bertlv.ContextSpecific.Primitive(21), v)
+		var err error
+		request.SearchCriteria, err = bertlv.MarshalValue(bertlv.ContextSpecific.Primitive(21), v)
+		if err != nil {
+			return nil, fmt.Errorf("marshal profile search criteria: %w", err)
+		}
+	default:
+		return nil, errors.New("invalid profile search criteria")
 	}
 	request.Tags = slices.Concat([]bertlv.Tag{
 		sgp22.TagICCID,

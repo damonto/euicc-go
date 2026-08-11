@@ -20,7 +20,7 @@ func (tlv *TLV) Len() int {
 	case n < 16777216:
 		n += 4 // 0x83 + 3 bytes
 	default:
-		panic(fmt.Sprintf("TLV too large: %d exceeds 3-byte length limit (3 bytes max)", n))
+		n += 5 // Size if encoded with a 4-byte BER length.
 	}
 	n += len(tlv.Tag)
 	return n
@@ -41,7 +41,11 @@ func (tlv *TLV) WriteTo(w io.Writer) (int64, error) {
 	if _, err := w.Write(tlv.Tag); err != nil {
 		return n, err
 	}
-	if _, err := w.Write(marshalLength(uint32(length))); err != nil {
+	encodedLength, err := marshalLength(uint32(length))
+	if err != nil {
+		return n, err
+	}
+	if _, err := w.Write(encodedLength); err != nil {
 		return n, err
 	}
 	if tlv.Tag.Primitive() {
@@ -62,14 +66,13 @@ func (tlv *TLV) WriteTo(w io.Writer) (int64, error) {
 func (tlv *TLV) MarshalText() ([]byte, error) {
 	var buf bytes.Buffer
 	encoder := base64.NewEncoder(base64.StdEncoding, &buf)
-	_, err := tlv.WriteTo(encoder)
-	_ = encoder.Close()
-	return buf.Bytes(), err
+	_, writeErr := tlv.WriteTo(encoder)
+	closeErr := encoder.Close()
+	return buf.Bytes(), errors.Join(writeErr, closeErr)
 }
 
 func (tlv *TLV) MarshalBinary() ([]byte, error) {
 	var buf bytes.Buffer
-	buf.Grow(tlv.Len())
 	_, err := tlv.WriteTo(&buf)
 	return buf.Bytes(), err
 }
@@ -97,10 +100,6 @@ func (tlv *TLV) Clone() *TLV {
 	return &cloned
 }
 
-func (tlv *TLV) Bytes() []byte {
-	encoded, err := tlv.MarshalBinary()
-	if err != nil {
-		panic(err)
-	}
-	return encoded
+func (tlv *TLV) Bytes() ([]byte, error) {
+	return tlv.MarshalBinary()
 }

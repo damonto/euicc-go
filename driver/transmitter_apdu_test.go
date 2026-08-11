@@ -218,7 +218,11 @@ func TestTransmitterBuildsRecordedES10APDUs(t *testing.T) {
 			if err != nil {
 				t.Fatalf("MarshalBERTLV() error = %v", err)
 			}
-			if _, err := tx.TransmitRaw(tlv.Bytes()); err != nil {
+			encoded, err := tlv.Bytes()
+			if err != nil {
+				t.Fatalf("TLV.Bytes() error = %v", err)
+			}
+			if _, err := tx.TransmitRaw(encoded); err != nil {
 				t.Fatalf("TransmitRaw() error = %v", err)
 			}
 			if got := hex.EncodeToString(channel.requests[0]); got != lowerHex(tt.apdu) {

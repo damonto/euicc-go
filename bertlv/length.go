@@ -6,18 +6,18 @@ import (
 	"io"
 )
 
-func marshalLength(n uint32) []byte {
+func marshalLength(n uint32) ([]byte, error) {
 	switch {
 	case n < 128:
-		return []byte{byte(n)}
+		return []byte{byte(n)}, nil
 	case n < 256:
-		return []byte{0x81, byte(n)}
+		return []byte{0x81, byte(n)}, nil
 	case n < 65536:
-		return []byte{0x82, byte(n >> 8), byte(n)}
+		return []byte{0x82, byte(n >> 8), byte(n)}, nil
 	case n < 16777216:
-		return []byte{0x83, byte(n >> 16), byte(n >> 8), byte(n)}
+		return []byte{0x83, byte(n >> 16), byte(n >> 8), byte(n)}, nil
 	}
-	panic(fmt.Sprintf("TLV too large: %d exceeds 3-byte length limit (3 bytes max)", n))
+	return nil, fmt.Errorf("TLV length %d exceeds 3-byte limit", n)
 }
 
 func readLength(r io.Reader) (uint32, error) {
