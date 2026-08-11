@@ -65,6 +65,23 @@ func TestChannelOpenLogicalChannelSelectsAID(t *testing.T) {
 	}
 }
 
+func TestChannelOpenLogicalChannelRejectsSecondChannel(t *testing.T) {
+	fake := &fakeTransmitter{responses: [][]byte{
+		{0x04, 0x90, 0x00},
+		{0x90, 0x00},
+	}}
+	channel := NewChannel(fake)
+	if _, err := channel.OpenLogicalChannel([]byte{0xA0}); err != nil {
+		t.Fatalf("first OpenLogicalChannel() error = %v", err)
+	}
+	if _, err := channel.OpenLogicalChannel([]byte{0xA0}); err == nil {
+		t.Fatal("second OpenLogicalChannel() error = nil")
+	}
+	if len(fake.requests) != 2 {
+		t.Fatalf("Transmit() calls = %d, want 2", len(fake.requests))
+	}
+}
+
 func TestChannelOpenLogicalChannelClosesWhenSelectFails(t *testing.T) {
 	fake := &fakeTransmitter{responses: [][]byte{
 		{0x01, 0x90, 0x00},
@@ -80,6 +97,29 @@ func TestChannelOpenLogicalChannelClosesWhenSelectFails(t *testing.T) {
 	wantClose := []byte{0x00, 0x70, 0x80, 0x01, 0x00}
 	if !bytes.Equal(fake.requests[2], wantClose) {
 		t.Fatalf("close request = % X, want % X", fake.requests[2], wantClose)
+	}
+}
+
+func TestChannelDisconnectRetriesFailedSelectCleanup(t *testing.T) {
+	fake := &fakeTransmitter{responses: [][]byte{
+		{0x01, 0x90, 0x00},
+		{0x6A, 0x82},
+		{0x6F, 0x00},
+		{0x90, 0x00},
+	}}
+	channel := NewChannel(fake)
+	if _, err := channel.OpenLogicalChannel([]byte{0xA0}); err == nil {
+		t.Fatal("OpenLogicalChannel() error = nil")
+	}
+	if err := channel.Disconnect(); err != nil {
+		t.Fatalf("Disconnect() error = %v", err)
+	}
+	if !fake.closed {
+		t.Fatal("Disconnect() did not close transport")
+	}
+	wantClose := []byte{0x00, 0x70, 0x80, 0x01, 0x00}
+	if !bytes.Equal(fake.requests[2], wantClose) || !bytes.Equal(fake.requests[3], wantClose) {
+		t.Fatalf("close requests = % X and % X, want % X twice", fake.requests[2], fake.requests[3], wantClose)
 	}
 }
 
@@ -109,6 +149,16 @@ func TestChannelUsesFreshContextToCleanUpSelectTimeout(t *testing.T) {
 	}
 	if !cleanupContextActive {
 		t.Fatal("OpenLogicalChannel() reused expired context for cleanup")
+	}
+}
+
+func TestChannelNonPositiveTimeoutExpiresContextImmediately(t *testing.T) {
+	fake := &fakeTransmitter{transmit: func(ctx context.Context, _ []byte) ([]byte, error) {
+		return nil, ctx.Err()
+	}}
+	channel := NewChannel(fake, WithTimeout(0))
+	if err := channel.Connect(); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Connect() error = %v, want deadline exceeded", err)
 	}
 }
 

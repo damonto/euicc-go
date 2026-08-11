@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"time"
 
 	"github.com/damonto/euicc-go/bertlv"
 	"github.com/damonto/euicc-go/driver/qcom"
@@ -15,12 +16,12 @@ import (
 func main() {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
-	// ch, err := mbim.New("/dev/cdc-wdm0", 1)
+	// ch, err := mbim.New(mbim.WithProxy("/dev/cdc-wdm0"), mbim.WithSlot(1), mbim.WithTimeout(30*time.Second))
 	// if err != nil {
 	// 	panic(err)
 	// }
-	ch, err := qcom.NewQMI("/dev/cdc-wdm0", 1)
-	// ch, err := qcom.NewQRTR(1)
+	ch, err := qcom.NewQMI(qcom.WithProxy("/dev/cdc-wdm0"), qcom.WithSlot(1), qcom.WithTimeout(30*time.Second))
+	// ch, err := qcom.NewQRTR(qcom.WithSlot(1))
 	if err != nil {
 		panic(err)
 	}

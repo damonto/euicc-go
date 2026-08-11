@@ -3,20 +3,26 @@ package mbim
 import (
 	"bytes"
 	"context"
+	"errors"
 	"testing"
+	"time"
 
 	wwanmbim "github.com/damonto/wwan-go/mbim"
 )
 
 type fakeMBIMReader struct {
-	openChannel   uint32
-	response      []byte
-	status        uint32
-	closedChannel []uint32
-	closed        bool
+	openChannel    uint32
+	openCalls      int
+	openContextErr error
+	response       []byte
+	status         uint32
+	closedChannel  []uint32
+	closed         bool
 }
 
-func (f *fakeMBIMReader) OpenChannel(context.Context, []byte) (uint32, error) {
+func (f *fakeMBIMReader) OpenChannel(ctx context.Context, _ []byte) (uint32, error) {
+	f.openCalls++
+	f.openContextErr = ctx.Err()
 	return f.openChannel, nil
 }
 
@@ -35,12 +41,43 @@ func (f *fakeMBIMReader) Close() error {
 }
 
 func TestNewRejectsInvalidSlot(t *testing.T) {
-	if _, err := New("/dev/cdc-wdm1", 0); err == nil {
+	if _, err := New(WithAutoDetect("/dev/cdc-wdm1"), WithSlot(0)); err == nil {
 		t.Fatal("New() error = nil, want invalid slot error")
 	}
 }
 
-func TestNewWithClientUsesConnectedClient(t *testing.T) {
+func TestNewValidatesOptions(t *testing.T) {
+	tests := []struct {
+		name    string
+		options []Option
+	}{
+		{name: "missing access method"},
+		{name: "missing device", options: []Option{WithDirect("")}},
+		{name: "client with access", options: []Option{WithClient(new(wwanmbim.Client)), WithDirect("/dev/cdc-wdm1")}},
+		{name: "client with slot", options: []Option{WithClient(new(wwanmbim.Client)), WithSlot(2)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := New(tt.options...); err == nil {
+				t.Fatal("New() error = nil, want invalid options error")
+			}
+		})
+	}
+}
+
+func TestNewAcceptsNonPositiveTimeout(t *testing.T) {
+	for _, timeout := range []time.Duration{0, -time.Second} {
+		channel, err := New(WithClient(new(wwanmbim.Client)), WithTimeout(timeout))
+		if err != nil {
+			t.Fatalf("New(WithTimeout(%s)) error = %v", timeout, err)
+		}
+		if got := channel.timeout; got != timeout {
+			t.Fatalf("New(WithTimeout(%s)) timeout = %s", timeout, got)
+		}
+	}
+}
+
+func TestNewUsesClient(t *testing.T) {
 	tests := []struct {
 		name    string
 		client  *wwanmbim.Client
@@ -52,19 +89,18 @@ func TestNewWithClientUsesConnectedClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			channel, err := NewWithClient(tt.client)
+			channel, err := New(WithClient(tt.client), WithTimeout(time.Second))
 			if (err != nil) != tt.wantErr {
-				t.Fatalf("NewWithClient() error = %v, wantErr %t", err, tt.wantErr)
+				t.Fatalf("New() error = %v, wantErr %t", err, tt.wantErr)
 			}
 			if tt.wantErr {
 				return
 			}
-			got, ok := channel.(*MBIM)
-			if !ok {
-				t.Fatalf("NewWithClient() type = %T, want *MBIM", channel)
+			if channel.reader != tt.client {
+				t.Fatal("New() did not retain the injected MBIM client")
 			}
-			if got.reader != tt.client {
-				t.Fatal("NewWithClient() did not retain the injected MBIM client")
+			if channel.timeout != time.Second {
+				t.Fatalf("New() timeout = %s, want %s", channel.timeout, time.Second)
 			}
 			if err := channel.Connect(); err != nil {
 				t.Fatalf("Connect() error = %v", err)
@@ -108,6 +144,31 @@ func TestOpenLogicalChannelRejectsInvalidChannel(t *testing.T) {
 		if logicalChannel != 0 && (len(fake.closedChannel) != 1 || fake.closedChannel[0] != logicalChannel) {
 			t.Fatalf("OpenLogicalChannel() cleanup = %v, want [%d]", fake.closedChannel, logicalChannel)
 		}
+	}
+}
+
+func TestOpenLogicalChannelRejectsSecondChannel(t *testing.T) {
+	fake := &fakeMBIMReader{openChannel: 3}
+	m := &MBIM{reader: fake, timeout: defaultTimeout}
+	if _, err := m.OpenLogicalChannel(nil); err != nil {
+		t.Fatalf("first OpenLogicalChannel() error = %v", err)
+	}
+	if _, err := m.OpenLogicalChannel(nil); err == nil {
+		t.Fatal("second OpenLogicalChannel() error = nil")
+	}
+	if fake.openCalls != 1 {
+		t.Fatalf("OpenChannel() calls = %d, want 1", fake.openCalls)
+	}
+}
+
+func TestNonPositiveTimeoutExpiresContextImmediately(t *testing.T) {
+	fake := &fakeMBIMReader{openChannel: 3}
+	m := &MBIM{reader: fake, timeout: 0}
+	if _, err := m.OpenLogicalChannel(nil); err != nil {
+		t.Fatalf("OpenLogicalChannel() error = %v", err)
+	}
+	if !errors.Is(fake.openContextErr, context.DeadlineExceeded) {
+		t.Fatalf("OpenChannel() context error = %v, want deadline exceeded", fake.openContextErr)
 	}
 }
 

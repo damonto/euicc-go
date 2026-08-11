@@ -114,8 +114,8 @@ func TestNewTransmitterCleansUpFailedInitialization(t *testing.T) {
 	if _, err := NewTransmitter(discardLogger(), channel, nil, 254); !errors.Is(err, openErr) {
 		t.Fatalf("NewTransmitter() error = %v, want open error", err)
 	}
-	if channel.closedChannel != 3 || !channel.disconnected {
-		t.Fatalf("NewTransmitter() cleanup = close %d, disconnect %t; want close 3 and disconnect", channel.closedChannel, channel.disconnected)
+	if channel.closedChannel != 0 || !channel.disconnected {
+		t.Fatalf("NewTransmitter() cleanup = close %d, disconnect %t; want disconnect only", channel.closedChannel, channel.disconnected)
 	}
 }
 

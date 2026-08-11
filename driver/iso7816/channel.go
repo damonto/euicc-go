@@ -110,12 +110,16 @@ func (c *Channel) OpenLogicalChannel(aid []byte) (byte, error) {
 	if len(aid) > maxShortAPDUDataLength {
 		return 0, fmt.Errorf("AID length %d exceeds short APDU limit", len(aid))
 	}
+	if c.channel != 0 {
+		return 0, fmt.Errorf("logical channel %d is already open", c.channel)
+	}
 	ctx, cancel := c.newContext()
 	channel, err := c.openChannel(ctx)
 	cancel()
 	if err != nil {
 		return 0, err
 	}
+	c.channel = channel
 	ctx, cancel = c.newContext()
 	err = c.selectAID(ctx, channel, aid)
 	cancel()
@@ -125,7 +129,6 @@ func (c *Channel) OpenLogicalChannel(aid []byte) (byte, error) {
 		cleanupCancel()
 		return 0, errors.Join(err, cleanupErr)
 	}
-	c.channel = channel
 	return channel, nil
 }
 

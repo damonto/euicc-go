@@ -38,7 +38,6 @@ end-user CLI.
 | `driver/at` | AT-command modem channel over a serial device. |
 | `driver/mbim` | MBIM proxy modem channel. |
 | `driver/qcom` | Qualcomm QMI and QRTR modem channels. |
-| `driver/qmi` | Deprecated compatibility aliases for `driver/qcom`. |
 | `http` | RSP JSON-over-HTTP client helpers. |
 | `http/rootci` | Embedded eUICC CI root certificate bundle. |
 | `bertlv` | BER-TLV read, write, selector, and primitive helpers. |
@@ -122,6 +121,9 @@ Smart-card channels and LPA clients are intentionally not safe for concurrent
 use. Serialize every operation on a channel or client, including `Close` and
 `Disconnect`.
 
+Driver constructors only validate and store configuration. `Connect` performs
+the transport I/O; `lpa.New` calls it when creating the LPA client.
+
 ```go
 // CCID / PCSC reader.
 ch := ccid.NewWithReader("reader name")
@@ -130,19 +132,29 @@ ch := ccid.NewWithReader("reader name")
 ch, err := at.New("/dev/ttyUSB7")
 
 // MBIM proxy device, slot numbering starts at 1.
-ch, err := mbim.New("/dev/cdc-wdm0", 1)
+ch, err := mbim.New(
+	mbim.WithProxy("/dev/cdc-wdm0"),
+	mbim.WithSlot(1),
+	mbim.WithTimeout(30*time.Second),
+)
 
 // Qualcomm QMI proxy device, slot numbering starts at 1.
-ch, err := qcom.NewQMI("/dev/cdc-wdm0", 1)
+ch, err := qcom.NewQMI(
+	qcom.WithProxy("/dev/cdc-wdm0"),
+	qcom.WithSlot(1),
+	qcom.WithTimeout(30*time.Second),
+)
 
 // Qualcomm QRTR UIM service, slot numbering starts at 1.
-ch, err := qcom.NewQRTR(1)
+ch, err := qcom.NewQRTR(qcom.WithSlot(1))
 ```
 
 Import the matching packages as needed:
 
 ```go
 import (
+	"time"
+
 	"github.com/damonto/euicc-go/driver/at"
 	"github.com/damonto/euicc-go/driver/ccid"
 	"github.com/damonto/euicc-go/driver/mbim"

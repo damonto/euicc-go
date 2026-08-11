@@ -19,7 +19,9 @@ const (
 	maxStoreDataBlocks = 256
 )
 
-// SmartCardChannel provides serialized access to a smart card. It is not safe
+// SmartCardChannel provides serialized access to a smart card. Driver
+// constructors configure channels without opening their transports; Connect
+// performs the I/O needed to establish a session. SmartCardChannel is not safe
 // for concurrent use; callers must serialize all operations, including
 // Disconnect.
 type SmartCardChannel interface {
@@ -101,7 +103,6 @@ func newCardTransmitter(logger *slog.Logger, channel SmartCardChannel, aid []byt
 	if err != nil {
 		return nil, errors.Join(
 			fmt.Errorf("open logical channel: %w", err),
-			closeChannel(channel, logicalChannel),
 			disconnectChannel(channel),
 		)
 	}

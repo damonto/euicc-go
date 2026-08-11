@@ -22,13 +22,15 @@ type uimReader interface {
 }
 
 type channel struct {
-	reader  uimReader
-	channel uint8
-	closed  bool
+	reader    uimReader
+	channel   uint8
+	timeout   time.Duration
+	connected bool
+	closed    bool
 }
 
-func newChannel(reader uimReader) *channel {
-	return &channel{reader: reader}
+func newChannel(reader uimReader, timeout time.Duration) *channel {
+	return &channel{reader: reader, timeout: timeout}
 }
 
 func validateSlot(slot uint8) error {
@@ -42,11 +44,18 @@ func (c *channel) Connect() error {
 	if c.closed {
 		return errors.New("smart card channel is closed")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	if c.connected {
+		return nil
+	}
+	if c.reader == nil {
+		return errors.New("QCOM reader is not connected")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 	if err := c.reader.ActivateSlot(ctx); err != nil {
 		return fmt.Errorf("activate QCOM slot: %w", err)
 	}
+	c.connected = true
 	return nil
 }
 
@@ -55,22 +64,22 @@ func (c *channel) Disconnect() error {
 		return nil
 	}
 	var channelErr error
-	if c.channel != 0 {
+	if c.reader != nil && c.channel != 0 {
 		channelErr = c.closeLogicalChannel(c.channel)
 	}
 	c.closed = true
-	closeErr := c.reader.Close()
-	if closeErr != nil {
-		closeErr = fmt.Errorf("close QCOM reader: %w", closeErr)
-	}
-	return errors.Join(channelErr, closeErr)
+	c.connected = false
+	return errors.Join(channelErr, c.releaseReader())
 }
 
 func (c *channel) OpenLogicalChannel(aid []byte) (byte, error) {
-	if c.closed {
-		return 0, errors.New("smart card channel is closed")
+	if err := c.ensureConnected(); err != nil {
+		return 0, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	if c.channel != 0 {
+		return 0, fmt.Errorf("QCOM logical channel %d is already open", c.channel)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 	channel, err := c.reader.OpenLogicalChannel(ctx, aid)
 	if err != nil {
@@ -91,10 +100,10 @@ func (c *channel) OpenLogicalChannel(aid []byte) (byte, error) {
 }
 
 func (c *channel) Transmit(command []byte) ([]byte, error) {
-	if c.closed {
-		return nil, errors.New("smart card channel is closed")
+	if err := c.ensureConnected(); err != nil {
+		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 	response, err := c.reader.SendAPDU(ctx, c.channel, command)
 	if err != nil {
@@ -104,8 +113,8 @@ func (c *channel) Transmit(command []byte) ([]byte, error) {
 }
 
 func (c *channel) CloseLogicalChannel(channel byte) error {
-	if c.closed {
-		return errors.New("smart card channel is closed")
+	if err := c.ensureConnected(); err != nil {
+		return err
 	}
 	if channel == 0 || channel > maxLogicalChannel {
 		return fmt.Errorf("invalid logical channel %d", channel)
@@ -114,13 +123,35 @@ func (c *channel) CloseLogicalChannel(channel byte) error {
 }
 
 func (c *channel) closeLogicalChannel(channel byte) error {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 	if err := c.reader.CloseLogicalChannel(ctx, channel); err != nil {
 		return fmt.Errorf("close QCOM logical channel %d: %w", channel, err)
 	}
 	if c.channel == channel {
 		c.channel = 0
+	}
+	return nil
+}
+
+func (c *channel) releaseReader() error {
+	if c.reader == nil {
+		return nil
+	}
+	if err := c.reader.Close(); err != nil {
+		return fmt.Errorf("close QCOM reader: %w", err)
+	}
+	c.reader = nil
+	c.connected = false
+	return nil
+}
+
+func (c *channel) ensureConnected() error {
+	if c.closed {
+		return errors.New("smart card channel is closed")
+	}
+	if !c.connected || c.reader == nil {
+		return errors.New("smart card channel is not connected")
 	}
 	return nil
 }

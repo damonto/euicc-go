@@ -26,28 +26,33 @@ const (
 // MBIM implements driver.SmartCardChannel over an MBIM connection. It is not
 // safe for concurrent use.
 type MBIM struct {
+	access  accessMode
 	device  string
 	slot    uint8
+	timeout time.Duration
 	reader  reader
 	channel uint32
 	closed  bool
 }
 
-// New creates an MBIM channel whose access method is resolved by Connect.
-func New(device string, slot uint8) (driver.SmartCardChannel, error) {
-	if slot == 0 {
-		return nil, fmt.Errorf("slot must be >= 1")
-	}
-	return &MBIM{device: device, slot: slot}, nil
-}
+var _ driver.SmartCardChannel = (*MBIM)(nil)
 
-// NewWithClient creates a channel backed by an already connected MBIM client.
-// The channel takes ownership of client and closes it on Disconnect.
-func NewWithClient(client *wwanmbim.Client) (driver.SmartCardChannel, error) {
-	if client == nil {
-		return nil, errors.New("mbim client is nil")
+// New creates an MBIM channel. Configure its connection using WithAutoDetect,
+// WithDirect, WithProxy, or WithClient.
+func New(options ...Option) (*MBIM, error) {
+	config := applyOptions(options)
+	if err := config.validate(); err != nil {
+		return nil, err
 	}
-	return &MBIM{reader: client}, nil
+	if config.client != nil {
+		return &MBIM{reader: config.client, timeout: config.timeout}, nil
+	}
+	return &MBIM{
+		access:  config.access,
+		device:  config.device,
+		slot:    config.slot,
+		timeout: config.timeout,
+	}, nil
 }
 
 // Connect establishes the MBIM session and opens the device.
@@ -58,9 +63,18 @@ func (m *MBIM) Connect() error {
 	if m.reader != nil {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), m.timeout)
 	defer cancel()
-	reader, err := wwanmbim.Open(ctx, wwanmbim.WithAutoDetect(m.device), wwanmbim.WithSlot(int(m.slot)))
+	options := []wwanmbim.Option{wwanmbim.WithSlot(int(m.slot))}
+	switch m.access {
+	case accessAutoDetect:
+		options = append(options, wwanmbim.WithAutoDetect(m.device))
+	case accessDirect:
+		options = append(options, wwanmbim.WithDirect(m.device))
+	case accessProxy:
+		options = append(options, wwanmbim.WithProxy(m.device))
+	}
+	reader, err := wwanmbim.Open(ctx, options...)
 	if err != nil {
 		return fmt.Errorf("open MBIM reader: %w", err)
 	}
@@ -73,7 +87,10 @@ func (m *MBIM) OpenLogicalChannel(aid []byte) (byte, error) {
 	if err := m.ensureOpen(); err != nil {
 		return 0, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	if m.channel != 0 {
+		return 0, fmt.Errorf("MBIM logical channel %d is already open", m.channel)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), m.timeout)
 	defer cancel()
 	channel, err := m.reader.OpenChannel(ctx, aid)
 	if err != nil {
@@ -98,7 +115,7 @@ func (m *MBIM) Transmit(command []byte) ([]byte, error) {
 	if err := m.ensureOpen(); err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), m.timeout)
 	defer cancel()
 	response, status, err := m.reader.TransmitAPDU(ctx, m.channel, command)
 	if err != nil {
@@ -119,7 +136,7 @@ func (m *MBIM) CloseLogicalChannel(channel byte) error {
 }
 
 func (m *MBIM) closeLogicalChannel(channel uint32) error {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), m.timeout)
 	defer cancel()
 	if err := m.reader.CloseChannel(ctx, channel); err != nil {
 		return fmt.Errorf("close MBIM logical channel %d: %w", channel, err)

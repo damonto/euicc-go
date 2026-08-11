@@ -14,36 +14,66 @@ import (
 // for concurrent use.
 type QMI struct {
 	*channel
+	access accessMode
+	device string
+	slot   uint8
 }
 
-// NewQMI creates a new QMI connection to the specified device.
-func NewQMI(device string, slot uint8) (driver.SmartCardChannel, error) {
-	if err := validateSlot(slot); err != nil {
+var _ driver.SmartCardChannel = (*QMI)(nil)
+
+// NewQMI creates a QMI channel. Configure its connection using WithAutoDetect,
+// WithDirect, WithProxy, or WithClient.
+func NewQMI(options ...Option) (*QMI, error) {
+	config := applyOptions(options)
+	if err := config.validateQMI(); err != nil {
 		return nil, err
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-	transport, err := wwanqmi.Open(ctx, wwanqmi.WithAutoDetect(device))
-	if err != nil {
-		return nil, fmt.Errorf("open QMI transport: %w", err)
+	if config.client != nil {
+		return &QMI{channel: newChannel(config.client, config.timeout)}, nil
 	}
-	reader, err := qcom.NewClient(transport, qcom.WithSlot(slot))
+	return &QMI{
+		channel: newChannel(nil, config.timeout),
+		access:  config.access,
+		device:  config.device,
+		slot:    config.slot,
+	}, nil
+}
+
+// Connect opens the QMI transport and activates the configured slot.
+func (q *QMI) Connect() error {
+	if q.closed {
+		return errors.New("smart card channel is closed")
+	}
+	if q.reader != nil {
+		return q.channel.Connect()
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), q.timeout)
+	defer cancel()
+	var accessOption wwanqmi.Option
+	switch q.access {
+	case accessAutoDetect:
+		accessOption = wwanqmi.WithAutoDetect(q.device)
+	case accessDirect:
+		accessOption = wwanqmi.WithDirect(q.device)
+	case accessProxy:
+		accessOption = wwanqmi.WithProxy(q.device)
+	}
+	transport, err := wwanqmi.Open(ctx, accessOption)
+	if err != nil {
+		return fmt.Errorf("open QMI transport: %w", err)
+	}
+	reader, err := qcom.NewClient(transport, qcom.WithSlot(q.slot))
 	if err != nil {
 		closeErr := transport.Close()
 		if closeErr != nil {
 			closeErr = fmt.Errorf("close QMI transport: %w", closeErr)
 		}
-		return nil, errors.Join(fmt.Errorf("create QMI client: %w", err), closeErr)
+		return errors.Join(fmt.Errorf("create QMI client: %w", err), closeErr)
 	}
-	return NewQMIWithClient(reader)
-}
-
-// NewQMIWithClient creates a channel backed by an already connected QMI
-// client. The channel takes ownership of client and closes it on Disconnect.
-func NewQMIWithClient(client *qcom.Client) (driver.SmartCardChannel, error) {
-	if client == nil {
-		return nil, errors.New("qmi client is nil")
+	q.reader = reader
+	if err := q.channel.Connect(); err != nil {
+		return errors.Join(err, q.releaseReader())
 	}
-	return &QMI{channel: newChannel(client)}, nil
+	return nil
 }
