@@ -1,7 +1,5 @@
 github.com/ElMostafaIdrassi/goscard v1.0.0 h1:RDG5QrqrQBUoi5MkzM4zILdYf8qDn62daYZszqvdgx0=
 github.com/ElMostafaIdrassi/goscard v1.0.0/go.mod h1:uGOakQe2fFlW2cVlr9cv6x07uelrf0j0aKPbR7jGgfg=
-github.com/damonto/wwan-go v0.0.0-20260731153740-68483b6b3dd9 h1:jmMicAlMTMEgXf6BUfWFLUhM1YmtHkmKfcIY6ZM+wLo=
-github.com/damonto/wwan-go v0.0.0-20260731153740-68483b6b3dd9/go.mod h1:mW0oTnam1/0WLTbhULbcPz9i5Y5kmNE83e9pRxDpA4Y=
 github.com/damonto/wwan-go v0.0.0-20260812150829-343eef16246d h1:9q8QG9xy8AzF5MJ5VtPnjcQ8ZKtnETceXEFWVdmT7/c=
 github.com/damonto/wwan-go v0.0.0-20260812150829-343eef16246d/go.mod h1:mW0oTnam1/0WLTbhULbcPz9i5Y5kmNE83e9pRxDpA4Y=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
