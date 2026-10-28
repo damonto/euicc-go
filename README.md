@@ -112,6 +112,13 @@ cd examples
 go run .
 ```
 
+By default, the example reads the EID and lists profiles. Use `-operation` to
+select `download`, `list-notifications`, `enable-profile`, `disable-profile`,
+`send-notification`, or `discovery`. For `send-notification`, pass the
+notification sequence number with `-sequence` (default `0`). Run `go run . -h`
+to see the available flags. Configure the modem path, ICCID, activation code,
+and IMEI in `examples/main.go` for your device.
+
 ## Choosing A Channel Driver
 
 All high-level LPA operations use a `driver.SmartCardChannel`. Select the

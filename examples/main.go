@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -16,14 +17,42 @@ import (
 )
 
 func main() {
+	operation := flag.String("operation", "info", "example to run: info, download, list-notifications, enable-profile, disable-profile, send-notification, discovery")
+	sequenceNumber := flag.Int64("sequence", 0, "notification sequence number for send-notification")
+	flag.Parse()
+
 	slog.SetLogLoggerLevel(slog.LevelDebug)
-	if err := run(); err != nil {
+	if err := run(*operation, sgp22.SequenceNumber(*sequenceNumber)); err != nil {
 		fmt.Fprintf(os.Stderr, "euicc example: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run() (err error) {
+func run(operation string, sequenceNumber sgp22.SequenceNumber) (err error) {
+	operations := map[string]func(*lpa.Client) error{
+		"info": func(client *lpa.Client) error {
+			if err := testEID(client); err != nil {
+				return err
+			}
+			return testListProfiles(client)
+		},
+		"download":           testDownload,
+		"list-notifications": testListNotifications,
+		"enable-profile":     testEnableProfile,
+		"disable-profile":    testDisableProfile,
+		"send-notification": func(client *lpa.Client) error {
+			return testSendNotification(client, sequenceNumber)
+		},
+		"discovery": testDiscovery,
+	}
+	runExample, ok := operations[operation]
+	if !ok {
+		return fmt.Errorf("unknown operation %q", operation)
+	}
+	if operation == "send-notification" && sequenceNumber < 0 {
+		return errors.New("notification sequence number must not be negative")
+	}
+
 	// ch, err := mbim.New(mbim.WithProxy("/dev/cdc-wdm0"), mbim.WithSlot(1), mbim.WithTimeout(30*time.Second))
 	// if err != nil {
 	// 	return fmt.Errorf("open MBIM channel: %w", err)
@@ -60,20 +89,7 @@ func run() (err error) {
 		err = errors.Join(err, client.Close())
 	}()
 
-	if err := testEID(client); err != nil {
-		return err
-	}
-
-	// if err := testDownload(client); err != nil {
-	// 	return err
-	// }
-
-	if err := testListProfiles(client); err != nil {
-		return err
-	}
-
-	// return testDiscovery(client)
-	return nil
+	return runExample(client)
 }
 
 func testEID(client *lpa.Client) error {
